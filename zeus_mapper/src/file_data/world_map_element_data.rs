@@ -11,7 +11,7 @@ use std::io::Cursor;
 use std::io::Read;
 use std::io::Write;
 
-#[derive(Debug, LogDifferences)]
+#[derive(Debug, Clone, Default, LogDifferences)]
 pub struct WorldMapElementData {
     pub variant: u8, // 0 = invisible / 1 = old_city / 2 = label ?
     pub data_a: [u8; 3],

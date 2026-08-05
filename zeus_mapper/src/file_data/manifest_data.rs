@@ -6,7 +6,7 @@ use std::io;
 use std::io::Read;
 use std::io::Write;
 
-#[derive(Debug, Clone, LogDifferences)]
+#[derive(Debug, Clone, Default, LogDifferences)]
 pub struct ManifestData {
     pub compressed: u32,
     pub address: u32,

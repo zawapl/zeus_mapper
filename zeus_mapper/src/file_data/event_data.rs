@@ -5,7 +5,7 @@ use std::io;
 use std::io::Read;
 use std::io::Write;
 
-#[derive(Debug, PartialEq, LogDifferences)]
+#[derive(Debug, PartialEq, Copy, Clone, Default, LogDifferences)]
 pub struct EventData {
     pub id: u16,
     pub event_type: u8,

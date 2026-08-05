@@ -25,6 +25,25 @@ impl Mythology {
             max_sanctuaries: mythology_data.max_sanctuaries as u8,
         };
     }
+
+    pub(crate) fn to_data(&self) -> MythologyData {
+        let mut mythology_data = MythologyData::default();
+
+        for (i, (god, sanctuary_allowed)) in self.proponent_gods.iter().take(12).enumerate() {
+            mythology_data.proponent_gods[i] = god.value();
+            if *sanctuary_allowed {
+                mythology_data.sanctuaries_allowed[i] = god.value() as u8;
+            }
+        }
+
+        for (i, god) in self.opponent_gods.iter().take(12).enumerate() {
+            mythology_data.opponent_gods[i] = god.value();
+        }
+
+        mythology_data.max_sanctuaries = self.max_sanctuaries as u32;
+
+        return mythology_data;
+    }
 }
 
 type SanctuaryAllowed = bool;

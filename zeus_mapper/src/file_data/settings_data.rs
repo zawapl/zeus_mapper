@@ -40,6 +40,10 @@ impl SettingsData {
     pub fn read_from(reader: &mut impl Read) -> io::Result<Self> {
         return ReadFrom::read_from(reader);
     }
+
+    pub fn write_to<W: Write>(&self, writer: &mut W) -> io::Result<usize> {
+        return WriteTo::write_to(self, writer);
+    }
 }
 
 impl ReadFrom for SettingsData {
@@ -76,7 +80,7 @@ impl ReadFrom for SettingsData {
 impl WriteTo for SettingsData {
     fn write_to<W: Write>(&self, writer: &mut W) -> io::Result<usize> {
         let new_file_ver = self.version_2 == 26;
-        let _end_position = if new_file_ver { 842_931 } else { 841_863 };
+        let end_position = if new_file_ver { 842_931 } else { 841_863 };
 
         let mut bytes = 0;
 
@@ -94,9 +98,37 @@ impl WriteTo for SettingsData {
         bytes += WriteTo::write_to(&self.data_length, writer)?;
         bytes += WriteTo::write_to(&self.field_9, writer)?;
         bytes += WriteTo::write_to(&self.map_data, writer)?;
-        bytes += WriteTo::write_to(&self.padding, writer)?;
+
+        // ignore content of the `padding` field, instead write the right amount of bytes
+        if bytes < end_position {
+            let filler = vec![0u8; end_position - bytes];
+            writer.write_all(&filler)?;
+            bytes += filler.len();
+        }
 
         return Ok(bytes);
+    }
+}
+
+impl Default for SettingsData {
+    fn default() -> Self {
+        return SettingsData {
+            version_1: 0,
+            version_2: 0,
+            parent_episodes: 0,
+            colony_episodes_used: 0,
+            colony_episodes_available: 0,
+            basic_episode_data: Default::default(),
+            real_episode_data: Default::default(),
+            field_4: [0; 37],
+            mythology: Default::default(),
+            events: vec![[EventData::default(); 150]; 14],
+            field_8: [0; 5],
+            data_length: 0,
+            field_9: [0; 4],
+            map_data: Default::default(),
+            padding: vec![],
+        };
     }
 }
 

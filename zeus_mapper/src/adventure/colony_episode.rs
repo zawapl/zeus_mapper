@@ -8,6 +8,7 @@ use crate::adventure::episode_goals::ResourceType;
 use crate::adventure::event::Event;
 use crate::adventure::mythology::Mythology;
 use crate::l10n::adventure_text::AdventureText;
+use crate::l10n::adventure_text::ColonyText;
 use crate::prelude::PakData;
 use my_macros::LogDifferences;
 
@@ -84,5 +85,14 @@ impl ColonyEpisode {
         result.shrink_to_fit();
 
         return result;
+    }
+
+    pub(crate) fn to_text(&self) -> ColonyText {
+        return ColonyText {
+            title: self.title.clone(),
+            introduction: self.introduction_text.clone(),
+            complete: self.complete_text.clone(),
+            selection: self.selection_text.clone(),
+        };
     }
 }

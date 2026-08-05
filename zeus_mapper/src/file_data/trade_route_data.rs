@@ -7,7 +7,7 @@ use std::io::Write;
 
 // count = 232
 // size = 324
-#[derive(Debug, LogDifferences)]
+#[derive(Debug, Copy, Clone, LogDifferences)]
 pub struct TradeRouteData {
     pub header: [u8; 8],
     pub points: [TradeRoutePointData; 50],
@@ -57,6 +57,20 @@ impl ReadFrom for TradeRouteData {
     }
 }
 
+impl Default for TradeRouteData {
+    fn default() -> Self {
+        return TradeRouteData {
+            header: [0; 8],
+            points: [TradeRoutePointData::default(); 50],
+            distance: [0; 12],
+            route_type: 0,
+            points_count: 0,
+            exists: 0,
+            unknown: 0,
+        };
+    }
+}
+
 impl WriteTo for TradeRouteData {
     fn write_to<W: Write>(&self, writer: &mut W) -> io::Result<usize> {
         let mut bytes = 0;
@@ -71,7 +85,7 @@ impl WriteTo for TradeRouteData {
     }
 }
 
-#[derive(Debug, LogDifferences)]
+#[derive(Debug, Copy, Clone, Default, LogDifferences)]
 pub struct TradeRoutePointData {
     pub x: u16,
     pub y: u16,

@@ -2,6 +2,7 @@ use encoding_rs::WINDOWS_1252;
 use std::collections::HashMap;
 use std::io;
 use std::io::Read;
+use std::io::Write;
 
 #[derive(Default)]
 pub struct AdventureText {
@@ -39,6 +40,41 @@ impl AdventureText {
             colony_text: extract_colony_text(&mut texts),
         });
     }
+
+    pub fn write_to<W: Write>(&self, writer: &mut W) -> io::Result<usize> {
+        let mut bytes = 0;
+
+        bytes += write_entry(writer, "Adventure_Title", &self.title)?;
+        bytes += write_entry(writer, "Adventure_Introduction", &self.introduction)?;
+        bytes += write_entry(writer, "Adventure_Complete", &self.complete)?;
+
+        for (i, episode) in self.episodes_text.iter().enumerate() {
+            let n = i + 1;
+            bytes += write_entry(writer, &format!("Parent_Episode_{n}_Title"), &episode.title)?;
+            bytes += write_entry(writer, &format!("Parent_Episode_{n}_Introduction"), &episode.introduction)?;
+            bytes += write_entry(writer, &format!("Parent_Episode_{n}_Complete"), &episode.complete)?;
+        }
+
+        for (i, colony) in self.colony_text.iter().enumerate() {
+            let n = i + 1;
+            bytes += write_entry(writer, &format!("Colony_{n}_Title"), &colony.title)?;
+            bytes += write_entry(writer, &format!("Colony_{n}_Introduction"), &colony.introduction)?;
+            bytes += write_entry(writer, &format!("Colony_{n}_Complete"), &colony.complete)?;
+            bytes += write_entry(writer, &format!("Colony_{n}_Selection"), &colony.selection)?;
+        }
+
+        return Ok(bytes);
+    }
+}
+
+fn write_entry<W: Write>(writer: &mut W, key: &str, value: &str) -> io::Result<usize> {
+    let escaped = value.replace("\n\t", "@P").replace('\n', "@L");
+    let line = format!("{key}=\"{escaped}\"\r\n");
+
+    let (encoded, _encoding, _errs) = WINDOWS_1252.encode(&line);
+    writer.write_all(&encoded)?;
+
+    return Ok(encoded.len());
 }
 
 fn to_map(reader: &mut impl Read) -> io::Result<HashMap<String, String>> {

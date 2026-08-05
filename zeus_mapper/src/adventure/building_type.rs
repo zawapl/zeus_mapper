@@ -70,4 +70,17 @@ impl BuildingType {
             .filter_map(|(i, _)| BuildingType::try_resolve(&(i as u16)))
             .collect();
     }
+
+    pub(crate) fn vec_to_data(buildings: &[BuildingType]) -> [u16; 100] {
+        let mut data = [0; 100];
+
+        for building in buildings {
+            let index = building.value() as usize;
+            if index < data.len() {
+                data[index] = 1;
+            }
+        }
+
+        return data;
+    }
 }

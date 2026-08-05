@@ -12,7 +12,7 @@ use std::io::Cursor;
 use std::io::Read;
 use std::io::Write;
 
-#[derive(Debug, LogDifferences)]
+#[derive(Debug, Clone, LogDifferences)]
 pub struct WorldLocationData {
     pub exists: u16,
     pub location_type: u8,
@@ -42,6 +42,40 @@ pub struct WorldLocationData {
     pub custom_leader_name: String,
     pub tail: Vec<u8>,
 }
+impl Default for WorldLocationData {
+    fn default() -> Self {
+        return WorldLocationData {
+            exists: 0,
+            location_type: 0,
+            unknown_3: [0; 94],
+            trade_quantities: [0; 36],
+            unknown_133: [0; 55],
+            buying: [0; 8],
+            selling: [0; 8],
+            variant: 0,
+            leader_name: 0,
+            attitude: 0,
+            economical_strength: 0,
+            military_strength: 0,
+            tribute: 0,
+            rec: 0,
+            pay: 0,
+            pay_resource: [0; 2],
+            unknown_240: [0; 116],
+            favour: 0,
+            unknown_360: [0; 8],
+            active: 0,
+            visible: 0,
+            unknown_376: [0; 100],
+            unknown_476: vec![],
+            trade_route_visible: 0,
+            custom_name: "".to_string(),
+            custom_leader_name: "".to_string(),
+            tail: vec![],
+        };
+    }
+}
+
 impl WorldLocationData {
     pub(crate) fn read_vec_from(reader: &mut impl Read, include_extras: bool) -> io::Result<Vec<Self>> {
         let mut result = Vec::with_capacity(22);

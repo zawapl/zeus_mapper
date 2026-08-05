@@ -60,6 +60,11 @@ impl MapData {
     pub fn read_from(reader: &mut impl Read) -> io::Result<Self> {
         return ReadFrom::read_from(reader);
     }
+
+    pub fn write_to<W: Write>(&self, writer: &mut W) -> io::Result<usize> {
+        return WriteTo::write_to(self, writer);
+    }
+
     pub(crate) fn read_maps<R: Read + Seek>(reader: &mut R, count: usize) -> io::Result<Vec<Self>> {
         let mut result = Vec::with_capacity(count);
 
@@ -188,13 +193,13 @@ impl Default for MapData {
         return MapData {
             version_1: 0,
             version_2: 0,
-            manifest: vec![],
+            manifest: vec![ManifestData::default(); 300],
             sprite: vec![0; 51984],
             root_offset: vec![0; 51984],
             terrain: vec![0; 51984],
             tile_size: vec![0; 51984],
             random: vec![0; 51984],
-            field_10: vec![],
+            field_10: vec![0; 51984],
             seed_1: 0,
             seed_2: 0,
             field_13: 0,
@@ -202,15 +207,15 @@ impl Default for MapData {
             scenario_data: Default::default(),
             meadow: vec![0; 51984],
             field_17: [0; 18628],
-            world_map_elements: vec![],
-            trade_routes: vec![],
-            field_20: vec![],
-            field_21: vec![],
+            world_map_elements: vec![WorldMapElementData::default(); 200],
+            trade_routes: vec![TradeRouteData::default(); 232],
+            field_20: vec![0; 51984],
+            field_21: vec![0; 36],
             prices: [0; 36],
-            scrub: vec![],
+            scrub: vec![0; 51984],
             elevation: vec![0; 51984],
-            elevation_rotation: vec![],
-            world_locations: vec![],
+            elevation_rotation: vec![0; 51984],
+            world_locations: vec![WorldLocationData::default(); 22],
             background_image: 0,
             field_28: vec![],
             mythology: Default::default(),

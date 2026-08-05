@@ -7,6 +7,7 @@ use crate::adventure::episode_goals::ResourceType;
 use crate::adventure::event::Event;
 use crate::adventure::mythology::Mythology;
 use crate::l10n::adventure_text::AdventureText;
+use crate::l10n::adventure_text::EpisodeText;
 use crate::prelude::DataConstant;
 use crate::prelude::PakData;
 use my_macros::LogDifferences;
@@ -72,5 +73,13 @@ impl ParentEpisode {
         }
 
         return result;
+    }
+
+    pub(crate) fn to_text(&self) -> EpisodeText {
+        return EpisodeText {
+            title: self.title.clone(),
+            introduction: self.introduction_text.clone(),
+            complete: self.complete_text.clone(),
+        };
     }
 }

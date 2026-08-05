@@ -7,7 +7,7 @@ use std::io::Read;
 use std::io::Seek;
 use std::io::Write;
 
-#[derive(Debug, LogDifferences)]
+#[derive(Debug, Default, LogDifferences)]
 pub struct PakData {
     pub settings_data: SettingsData,
     pub map_data: Vec<MapData>,
@@ -18,6 +18,10 @@ impl PakData {
         let settings_data = SettingsData::read_from(reader)?;
         let map_data = MapData::read_maps(reader, 1 + settings_data.colony_episodes_available as usize)?;
         return Ok(PakData { settings_data, map_data });
+    }
+
+    pub fn write_to<W: Write>(&self, writer: &mut W) -> io::Result<usize> {
+        return WriteTo::write_to(self, writer);
     }
 }
 

@@ -38,8 +38,51 @@ impl CityMap {
             wolf_spawn: zip_positions(&map_data.scenario_data.wolf_x, &map_data.scenario_data.wolf_y),
         };
     }
+
+    pub fn to_map_data(&self) -> MapData {
+        let mut map_data = MapData::default();
+
+        map_data.version_2 = 33;
+
+        map_data.scenario_data.map_size = self.map_size;
+        map_data.scenario_data.tropical = if self.tropical { 1 } else { 0 };
+        map_data.sprite = self.sprite.clone();
+        map_data.root_offset = self.root_offset.clone();
+        map_data.terrain = self.terrain.clone();
+        map_data.tile_size = self.tile_size.clone();
+        map_data.random = self.random.clone();
+        map_data.meadow = self.meadow.clone();
+        map_data.scrub = self.scrub.clone();
+        map_data.elevation = self.elevation.clone();
+        map_data.scenario_data.entry_x = self.entry_point.0;
+        map_data.scenario_data.entry_y = self.entry_point.1;
+        map_data.scenario_data.exit_x = self.exit_point.0;
+        map_data.scenario_data.exit_y = self.exit_point.1;
+
+        let (fish_x, fish_y) = unzip_positions(&self.fishing_spots);
+        map_data.scenario_data.fish_x = fish_x;
+        map_data.scenario_data.fish_y = fish_y;
+
+        let (wolf_x, wolf_y) = unzip_positions(&self.wolf_spawn);
+        map_data.scenario_data.wolf_x = wolf_x;
+        map_data.scenario_data.wolf_y = wolf_y;
+
+        return map_data;
+    }
 }
 
 fn zip_positions<const N: usize>(a: &[u16; N], b: &[u16; N]) -> Vec<(u16, u16)> {
     return a.iter().zip(b).map(|(&x, &y)| (x, y)).collect();
+}
+
+fn unzip_positions<const N: usize>(positions: &[(u16, u16)]) -> ([u16; N], [u16; N]) {
+    let mut x = [0u16; N];
+    let mut y = [0u16; N];
+
+    for (i, &(px, py)) in positions.iter().take(N).enumerate() {
+        x[i] = px;
+        y[i] = py;
+    }
+
+    return (x, y);
 }
