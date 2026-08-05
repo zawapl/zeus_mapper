@@ -1,0 +1,16 @@
+[package]
+name = "zeus_mapper"
+version = "0.1.0"
+authors = ["Jakub Zawadzki <kuba.zaw@gmail.com>"]
+edition = "2024"
+license = "MIT"
+
+[dependencies]
+explode = "0.1.2"
+pklib = "0.2.0"
+encoding_rs = "0.8.35"
+my_macros = { path = "../my_macros" }
+regex = "1.12.2"
+
+[dev-dependencies]
+image = "0.25.2"

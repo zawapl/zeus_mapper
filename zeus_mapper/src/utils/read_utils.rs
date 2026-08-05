@@ -1,0 +1,136 @@
+use encoding_rs::WINDOWS_1252;
+use std::io;
+use std::io::Error;
+use std::io::ErrorKind;
+use std::io::Read;
+use std::io::Seek;
+use std::io::SeekFrom;
+
+pub trait ReadFrom: Sized {
+    fn read_from(reader: &mut impl Read) -> io::Result<Self>;
+}
+
+impl ReadFrom for u8 {
+    fn read_from(reader: &mut impl Read) -> io::Result<Self> {
+        let mut tmp = [0; 1];
+        reader.read_exact(&mut tmp)?;
+        return Ok(tmp[0]);
+    }
+}
+
+impl ReadFrom for u16 {
+    fn read_from(reader: &mut impl Read) -> io::Result<Self> {
+        let mut tmp = [0; 2];
+        reader.read_exact(&mut tmp)?;
+        return Ok(u16::from_le_bytes(tmp));
+    }
+}
+
+impl ReadFrom for i16 {
+    fn read_from(reader: &mut impl Read) -> io::Result<Self> {
+        let mut tmp = [0; 2];
+        reader.read_exact(&mut tmp)?;
+        return Ok(i16::from_le_bytes(tmp));
+    }
+}
+
+impl ReadFrom for u32 {
+    fn read_from(reader: &mut impl Read) -> io::Result<Self> {
+        let mut tmp = [0; 4];
+        reader.read_exact(&mut tmp)?;
+        return Ok(u32::from_le_bytes(tmp));
+    }
+}
+
+impl ReadFrom for i32 {
+    fn read_from(reader: &mut impl Read) -> io::Result<Self> {
+        let mut tmp = [0; 4];
+        reader.read_exact(&mut tmp)?;
+        return Ok(i32::from_le_bytes(tmp));
+    }
+}
+
+impl<T: ReadFrom, const N: usize> ReadFrom for [T; N] {
+    // todo Use MaybeUninit with array transposing once stable: https://github.com/rust-lang/rust/issues/96097
+    fn read_from(reader: &mut impl Read) -> io::Result<Self> {
+        let vec: Vec<T> = read_vec_from(reader, N)?;
+        return vec.try_into().map_err(|_| Error::from(ErrorKind::InvalidData));
+    }
+}
+
+pub fn read_string_from(reader: &mut impl Read, bytes: usize) -> io::Result<String> {
+    let mut buffer = vec![0; bytes];
+
+    reader.read_exact(&mut buffer)?;
+
+    // todo this may need to vary depending on language, PL seems to be WINDOWS_1250 for example, or maybe all of them are?
+    let (cow, _) = WINDOWS_1252.decode_with_bom_removal(buffer.as_slice());
+
+    let result = cow.trim_end_matches(char::from(0)).to_owned();
+
+    return Ok(result);
+}
+
+pub fn read_string_nul_from<R: Read + Seek>(reader: &mut R) -> io::Result<String> {
+    let mut bytes = Vec::new();
+
+    loop {
+        let mut buffer = [0];
+        reader.read_exact(&mut buffer)?;
+
+        if buffer == [0] {
+            // String might be terminated with multiple nul chars, read them all
+            loop {
+                let mut buffer = [0];
+                let count = reader.read(&mut buffer)?;
+                if count == 0 || buffer != [0] {
+                    break;
+                }
+            }
+            reader.seek(SeekFrom::Current(-1))?;
+            break;
+        } else {
+            bytes.push(buffer[0]);
+        }
+    }
+
+    // todo this may need to vary depending on language, PL seems to be WINDOWS_1250 for example, or maybe all of them are?
+    let (cow, _) = WINDOWS_1252.decode_with_bom_removal(bytes.as_slice());
+
+    let result = cow.trim_end_matches(char::from(0)).to_owned();
+
+    return Ok(result);
+}
+
+pub fn read_vec_from<T: ReadFrom>(reader: &mut impl Read, count: usize) -> io::Result<Vec<T>> {
+    let mut result = Vec::with_capacity(count);
+
+    for _ in 0..count {
+        result.push(T::read_from(reader)?);
+    }
+
+    return Ok(result);
+}
+
+pub fn read_compressed_vec_from<T: ReadFrom>(reader: &mut impl Read, count: usize) -> io::Result<Vec<T>> {
+    let compressed_size = i32::read_from(reader)?;
+
+    if compressed_size < 0 {
+        return read_vec_from(reader, count);
+    } else {
+        let mut explode_reader = explode::ExplodeReader::new(reader);
+        return read_vec_from(&mut explode_reader, count);
+    };
+}
+
+pub fn read_bytes_to_end(reader: &mut impl Read) -> io::Result<Vec<u8>> {
+    let mut buf = vec![];
+    reader.read_to_end(&mut buf)?;
+    return Ok(buf);
+}
+pub fn to_usize<T>(value: T) -> io::Result<usize>
+where
+    usize: TryFrom<T>,
+{
+    usize::try_from(value).map_err(|_| Error::new(ErrorKind::InvalidInput, "Failed to convert value to usize."))
+}

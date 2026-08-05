@@ -1,0 +1,13 @@
+[package]
+name = "my_macros"
+version = "0.1.0"
+authors = ["Jakub Zawadzki <kuba.zaw@gmail.com>"]
+edition = "2024"
+license = "MIT"
+
+[lib]
+proc-macro = true
+
+[dependencies]
+syn = "2.0"
+quote = "1.0"

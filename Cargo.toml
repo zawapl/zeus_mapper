@@ -1,0 +1,3 @@
+[workspace]
+members = ["zeus_mapper", "my_macros"]
+resolver = "3"
