@@ -6,10 +6,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 `zeus_mapper` is a Rust library (plus `my_macros`, a proc-macro helper crate) for reading and writing the binary
 save/scenario file formats used by the 2000 city-builder game **Zeus: Master of Olympus** (and its expansion
-Poseidon): `.pak`, `.set`, `.map`, `.sav` files. The formats were reverse-engineered by hex-editing game files; see
-`zeus_mapper/notes.md` (raw research notes) and `zeus_mapper/data_bjects.md` (cleaned-up field/offset reference) for
-the format documentation this code implements. Fields whose purpose is still unknown are named `field_N` or
-`unknown`.
+Poseidon): `.pak`, `.set`, `.map`, `.sav` files. The formats were reverse-engineered by hex-editing game files.
+Fields whose purpose is still unknown are named `field_N` or `unknown`.
 
 ## Build / test / lint
 
@@ -46,15 +44,13 @@ The codebase is a layered pipeline, low-level binary parsing at the bottom, a fr
    generally implement `read_from` by delegating field-by-field to `ReadFrom::read_from`, so field declaration order
    in the struct **is** the file layout — reordering fields breaks parsing.
 
-2. **`file_data/`** — one struct per binary record type, mirroring the file layout described in `notes.md` /
-   `data_bjects.md` almost 1:1 (`PakData`, `SettingsData`, `MapData`, `RealEpisodeData`, `MythologyData`,
-   `EventData`, `ManifestData`, `WorldLocationData`, `WorldMapElementData`, `TradeRouteData`, `PyramidData`,
-   `BasicEpisodeData`). `PakData::read_from` composes `SettingsData` (the `.set` portion) followed by N `MapData`
-   blocks (the `.map` portions, delimited by a `"MAPS"` header) — this is how a `.pak` file is actually a
-   concatenation of a `.set` file and one-or-more `.map` files (see `data_bjects.md` for the historical reasoning).
-   Several formats are manifest-driven: a `ManifestData` entry's `size`/`count` determines whether optional trailing
-   fields are present (e.g. `include_custom_names`, `include_pyramids` in `map_data.rs`) — read and write logic must
-   stay in sync on these conditionals.
+2. **`file_data/`** — one struct per binary record type (`PakData`, `SettingsData`, `MapData`, `RealEpisodeData`,
+   `MythologyData`, `EventData`, `ManifestData`, `WorldLocationData`, `WorldMapElementData`, `TradeRouteData`,
+   `PyramidData`, `BasicEpisodeData`). `PakData::read_from` composes `SettingsData` (the `.set` portion) followed by
+   N `MapData` blocks (the `.map` portions, delimited by a `"MAPS"` header) — this is how a `.pak` file is actually a
+   concatenation of a `.set` file and one-or-more `.map` files. Several formats are manifest-driven: a `ManifestData`
+   entry's `size`/`count` determines whether optional trailing fields are present (e.g. `include_custom_names`,
+   `include_pyramids` in `map_data.rs`) — read and write logic must stay in sync on these conditionals.
 
 3. **`constants/`** — `data_constants!` (in `data_constant.rs`) is a macro that generates a C-like enum plus a
    `DataConstant` trait impl (`try_resolve` from a primitive, `value()` back to primitive, `values()`). Used for
@@ -130,8 +126,6 @@ The codebase is a layered pipeline, low-level binary parsing at the bottom, a fr
 - Struct field order is load-bearing: it defines binary layout for both reading and writing. When adding a field,
   place it in the correct byte-offset position, not just appended.
 - When a field's meaning is unknown, keep the `field_N`/`unknown` naming convention rather than guessing a name.
-- Cross-check any offset/size changes against `zeus_mapper/data_bjects.md` and update that doc if you resolve a
-  previously-unknown field.
 - Read and write paths for a struct must stay symmetric (same manifest-driven conditionals, same compression calls)
   — a round-trip (`read_from` → `write_to` → `read_from`) should reproduce the original data, which is exactly what
   the `LogDifferences` derive is for when validating changes.

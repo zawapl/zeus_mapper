@@ -5,6 +5,9 @@ authors = ["Jakub Zawadzki <kuba.zaw@gmail.com>"]
 edition = "2024"
 license = "MIT"
 
+[lints]
+workspace = true
+
 [lib]
 proc-macro = true
 

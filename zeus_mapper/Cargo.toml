@@ -5,6 +5,9 @@ authors = ["Jakub Zawadzki <kuba.zaw@gmail.com>"]
 edition = "2024"
 license = "MIT"
 
+[lints]
+workspace = true
+
 [dependencies]
 explode = "0.1.2"
 # pklib = "0.2.0" - has issue with compressing the data, using forked version with a fix for now
