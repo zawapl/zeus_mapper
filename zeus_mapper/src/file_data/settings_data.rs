@@ -3,9 +3,9 @@ use crate::file_data::event_data::EventData;
 use crate::file_data::map_data::MapData;
 use crate::file_data::mythology_data::MythologyData;
 use crate::file_data::real_episode_data::RealEpisodeData;
+use crate::utils::boxed_array::BoxedArray;
 use crate::utils::read_utils::ReadFrom;
 use crate::utils::read_utils::read_bytes_to_end;
-use crate::utils::read_utils::read_vec_from;
 use crate::utils::write_utils::WriteTo;
 use my_macros::LogDifferences;
 use std::io;
@@ -14,7 +14,7 @@ use std::io::ErrorKind;
 use std::io::Read;
 use std::io::Write;
 
-#[derive(Debug, LogDifferences)]
+#[derive(Debug, Default, LogDifferences)]
 pub struct SettingsData {
     pub version_1: u32,
     pub version_2: u32,
@@ -23,21 +23,21 @@ pub struct SettingsData {
     pub colony_episodes_available: u32,
     pub basic_episode_data: [BasicEpisodeData; 20],
     pub real_episode_data: [RealEpisodeData; 14],
-    pub field_4: [u32; 37],
+    pub field_4: BoxedArray<u32, 37>,
     // Odyssey changes:
     //  set_file.field_4[010]: difference detected: 5 vs 6 = when bitmap changed from 7 to 2
     pub mythology: [MythologyData; 14], // 300 or 224
-    pub events: Vec<[EventData; 150]>,
+    pub events: BoxedArray<BoxedArray<EventData, 150>, 14>,
     pub field_8: [u8; 5],
     pub data_length: u32,
     pub field_9: [u32; 4],
     pub map_data: MapData,
     pub padding: Vec<u8>,
-    pub events_per_episode: [u8; 43],
-    pub unused_blocks: [u8; 31_693], // "10 different blocks of data, all apparently never used" per notes.md
+    pub events_per_episode: BoxedArray<u8, 43>,
+    pub unused_blocks: BoxedArray<u8, 31_693>, // "10 different blocks of data, all apparently never used" per notes.md
     pub parent_city_favor: [u32; 10],
-    pub colony_goals: [u8; 4394],
-    pub parent_city_goals: [u8; 1840],
+    pub colony_goals: BoxedArray<u8, 4394>,
+    pub parent_city_goals: BoxedArray<u8, 1840>,
     pub field_10: Vec<u8>,
     // Odyssey changes:
     // set_file.field_11[431281]: difference detected: 7 vs 2 = bitmap id
@@ -79,7 +79,7 @@ impl ReadFrom for SettingsData {
             real_episode_data: ReadFrom::read_from(&mut map_data_reader)?,
             field_4: ReadFrom::read_from(&mut map_data_reader)?,
             mythology: MythologyData::read_arr_from(&mut map_data_reader, new_file_ver)?,
-            events: read_vec_from(&mut map_data_reader, 14)?,
+            events: ReadFrom::read_from(&mut map_data_reader)?,
             field_8: ReadFrom::read_from(&mut map_data_reader)?,
             data_length: ReadFrom::read_from(&mut map_data_reader)?,
             field_9: ReadFrom::read_from(&mut map_data_reader)?,
@@ -141,34 +141,6 @@ impl WriteTo for SettingsData {
         }
 
         return Ok(bytes);
-    }
-}
-
-impl Default for SettingsData {
-    fn default() -> Self {
-        return SettingsData {
-            version_1: 0,
-            version_2: 0,
-            parent_episodes: 0,
-            colony_episodes_used: 0,
-            colony_episodes_available: 0,
-            basic_episode_data: Default::default(),
-            real_episode_data: Default::default(),
-            field_4: [0; 37],
-            mythology: Default::default(),
-            events: vec![[EventData::default(); 150]; 14],
-            field_8: [0; 5],
-            data_length: 0,
-            field_9: [0; 4],
-            map_data: Default::default(),
-            padding: vec![],
-            events_per_episode: [0; 43],
-            unused_blocks: [0; 31_693],
-            parent_city_favor: [0; 10],
-            colony_goals: [0; 4394],
-            parent_city_goals: [0; 1840],
-            field_10: vec![],
-        };
     }
 }
 

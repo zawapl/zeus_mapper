@@ -1,5 +1,6 @@
 use crate::constants::data_constant::data_constants;
 use crate::prelude::DataConstant;
+use crate::utils::boxed_array::BoxedArray;
 
 data_constants!(BuildingType<u16> {
     Mint = 1,
@@ -71,7 +72,7 @@ impl BuildingType {
             .collect();
     }
 
-    pub(crate) fn vec_to_data(buildings: &[BuildingType]) -> [u16; 100] {
+    pub(crate) fn vec_to_data(buildings: &[BuildingType]) -> BoxedArray<u16, 100> {
         let mut data = [0; 100];
 
         for building in buildings {
@@ -81,6 +82,6 @@ impl BuildingType {
             }
         }
 
-        return data;
+        return BoxedArray::from_vec(data.to_vec());
     }
 }

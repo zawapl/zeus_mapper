@@ -1,4 +1,5 @@
 use crate::file_data::pyramid_data::PyramidData;
+use crate::utils::boxed_array::BoxedArray;
 use crate::utils::read_utils::ReadFrom;
 use crate::utils::read_utils::read_vec_from;
 use crate::utils::write_utils::WriteTo;
@@ -9,12 +10,12 @@ use std::io::ErrorKind;
 use std::io::Read;
 use std::io::Write;
 
-#[derive(Debug, LogDifferences)]
+#[derive(Debug, Default, LogDifferences)]
 pub struct MythologyData {
     pub opponent_gods: [u32; 12],
     pub proponent_gods: [u32; 12],
     pub monster: u32,
-    pub field_4: [u8; 96],
+    pub field_4: BoxedArray<u8, 96>,
     pub field_5: [u8; 12],
     pub sanctuaries_allowed: [u8; 12],
     pub max_sanctuaries: u32,
@@ -80,21 +81,5 @@ impl MythologyData {
         }
 
         return Ok(bytes);
-    }
-}
-
-impl Default for MythologyData {
-    fn default() -> Self {
-        return MythologyData {
-            opponent_gods: [0; 12],
-            proponent_gods: [0; 12],
-            monster: 0,
-            field_4: [0; 96],
-            field_5: [0; 12],
-            sanctuaries_allowed: [0; 12],
-            max_sanctuaries: 0,
-            max_pyramids: 0,
-            pyramids: vec![],
-        };
     }
 }

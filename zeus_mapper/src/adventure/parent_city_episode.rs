@@ -58,7 +58,7 @@ impl ParentEpisode {
                     .unwrap_or(NextEpisode::Victory),
                 panhellenic_games: pak_data.settings_data.real_episode_data[i].panhellenic_games == 0,
                 mythology: Mythology::from_data(&pak_data.settings_data.mythology[i]),
-                building_allowed: BuildingType::vec_from_data(&pak_data.settings_data.real_episode_data[i].building_flags),
+                building_allowed: BuildingType::vec_from_data(pak_data.settings_data.real_episode_data[i].building_flags.as_slice()),
                 episode_goals: vec![],
                 events: vec![],
                 city_resources: vec![],

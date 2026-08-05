@@ -99,22 +99,22 @@ pub(crate) fn write_compressed<T: WriteTo, W: Write>(data: &T, writer: &mut W) -
 
 #[cfg(test)]
 mod tests {
-    use crate::utils::read_utils::read_compressed_vec_from;
+    use crate::utils::boxed_array::BoxedArray;
+    use crate::utils::read_utils::read_compressed_boxed_array_from;
     use crate::utils::write_utils::write_compressed;
     use std::io::Cursor;
 
-    #[ignore]
     #[test]
     fn compress_decompress() {
-        let data: Vec<u16> = vec![1; 51984];
+        let data: BoxedArray<u16, 51984> = BoxedArray::from_vec(vec![1; 51984]);
 
         let compressed = vec![];
         let mut data_writer = Cursor::new(compressed);
         write_compressed(&data, &mut data_writer).unwrap();
 
         let mut data_reader = Cursor::new(data_writer.into_inner());
-        let reconstructed = read_compressed_vec_from(&mut data_reader, data.len()).unwrap();
+        let reconstructed: BoxedArray<u16, 51984> = read_compressed_boxed_array_from(&mut data_reader).unwrap();
 
-        assert_eq!(data, reconstructed);
+        assert_eq!(*data, *reconstructed);
     }
 }

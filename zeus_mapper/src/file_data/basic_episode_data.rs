@@ -1,3 +1,4 @@
+use crate::utils::boxed_array::BoxedArray;
 use crate::utils::read_utils::ReadFrom;
 use crate::utils::read_utils::read_string_from;
 use crate::utils::write_utils::WriteTo;
@@ -7,7 +8,7 @@ use std::io;
 use std::io::Read;
 use std::io::Write;
 
-#[derive(Debug, LogDifferences)]
+#[derive(Debug, Default, LogDifferences)]
 pub struct BasicEpisodeData {
     pub exists: u32,
     pub field_2: u32,
@@ -15,7 +16,7 @@ pub struct BasicEpisodeData {
     pub episode_no: u32,
     pub field_5: u32,
     pub field_6: u32,
-    pub field_7: [u8; 60],
+    pub field_7: BoxedArray<u8, 60>,
     pub next_episode: u32,
     pub episode_type: u32,
     pub name_padding: u8,
@@ -57,23 +58,5 @@ impl WriteTo for BasicEpisodeData {
         bytes += write_string_to(&self.name, writer, 263)?;
 
         return Ok(bytes);
-    }
-}
-
-impl Default for BasicEpisodeData {
-    fn default() -> Self {
-        return BasicEpisodeData {
-            exists: 0,
-            field_2: 0,
-            field_3: 0,
-            episode_no: 0,
-            field_5: 0,
-            field_6: 0,
-            field_7: [0; 60],
-            next_episode: 0,
-            episode_type: 0,
-            name_padding: 0,
-            name: "".to_string(),
-        };
     }
 }

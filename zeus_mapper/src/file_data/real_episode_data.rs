@@ -1,4 +1,5 @@
 use crate::file_data::basic_episode_data::BasicEpisodeData;
+use crate::utils::boxed_array::BoxedArray;
 use crate::utils::read_utils::ReadFrom;
 use crate::utils::read_utils::read_string_from;
 use crate::utils::write_utils::WriteTo;
@@ -7,7 +8,7 @@ use my_macros::LogDifferences;
 use std::io::Read;
 use std::io::Write;
 
-#[derive(Debug, LogDifferences)]
+#[derive(Debug, Default, LogDifferences)]
 pub struct RealEpisodeData {
     pub start_date: i16,
     pub field_2: [u8; 8],
@@ -33,7 +34,7 @@ pub struct RealEpisodeData {
     pub colonies_done: u16,
     pub deer_x: [u16; 4],
     pub deer_y: [u16; 4],
-    pub field_24: [u8; 76],
+    pub field_24: BoxedArray<u8, 76>,
     pub earthquake_area: [u16; 2],
     pub entry_x: u16,
     pub entry_y: u16,
@@ -45,17 +46,17 @@ pub struct RealEpisodeData {
     pub river_entry_y: u16,
     pub river_exit_x: u16,
     pub river_exit_y: u16,
-    pub field_36: [u8; 40],
+    pub field_36: BoxedArray<u8, 40>,
     pub tropical: u32,
     pub boar_x: [u16; 8],
     pub boar_y: [u16; 8],
-    pub building_flags: [u16; 100],
+    pub building_flags: BoxedArray<u16, 100>,
     pub field_41: [u8; 16],
     pub monster_x: [u32; 3],
     pub monster_y: [u32; 3],
     pub disembark_x: [u16; 6],
     pub disembark_y: [u16; 6],
-    pub field_46: [u8; 276],
+    pub field_46: BoxedArray<u8, 276>,
     pub landslide_x: [u16; 6],
     pub landslide_y: [u16; 6],
     pub field_49: [u8; 8],
@@ -65,7 +66,7 @@ pub struct RealEpisodeData {
     pub field_53: [u8; 2],
     pub city_resources_sold: [u8; 4],
     pub field_55: [u8; 2],
-    pub city_resources_quantity: [u8; 40],
+    pub city_resources_quantity: BoxedArray<u8, 40>,
 }
 
 impl ReadFrom for RealEpisodeData {
@@ -195,69 +196,5 @@ impl WriteTo for RealEpisodeData {
         bytes += WriteTo::write_to(&self.city_resources_quantity, writer)?;
 
         return Ok(bytes);
-    }
-}
-
-impl Default for RealEpisodeData {
-    fn default() -> Self {
-        return RealEpisodeData {
-            start_date: 0,
-            field_2: [0; 8],
-            months_elapsed: 0,
-            field_4: [0; 20],
-            starting_cash: 0,
-            field_6: [0; 8],
-            map_size: 0,
-            field_8: [0; 12],
-            text_buffer_1: "".to_string(),
-            text_buffer_2: "".to_string(),
-            civilization: 0,
-            wolf_x: [0; 4],
-            wolf_y: [0; 4],
-            fish_x: [0; 8],
-            fish_y: [0; 8],
-            urchin_x: [0; 8],
-            urchin_y: [0; 8],
-            field_17: [0; 12],
-            invasion_x: [0; 16],
-            invasion_y: [0; 16],
-            panhellenic_games: 0,
-            colonies_done: 0,
-            deer_x: [0; 4],
-            deer_y: [0; 4],
-            field_24: [0; 76],
-            earthquake_area: [0; 2],
-            entry_x: 0,
-            entry_y: 0,
-            exit_x: 0,
-            exit_y: 0,
-            disaster_x: [0; 8],
-            disaster_y: [0; 8],
-            river_entry_x: 0,
-            river_entry_y: 0,
-            river_exit_x: 0,
-            river_exit_y: 0,
-            field_36: [0; 40],
-            tropical: 0,
-            boar_x: [0; 8],
-            boar_y: [0; 8],
-            building_flags: [0; 100],
-            field_41: [0; 16],
-            monster_x: [0; 3],
-            monster_y: [0; 3],
-            disembark_x: [0; 6],
-            disembark_y: [0; 6],
-            field_46: [0; 276],
-            landslide_x: [0; 6],
-            landslide_y: [0; 6],
-            field_49: [0; 8],
-            basic_episode_data: Default::default(),
-            city_resources: [0; 20],
-            city_resources_bought: [0; 4],
-            field_53: [0; 2],
-            city_resources_sold: [0; 4],
-            field_55: [0; 2],
-            city_resources_quantity: [0; 40],
-        };
     }
 }

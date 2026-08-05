@@ -1,3 +1,4 @@
+pub(crate) mod boxed_array;
 pub(crate) mod read_utils;
 pub(crate) mod write_utils;
 

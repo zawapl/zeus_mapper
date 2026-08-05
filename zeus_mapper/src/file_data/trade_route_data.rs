@@ -1,3 +1,4 @@
+use crate::utils::boxed_array::BoxedArray;
 use crate::utils::read_utils::ReadFrom;
 use crate::utils::write_utils::WriteTo;
 use my_macros::LogDifferences;
@@ -7,10 +8,10 @@ use std::io::Write;
 
 // count = 232
 // size = 324
-#[derive(Debug, Copy, Clone, LogDifferences)]
+#[derive(Debug, Clone, Default, LogDifferences)]
 pub struct TradeRouteData {
     pub header: [u8; 8],
-    pub points: [TradeRoutePointData; 50],
+    pub points: BoxedArray<TradeRoutePointData, 50>,
     pub distance: [u8; 12],
     pub route_type: u8,
     pub points_count: u8,
@@ -22,7 +23,7 @@ pub struct TradeRouteData {
 // @322 = exists?
 
 impl TradeRouteData {
-    pub(crate) fn read_vec_from(reader: &mut impl Read) -> io::Result<Vec<Self>> {
+    pub(crate) fn read_arr_from(reader: &mut impl Read) -> io::Result<BoxedArray<Self, 232>> {
         let mut result = Vec::with_capacity(232);
 
         let compressed_size = i32::read_from(reader)?;
@@ -39,7 +40,7 @@ impl TradeRouteData {
             }
         }
 
-        return Ok(result);
+        return Ok(BoxedArray::from_vec(result));
     }
 }
 
@@ -54,20 +55,6 @@ impl ReadFrom for TradeRouteData {
             exists: ReadFrom::read_from(reader)?,
             unknown: ReadFrom::read_from(reader)?,
         });
-    }
-}
-
-impl Default for TradeRouteData {
-    fn default() -> Self {
-        return TradeRouteData {
-            header: [0; 8],
-            points: [TradeRoutePointData::default(); 50],
-            distance: [0; 12],
-            route_type: 0,
-            points_count: 0,
-            exists: 0,
-            unknown: 0,
-        };
     }
 }
 

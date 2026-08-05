@@ -5,9 +5,9 @@ use crate::file_data::real_episode_data::RealEpisodeData;
 use crate::file_data::trade_route_data::TradeRouteData;
 use crate::file_data::world_location_data::WorldLocationData;
 use crate::file_data::world_map_element_data::WorldMapElementData;
+use crate::utils::boxed_array::BoxedArray;
 use crate::utils::read_utils::ReadFrom;
-use crate::utils::read_utils::read_compressed_vec_from;
-use crate::utils::read_utils::read_vec_from;
+use crate::utils::read_utils::read_compressed_boxed_array_from;
 use crate::utils::write_utils::WriteTo;
 use crate::utils::write_utils::write_compressed;
 use crate::utils::write_utils::write_string_to;
@@ -20,40 +20,40 @@ use std::io::Seek;
 use std::io::SeekFrom;
 use std::io::Write;
 
-#[derive(Debug, LogDifferences)]
+#[derive(Debug, Default, LogDifferences)]
 pub struct MapData {
     pub version_1: u32,
     pub version_2: u32,
-    pub manifest: Vec<ManifestData>,
-    pub sprite: Vec<u32>,
-    pub root_offset: Vec<u8>,
-    pub terrain: Vec<u32>,
-    pub tile_size: Vec<u8>,
-    pub random: Vec<u8>,
-    pub field_10: Vec<u8>,
+    pub manifest: BoxedArray<ManifestData, 300>,
+    pub sprite: BoxedArray<u32, 51984>,
+    pub root_offset: BoxedArray<u8, 51984>,
+    pub terrain: BoxedArray<u32, 51984>,
+    pub tile_size: BoxedArray<u8, 51984>,
+    pub random: BoxedArray<u8, 51984>,
+    pub field_10: BoxedArray<u8, 51984>,
     pub seed_1: u32,
     pub seed_2: u32,
     pub field_13: u32,
     pub field_14: u32,
     pub scenario_data: RealEpisodeData,
-    pub meadow: Vec<u8>,
-    pub field_17: [u8; 18628],
-    pub world_map_elements: Vec<WorldMapElementData>,
-    pub trade_routes: Vec<TradeRouteData>,
-    pub field_20: Vec<u8>,
-    pub field_21: Vec<u8>,
-    pub prices: [u32; 36],
-    pub scrub: Vec<u8>,
-    pub elevation: Vec<u8>,
-    pub elevation_rotation: Vec<u8>,
-    pub world_locations: Vec<WorldLocationData>,
+    pub meadow: BoxedArray<u8, 51984>,
+    pub field_17: BoxedArray<u8, 18628>,
+    pub world_map_elements: BoxedArray<WorldMapElementData, 200>,
+    pub trade_routes: BoxedArray<TradeRouteData, 232>,
+    pub field_20: BoxedArray<u8, 51984>,
+    pub field_21: BoxedArray<u8, 36>,
+    pub prices: BoxedArray<u32, 36>,
+    pub scrub: BoxedArray<u8, 51984>,
+    pub elevation: BoxedArray<u8, 51984>,
+    pub elevation_rotation: BoxedArray<u8, 51984>,
+    pub world_locations: BoxedArray<WorldLocationData, 22>,
     pub background_image: u32,
     pub field_28: Vec<Vec<u8>>,
     pub mythology: MythologyData,
-    pub field_30: [[u8; 76]; 6],
+    pub field_30: [BoxedArray<u8, 76>; 6],
     pub field_31: u32,
     pub field_32: u32,
-    pub field_33: [[u8; 36]; 10],
+    pub field_33: [BoxedArray<u8, 36>; 10],
 }
 
 impl MapData {
@@ -99,7 +99,7 @@ impl ReadFrom for MapData {
         let version_1 = ReadFrom::read_from(reader)?;
         let version_2 = ReadFrom::read_from(reader)?;
 
-        let manifest: Vec<ManifestData> = read_vec_from(reader, 300)?;
+        let manifest: BoxedArray<ManifestData, 300> = ReadFrom::read_from(reader)?;
         let include_custom_names = manifest[17].size == 72;
         let include_world_locations_extras = manifest[25].size == 572;
         let manifest_field_28 = manifest[27].clone();
@@ -109,28 +109,28 @@ impl ReadFrom for MapData {
             version_1,
             version_2,
             manifest,
-            sprite: read_compressed_vec_from(reader, 51984)?,
-            root_offset: read_compressed_vec_from(reader, 51984)?,
-            terrain: read_compressed_vec_from(reader, 51984)?,
-            tile_size: read_compressed_vec_from(reader, 51984)?,
-            random: read_compressed_vec_from(reader, 51984)?,
-            field_10: read_compressed_vec_from(reader, 51984)?,
+            sprite: read_compressed_boxed_array_from(reader)?,
+            root_offset: read_compressed_boxed_array_from(reader)?,
+            terrain: read_compressed_boxed_array_from(reader)?,
+            tile_size: read_compressed_boxed_array_from(reader)?,
+            random: read_compressed_boxed_array_from(reader)?,
+            field_10: read_compressed_boxed_array_from(reader)?,
             seed_1: ReadFrom::read_from(reader)?,
             seed_2: ReadFrom::read_from(reader)?,
             field_13: ReadFrom::read_from(reader)?,
             field_14: ReadFrom::read_from(reader)?,
             scenario_data: ReadFrom::read_from(reader)?,
-            meadow: read_compressed_vec_from(reader, 51984)?,
+            meadow: read_compressed_boxed_array_from(reader)?,
             field_17: ReadFrom::read_from(reader)?,
-            world_map_elements: WorldMapElementData::read_vec_from(reader, include_custom_names)?,
-            trade_routes: TradeRouteData::read_vec_from(reader)?,
-            field_20: read_compressed_vec_from(reader, 51984)?,
-            field_21: read_compressed_vec_from(reader, 36)?,
+            world_map_elements: WorldMapElementData::read_arr_from(reader, include_custom_names)?,
+            trade_routes: TradeRouteData::read_arr_from(reader)?,
+            field_20: read_compressed_boxed_array_from(reader)?,
+            field_21: read_compressed_boxed_array_from(reader)?,
             prices: ReadFrom::read_from(reader)?,
-            scrub: read_compressed_vec_from(reader, 51984)?,
-            elevation: read_compressed_vec_from(reader, 51984)?,
-            elevation_rotation: read_compressed_vec_from(reader, 51984)?,
-            world_locations: WorldLocationData::read_vec_from(reader, include_world_locations_extras)?,
+            scrub: read_compressed_boxed_array_from(reader)?,
+            elevation: read_compressed_boxed_array_from(reader)?,
+            elevation_rotation: read_compressed_boxed_array_from(reader)?,
+            world_locations: WorldLocationData::read_arr_from(reader, include_world_locations_extras)?,
             background_image: ReadFrom::read_from(reader)?,
             field_28: read_segment(reader, &manifest_field_28)?,
             mythology: MythologyData::read_from(reader, include_pyramids)?,
@@ -167,7 +167,7 @@ impl WriteTo for MapData {
         bytes += WriteTo::write_to(&self.scenario_data, writer)?;
         bytes += write_compressed(&self.meadow, writer)?;
         bytes += WriteTo::write_to(&self.field_17, writer)?;
-        bytes += WorldMapElementData::write_vec_to(&self.world_map_elements, writer, include_custom_names)?;
+        bytes += WorldMapElementData::write_arr_to(&self.world_map_elements, writer, include_custom_names)?;
         bytes += write_compressed(&self.trade_routes, writer)?;
         bytes += write_compressed(&self.field_20, writer)?;
         bytes += write_compressed(&self.field_21, writer)?;
@@ -175,7 +175,7 @@ impl WriteTo for MapData {
         bytes += write_compressed(&self.scrub, writer)?;
         bytes += write_compressed(&self.elevation, writer)?;
         bytes += write_compressed(&self.elevation_rotation, writer)?;
-        bytes += WorldLocationData::write_vec_to(&self.world_locations, writer, include_world_locations_extras)?;
+        bytes += WorldLocationData::write_arr_to(&self.world_locations, writer, include_world_locations_extras)?;
         bytes += WriteTo::write_to(&self.background_image, writer)?;
         bytes += WriteTo::write_to(&self.field_28, writer)?;
         bytes += MythologyData::write_to(&self.mythology, writer, include_pyramids)?;
@@ -185,45 +185,6 @@ impl WriteTo for MapData {
         bytes += WriteTo::write_to(&self.field_33, writer)?;
 
         return Ok(bytes);
-    }
-}
-
-impl Default for MapData {
-    fn default() -> Self {
-        return MapData {
-            version_1: 0,
-            version_2: 0,
-            manifest: vec![ManifestData::default(); 300],
-            sprite: vec![0; 51984],
-            root_offset: vec![0; 51984],
-            terrain: vec![0; 51984],
-            tile_size: vec![0; 51984],
-            random: vec![0; 51984],
-            field_10: vec![0; 51984],
-            seed_1: 0,
-            seed_2: 0,
-            field_13: 0,
-            field_14: 0,
-            scenario_data: Default::default(),
-            meadow: vec![0; 51984],
-            field_17: [0; 18628],
-            world_map_elements: vec![WorldMapElementData::default(); 200],
-            trade_routes: vec![TradeRouteData::default(); 232],
-            field_20: vec![0; 51984],
-            field_21: vec![0; 36],
-            prices: [0; 36],
-            scrub: vec![0; 51984],
-            elevation: vec![0; 51984],
-            elevation_rotation: vec![0; 51984],
-            world_locations: vec![WorldLocationData::default(); 22],
-            background_image: 0,
-            field_28: vec![],
-            mythology: Default::default(),
-            field_30: [[0; 76]; 6],
-            field_31: 0,
-            field_32: 0,
-            field_33: [[0; 36]; 10],
-        };
     }
 }
 

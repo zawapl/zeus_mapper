@@ -1,4 +1,5 @@
 use crate::prelude::MapData;
+use crate::utils::boxed_array::BoxedArray;
 use my_macros::LogDifferences;
 
 #[derive(LogDifferences)]
@@ -24,14 +25,14 @@ impl CityMap {
         return CityMap {
             map_size: map_data.scenario_data.map_size,
             tropical: map_data.scenario_data.tropical != 0,
-            sprite: map_data.sprite.clone(),
-            root_offset: map_data.root_offset.clone(),
-            terrain: map_data.terrain.clone(),
-            tile_size: map_data.tile_size.clone(),
-            random: map_data.random.clone(),
-            meadow: map_data.meadow.clone(),
-            scrub: map_data.scrub.clone(),
-            elevation: map_data.elevation.clone(),
+            sprite: map_data.sprite.to_vec(),
+            root_offset: map_data.root_offset.to_vec(),
+            terrain: map_data.terrain.to_vec(),
+            tile_size: map_data.tile_size.to_vec(),
+            random: map_data.random.to_vec(),
+            meadow: map_data.meadow.to_vec(),
+            scrub: map_data.scrub.to_vec(),
+            elevation: map_data.elevation.to_vec(),
             entry_point: (map_data.scenario_data.entry_x, map_data.scenario_data.entry_y),
             exit_point: (map_data.scenario_data.exit_x, map_data.scenario_data.exit_y),
             fishing_spots: zip_positions(&map_data.scenario_data.fish_x, &map_data.scenario_data.fish_y),
@@ -46,14 +47,14 @@ impl CityMap {
 
         map_data.scenario_data.map_size = self.map_size;
         map_data.scenario_data.tropical = if self.tropical { 1 } else { 0 };
-        map_data.sprite = self.sprite.clone();
-        map_data.root_offset = self.root_offset.clone();
-        map_data.terrain = self.terrain.clone();
-        map_data.tile_size = self.tile_size.clone();
-        map_data.random = self.random.clone();
-        map_data.meadow = self.meadow.clone();
-        map_data.scrub = self.scrub.clone();
-        map_data.elevation = self.elevation.clone();
+        map_data.sprite = BoxedArray::from_vec(self.sprite.clone());
+        map_data.root_offset = BoxedArray::from_vec(self.root_offset.clone());
+        map_data.terrain = BoxedArray::from_vec(self.terrain.clone());
+        map_data.tile_size = BoxedArray::from_vec(self.tile_size.clone());
+        map_data.random = BoxedArray::from_vec(self.random.clone());
+        map_data.meadow = BoxedArray::from_vec(self.meadow.clone());
+        map_data.scrub = BoxedArray::from_vec(self.scrub.clone());
+        map_data.elevation = BoxedArray::from_vec(self.elevation.clone());
         map_data.scenario_data.entry_x = self.entry_point.0;
         map_data.scenario_data.entry_y = self.entry_point.1;
         map_data.scenario_data.exit_x = self.exit_point.0;

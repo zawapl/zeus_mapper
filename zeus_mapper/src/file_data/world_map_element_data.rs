@@ -1,3 +1,4 @@
+use crate::utils::boxed_array::BoxedArray;
 use crate::utils::read_utils::ReadFrom;
 use crate::utils::read_utils::read_string_from;
 use crate::utils::write_utils::COMPRESSION_MODE;
@@ -30,10 +31,9 @@ pub struct WorldMapElementData {
 }
 
 impl WorldMapElementData {
-    pub(crate) fn read_vec_from(reader: &mut impl Read, custom_names: bool) -> io::Result<Vec<Self>> {
-        let mut result = Vec::with_capacity(200);
-
+    pub(crate) fn read_arr_from(reader: &mut impl Read, custom_names: bool) -> io::Result<BoxedArray<Self, 200>> {
         let compressed_size = i32::read_from(reader)?;
+        let mut result = Vec::with_capacity(200);
 
         if compressed_size < 0 {
             for _ in 0..200 {
@@ -47,7 +47,7 @@ impl WorldMapElementData {
             }
         }
 
-        return Ok(result);
+        return Ok(BoxedArray::from_vec(result));
     }
 
     fn read_from(reader: &mut impl Read, custom_names: bool) -> io::Result<Self> {
@@ -68,10 +68,14 @@ impl WorldMapElementData {
             custom_names: read_string_from(reader, custom_names_length)?,
         });
     }
-    pub(crate) fn write_vec_to<W: Write>(data: &Vec<Self>, writer: &mut W, custom_names: bool) -> io::Result<usize> {
+    pub(crate) fn write_arr_to<W: Write, const N: usize>(
+        data: &BoxedArray<Self, N>,
+        writer: &mut W,
+        custom_names: bool,
+    ) -> io::Result<usize> {
         let mut uncompressed = Cursor::new(vec![]);
 
-        for world_map_element_data in data {
+        for world_map_element_data in data.iter() {
             world_map_element_data.write_to(&mut uncompressed, custom_names)?;
         }
 

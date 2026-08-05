@@ -1,3 +1,4 @@
+use crate::utils::boxed_array::BoxedArray;
 use encoding_rs::WINDOWS_1252;
 use std::io;
 use std::io::Error;
@@ -112,14 +113,16 @@ pub fn read_vec_from<T: ReadFrom>(reader: &mut impl Read, count: usize) -> io::R
     return Ok(result);
 }
 
-pub fn read_compressed_vec_from<T: ReadFrom>(reader: &mut impl Read, count: usize) -> io::Result<Vec<T>> {
+pub(crate) fn read_compressed_boxed_array_from<T: ReadFrom + Default, const N: usize>(
+    reader: &mut impl Read,
+) -> io::Result<BoxedArray<T, N>> {
     let compressed_size = i32::read_from(reader)?;
 
     if compressed_size < 0 {
-        return read_vec_from(reader, count);
+        return BoxedArray::read_from(reader);
     } else {
         let mut explode_reader = explode::ExplodeReader::new(reader);
-        return read_vec_from(&mut explode_reader, count);
+        return BoxedArray::read_from(&mut explode_reader);
     };
 }
 

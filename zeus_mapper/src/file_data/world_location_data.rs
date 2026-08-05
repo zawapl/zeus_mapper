@@ -1,3 +1,4 @@
+use crate::utils::boxed_array::BoxedArray;
 use crate::utils::read_utils::ReadFrom;
 use crate::utils::read_utils::read_string_from;
 use crate::utils::read_utils::read_vec_from;
@@ -12,13 +13,13 @@ use std::io::Cursor;
 use std::io::Read;
 use std::io::Write;
 
-#[derive(Debug, Clone, LogDifferences)]
+#[derive(Debug, Clone, Default, LogDifferences)]
 pub struct WorldLocationData {
     pub exists: u16,
     pub location_type: u8,
-    pub unknown_3: [u8; 94],
-    pub trade_quantities: [u8; 36],
-    pub unknown_133: [u8; 55],
+    pub unknown_3: BoxedArray<u8, 94>,
+    pub trade_quantities: BoxedArray<u8, 36>,
+    pub unknown_133: BoxedArray<u8, 55>,
     pub buying: [u8; 8],
     pub selling: [u8; 8],
     pub variant: u32,
@@ -30,54 +31,21 @@ pub struct WorldLocationData {
     pub rec: u32,
     pub pay: u32,
     pub pay_resource: [u16; 2],
-    pub unknown_240: [u8; 116],
+    pub unknown_240: BoxedArray<u8, 116>,
     pub favour: u32,
     pub unknown_360: [u8; 8],
     pub active: u32,
     pub visible: u32,
-    pub unknown_376: [u8; 100],
+    pub unknown_376: BoxedArray<u8, 100>,
     pub unknown_476: Vec<u8>,
     pub trade_route_visible: u8,
     pub custom_name: String,
     pub custom_leader_name: String,
     pub tail: Vec<u8>,
 }
-impl Default for WorldLocationData {
-    fn default() -> Self {
-        return WorldLocationData {
-            exists: 0,
-            location_type: 0,
-            unknown_3: [0; 94],
-            trade_quantities: [0; 36],
-            unknown_133: [0; 55],
-            buying: [0; 8],
-            selling: [0; 8],
-            variant: 0,
-            leader_name: 0,
-            attitude: 0,
-            economical_strength: 0,
-            military_strength: 0,
-            tribute: 0,
-            rec: 0,
-            pay: 0,
-            pay_resource: [0; 2],
-            unknown_240: [0; 116],
-            favour: 0,
-            unknown_360: [0; 8],
-            active: 0,
-            visible: 0,
-            unknown_376: [0; 100],
-            unknown_476: vec![],
-            trade_route_visible: 0,
-            custom_name: "".to_string(),
-            custom_leader_name: "".to_string(),
-            tail: vec![],
-        };
-    }
-}
 
 impl WorldLocationData {
-    pub(crate) fn read_vec_from(reader: &mut impl Read, include_extras: bool) -> io::Result<Vec<Self>> {
+    pub(crate) fn read_arr_from(reader: &mut impl Read, include_extras: bool) -> io::Result<BoxedArray<Self, 22>> {
         let mut result = Vec::with_capacity(22);
 
         let compressed_size = i32::read_from(reader)?;
@@ -94,7 +62,7 @@ impl WorldLocationData {
             }
         }
 
-        return Ok(result);
+        return Ok(BoxedArray::from_vec(result));
     }
 
     fn read_from(reader: &mut impl Read, include_extras: bool) -> io::Result<Self> {
@@ -132,10 +100,14 @@ impl WorldLocationData {
             tail: read_vec_from(reader, tail_length)?,
         });
     }
-    pub(crate) fn write_vec_to<W: Write>(data: &Vec<Self>, writer: &mut W, include_extras: bool) -> io::Result<usize> {
+    pub(crate) fn write_arr_to<W: Write, const N: usize>(
+        data: &BoxedArray<Self, N>,
+        writer: &mut W,
+        include_extras: bool,
+    ) -> io::Result<usize> {
         let mut uncompressed = Cursor::new(vec![]);
 
-        for world_location_data in data {
+        for world_location_data in data.iter() {
             world_location_data.write_to(&mut uncompressed, include_extras)?;
         }
 
