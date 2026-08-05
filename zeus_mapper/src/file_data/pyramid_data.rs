@@ -5,7 +5,7 @@ use std::io;
 use std::io::Read;
 use std::io::Write;
 
-#[derive(Default, Debug, LogDifferences)]
+#[derive(Default, Debug, PartialEq, LogDifferences)]
 pub struct PyramidData {
     pub pyramid_type: u32,
     pub deity: u32,
@@ -29,5 +29,30 @@ impl WriteTo for PyramidData {
         bytes += WriteTo::write_to(&self.deity, writer)?;
         bytes += WriteTo::write_to(&self.coloration, writer)?;
         return Ok(bytes);
+    }
+}
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io;
+    use std::io::Cursor;
+
+    #[test]
+    fn read_write() -> io::Result<()> {
+        let original = PyramidData {
+            pyramid_type: 1,
+            deity: 2,
+            coloration: 3,
+        };
+
+        let mut buffer = vec![];
+
+        original.write_to(&mut buffer)?;
+
+        let deserialized = PyramidData::read_from(&mut Cursor::new(buffer))?;
+
+        assert_eq!(original, deserialized);
+
+        return Ok(());
     }
 }

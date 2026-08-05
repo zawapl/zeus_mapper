@@ -12,7 +12,7 @@ use std::io::Cursor;
 use std::io::Read;
 use std::io::Write;
 
-#[derive(Debug, Clone, Default, LogDifferences)]
+#[derive(Debug, Clone, PartialEq, Default, LogDifferences)]
 pub struct WorldMapElementData {
     pub variant: u8, // 0 = invisible / 1 = old_city / 2 = label ?
     pub data_a: [u8; 3],
@@ -108,5 +108,60 @@ impl WorldMapElementData {
         }
 
         return Ok(bytes);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io;
+    use std::io::Cursor;
+
+    #[test]
+    fn read_write_without_custom_names() -> io::Result<()> {
+        let original = base();
+
+        let mut buffer = vec![];
+
+        original.write_to(&mut buffer, false)?;
+
+        let deserialized = WorldMapElementData::read_from(&mut Cursor::new(buffer), false)?;
+
+        assert_eq!(original, deserialized);
+
+        return Ok(());
+    }
+
+    #[test]
+    fn read_write_with_custom_names() -> io::Result<()> {
+        let mut original = base();
+        original.custom_names = "Custom Name".to_string();
+
+        let mut buffer = vec![];
+
+        original.write_to(&mut buffer, true)?;
+
+        let deserialized = WorldMapElementData::read_from(&mut Cursor::new(buffer), true)?;
+
+        assert_eq!(original, deserialized);
+
+        return Ok(());
+    }
+
+    fn base() -> WorldMapElementData {
+        return WorldMapElementData {
+            variant: 1,
+            data_a: [2, 3, 4],
+            x: 5,
+            y: 6,
+            sprite_width: 7,
+            sprite_height: 8,
+            sprite_id: 9,
+            unknown: [10; 11],
+            region_name: 11,
+            city_name: 12,
+            data_d: [13; 14],
+            custom_names: "".to_string(),
+        };
     }
 }

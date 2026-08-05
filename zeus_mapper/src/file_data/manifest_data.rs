@@ -6,7 +6,7 @@ use std::io;
 use std::io::Read;
 use std::io::Write;
 
-#[derive(Debug, Clone, Default, LogDifferences)]
+#[derive(Debug, Clone, PartialEq, Default, LogDifferences)]
 pub struct ManifestData {
     pub compressed: u32,
     pub address: u32,
@@ -48,5 +48,33 @@ impl WriteTo for ManifestData {
         bytes += WriteTo::write_to(&self.count, writer)?;
         bytes += WriteTo::write_to(&self.unknown, writer)?;
         return Ok(bytes);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io;
+    use std::io::Cursor;
+
+    #[test]
+    fn read_write() -> io::Result<()> {
+        let original = ManifestData {
+            compressed: 1,
+            address: 2,
+            size: 3,
+            count: 4,
+            unknown: 5,
+        };
+
+        let mut buffer = vec![];
+
+        original.write_to(&mut buffer)?;
+
+        let deserialized = ManifestData::read_from(&mut Cursor::new(buffer))?;
+
+        assert_eq!(original, deserialized);
+
+        return Ok(());
     }
 }

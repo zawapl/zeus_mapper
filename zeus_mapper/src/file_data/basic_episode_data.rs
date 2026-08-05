@@ -8,7 +8,7 @@ use std::io;
 use std::io::Read;
 use std::io::Write;
 
-#[derive(Debug, Default, LogDifferences)]
+#[derive(Debug, PartialEq, Default, LogDifferences)]
 pub struct BasicEpisodeData {
     pub exists: u32,
     pub field_2: u32,
@@ -58,5 +58,39 @@ impl WriteTo for BasicEpisodeData {
         bytes += write_string_to(&self.name, writer, 263)?;
 
         return Ok(bytes);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io;
+    use std::io::Cursor;
+
+    #[test]
+    fn read_write() -> io::Result<()> {
+        let original = BasicEpisodeData {
+            exists: 1,
+            field_2: 2,
+            field_3: 3,
+            episode_no: 4,
+            field_5: 5,
+            field_6: 6,
+            field_7: BoxedArray::from_vec((0..60).collect()),
+            next_episode: 7,
+            episode_type: 8,
+            name_padding: 9,
+            name: "Test Episode".to_owned(),
+        };
+
+        let mut buffer = vec![];
+
+        original.write_to(&mut buffer)?;
+
+        let deserialized = BasicEpisodeData::read_from(&mut Cursor::new(buffer))?;
+
+        assert_eq!(original, deserialized);
+
+        return Ok(());
     }
 }

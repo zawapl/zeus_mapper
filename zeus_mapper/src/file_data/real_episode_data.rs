@@ -8,7 +8,7 @@ use my_macros::LogDifferences;
 use std::io::Read;
 use std::io::Write;
 
-#[derive(Debug, Default, LogDifferences)]
+#[derive(Debug, PartialEq, Default, LogDifferences)]
 pub struct RealEpisodeData {
     pub start_date: i16,
     pub field_2: [u8; 8],
@@ -196,5 +196,122 @@ impl WriteTo for RealEpisodeData {
         bytes += WriteTo::write_to(&self.city_resources_quantity, writer)?;
 
         return Ok(bytes);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::utils::boxed_array::BoxedArray;
+    use std::io;
+    use std::io::Cursor;
+
+    #[test]
+    fn read_write() -> io::Result<()> {
+        let original = RealEpisodeData {
+            start_date: 1,
+            field_2: seq_u8(2),
+            months_elapsed: 3,
+            field_4: seq_u8(4),
+            starting_cash: 5,
+            field_6: seq_u8(6),
+            map_size: 7,
+            field_8: seq_u8(8),
+            text_buffer_1: "Text buffer one".to_owned(),
+            text_buffer_2: "Text buffer two".to_owned(),
+            civilization: 9,
+            wolf_x: seq_u16(10),
+            wolf_y: seq_u16(11),
+            fish_x: seq_u16(12),
+            fish_y: seq_u16(13),
+            urchin_x: seq_u16(14),
+            urchin_y: seq_u16(15),
+            field_17: seq_u8(16),
+            invasion_x: seq_u16(17),
+            invasion_y: seq_u16(18),
+            panhellenic_games: 19,
+            colonies_done: 20,
+            deer_x: seq_u16(21),
+            deer_y: seq_u16(22),
+            field_24: BoxedArray::from_vec(seq_u8::<76>(23).to_vec()),
+            earthquake_area: seq_u16(24),
+            entry_x: 25,
+            entry_y: 26,
+            exit_x: 27,
+            exit_y: 28,
+            disaster_x: seq_u16(29),
+            disaster_y: seq_u16(30),
+            river_entry_x: 31,
+            river_entry_y: 32,
+            river_exit_x: 33,
+            river_exit_y: 34,
+            field_36: BoxedArray::from_vec(seq_u8::<40>(35).to_vec()),
+            tropical: 36,
+            boar_x: seq_u16(37),
+            boar_y: seq_u16(38),
+            building_flags: BoxedArray::from_vec(seq_u16::<100>(39).to_vec()),
+            field_41: seq_u8(40),
+            monster_x: seq_u32(41),
+            monster_y: seq_u32(42),
+            disembark_x: seq_u16(43),
+            disembark_y: seq_u16(44),
+            field_46: BoxedArray::from_vec(seq_u8::<276>(45).to_vec()),
+            landslide_x: seq_u16(46),
+            landslide_y: seq_u16(47),
+            field_49: seq_u8(48),
+            basic_episode_data: BasicEpisodeData {
+                exists: 49,
+                field_2: 50,
+                field_3: 51,
+                episode_no: 52,
+                field_5: 53,
+                field_6: 54,
+                field_7: BoxedArray::from_vec(seq_u8::<60>(55).to_vec()),
+                next_episode: 56,
+                episode_type: 57,
+                name_padding: 58,
+                name: "Basic episode".to_owned(),
+            },
+            city_resources: seq_u8(59),
+            city_resources_bought: seq_u8(60),
+            field_53: seq_u8(61),
+            city_resources_sold: seq_u8(62),
+            field_55: seq_u8(63),
+            city_resources_quantity: BoxedArray::from_vec(seq_u8::<40>(64).to_vec()),
+        };
+
+        let mut buffer = vec![];
+
+        original.write_to(&mut buffer)?;
+
+        let deserialized = RealEpisodeData::read_from(&mut Cursor::new(buffer))?;
+
+        assert_eq!(original, deserialized);
+
+        return Ok(());
+    }
+
+    fn seq_u8<const N: usize>(start: u8) -> [u8; N] {
+        let mut result = [0u8; N];
+        for (i, value) in result.iter_mut().enumerate() {
+            *value = start.wrapping_add(i as u8);
+        }
+        return result;
+    }
+
+    fn seq_u16<const N: usize>(start: u16) -> [u16; N] {
+        let mut result = [0u16; N];
+        for (i, value) in result.iter_mut().enumerate() {
+            *value = start.wrapping_add(i as u16);
+        }
+        return result;
+    }
+
+    fn seq_u32<const N: usize>(start: u32) -> [u32; N] {
+        let mut result = [0u32; N];
+        for (i, value) in result.iter_mut().enumerate() {
+            *value = start.wrapping_add(i as u32);
+        }
+        return result;
     }
 }

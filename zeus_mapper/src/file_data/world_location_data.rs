@@ -13,7 +13,7 @@ use std::io::Cursor;
 use std::io::Read;
 use std::io::Write;
 
-#[derive(Debug, Clone, Default, LogDifferences)]
+#[derive(Debug, Clone, PartialEq, Default, LogDifferences)]
 pub struct WorldLocationData {
     pub exists: u16,
     pub location_type: u8,
@@ -181,5 +181,79 @@ impl ReadFrom for LocationType {
             5 => Ok(LocationType::Enchanted),
             _ => Ok(LocationType::Unknown),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io;
+    use std::io::Cursor;
+
+    #[test]
+    fn read_write_without_extras() -> io::Result<()> {
+        let original = base();
+
+        let mut buffer = vec![];
+
+        original.write_to(&mut buffer, false)?;
+
+        let deserialized = WorldLocationData::read_from(&mut Cursor::new(buffer), false)?;
+
+        assert_eq!(original, deserialized);
+
+        return Ok(());
+    }
+
+    #[test]
+    fn read_write_with_extras() -> io::Result<()> {
+        let mut original = base();
+        original.unknown_476 = vec![24; 28];
+        original.trade_route_visible = 25;
+        original.custom_name = "Custom Name".to_string();
+        original.custom_leader_name = "Custom Leader".to_string();
+        original.tail = vec![26; 3];
+
+        let mut buffer = vec![];
+
+        original.write_to(&mut buffer, true)?;
+
+        let deserialized = WorldLocationData::read_from(&mut Cursor::new(buffer), true)?;
+
+        assert_eq!(original, deserialized);
+
+        return Ok(());
+    }
+
+    fn base() -> WorldLocationData {
+        return WorldLocationData {
+            exists: 1,
+            location_type: 2,
+            unknown_3: BoxedArray::from_vec(vec![3; 94]),
+            trade_quantities: BoxedArray::from_vec(vec![4; 36]),
+            unknown_133: BoxedArray::from_vec(vec![5; 55]),
+            buying: [6; 8],
+            selling: [7; 8],
+            variant: 8,
+            leader_name: 9,
+            attitude: 10,
+            economical_strength: 11,
+            military_strength: 12,
+            tribute: 13,
+            rec: 14,
+            pay: 15,
+            pay_resource: [16, 17],
+            unknown_240: BoxedArray::from_vec(vec![18; 116]),
+            favour: 19,
+            unknown_360: [20; 8],
+            active: 21,
+            visible: 22,
+            unknown_376: BoxedArray::from_vec(vec![23; 100]),
+            unknown_476: vec![],
+            trade_route_visible: 4,
+            custom_name: "".to_string(),
+            custom_leader_name: "".to_string(),
+            tail: vec![],
+        };
     }
 }

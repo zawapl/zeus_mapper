@@ -10,7 +10,7 @@ use std::io::ErrorKind;
 use std::io::Read;
 use std::io::Write;
 
-#[derive(Debug, Default, LogDifferences)]
+#[derive(Debug, PartialEq, Default, LogDifferences)]
 pub struct MythologyData {
     pub opponent_gods: [u32; 12],
     pub proponent_gods: [u32; 12],
@@ -81,5 +81,70 @@ impl MythologyData {
         }
 
         return Ok(bytes);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io;
+    use std::io::Cursor;
+
+    #[test]
+    fn read_write_without_pyramids() -> io::Result<()> {
+        let original = MythologyData {
+            opponent_gods: [1; 12],
+            proponent_gods: [2; 12],
+            monster: 3,
+            field_4: BoxedArray::from_vec(vec![4; 96]),
+            field_5: [5; 12],
+            sanctuaries_allowed: [6; 12],
+            max_sanctuaries: 7,
+            max_pyramids: 0,
+            pyramids: vec![],
+        };
+
+        let mut buffer = vec![];
+
+        original.write_to(&mut buffer, false)?;
+
+        let deserialized = MythologyData::read_from(&mut Cursor::new(buffer), false)?;
+
+        assert_eq!(original, deserialized);
+
+        return Ok(());
+    }
+
+    #[test]
+    fn read_write_with_pyramids() -> io::Result<()> {
+        let original = MythologyData {
+            opponent_gods: [1; 12],
+            proponent_gods: [2; 12],
+            monster: 3,
+            field_4: BoxedArray::from_vec(vec![4; 96]),
+            field_5: [5; 12],
+            sanctuaries_allowed: [6; 12],
+            max_sanctuaries: 7,
+            max_pyramids: 6,
+            pyramids: (7..13).map(pyramid).collect(),
+        };
+
+        let mut buffer = vec![];
+
+        original.write_to(&mut buffer, true)?;
+
+        let deserialized = MythologyData::read_from(&mut Cursor::new(buffer), true)?;
+
+        assert_eq!(original, deserialized);
+
+        return Ok(());
+    }
+
+    fn pyramid(pyramid_type: u32) -> PyramidData {
+        return PyramidData {
+            pyramid_type,
+            deity: pyramid_type + 1,
+            coloration: pyramid_type + 2,
+        };
     }
 }

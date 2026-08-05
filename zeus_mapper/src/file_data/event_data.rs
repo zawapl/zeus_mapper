@@ -195,3 +195,83 @@ impl WriteTo for EventData {
         return Ok(bytes);
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io;
+    use std::io::Cursor;
+
+    #[test]
+    fn read_write() -> io::Result<()> {
+        let original = EventData {
+            id: 1,
+            event_type: 2,
+            month: 3,
+            item_chosen: 4,
+            first_item: 5,
+            second_item: 6,
+            third_item: 7,
+            amount: 8,
+            fixed_amount: 9,
+            min_amount: 10,
+            max_amount: 11,
+            time: 12,
+            fixed_time: 13,
+            min_time: 14,
+            max_time: 15,
+            target: 16,
+            fixed_target: 17,
+            min_target: 18,
+            max_target: 19,
+            on_success: 20,
+            on_failure: 21,
+            flags: 22,
+            warnings: 23,
+            time_ctr: 24,
+            status: 25,
+            need_msg_res: 26,
+            triggerer: 27,
+            god_or_mon_or_warship_id: 28,
+            mtar1: 29,
+            mtar2: 30,
+            mtar3: 31,
+            magg: 32,
+            unkown_row: [33, 34, 35, 36, 37, 38, 39, 40, 41],
+            trigger_on_1: 42,
+            trigger_on_2: 43,
+            eff_on_city: 44,
+            source: 45,
+            source_fixed: 46,
+            source_min: 47,
+            source_max: 48,
+            subtype: 49,
+            prev_amount: 50,
+            related_to_triggered_evt: 51,
+            unknown_1: 52,
+            trig_reason: 53,
+            unknown_2: 54,
+            unknown_3: 55,
+            other_city: 56,
+            loot_type: 57,
+            loot_amount: 58,
+            unknown_4: 59,
+            ally_city: 60,
+            ally_strength: 61,
+            to_strength: 62,
+            unknown_5: 63,
+            quest: 64,
+            tail: 65,
+        };
+
+        let mut buffer = vec![];
+
+        original.write_to(&mut buffer)?;
+
+        let deserialized = EventData::read_from(&mut Cursor::new(buffer))?;
+
+        assert_eq!(original, deserialized);
+
+        return Ok(());
+    }
+}

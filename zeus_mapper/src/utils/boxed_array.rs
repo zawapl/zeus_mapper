@@ -9,7 +9,7 @@ use std::ops::Deref;
 use std::ops::DerefMut;
 
 /// A heap-allocated fixed-size array of `N` elements of `T`.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct BoxedArray<T, const N: usize>(Box<[T; N]>);
 
 impl<T: Default, const N: usize> BoxedArray<T, N> {

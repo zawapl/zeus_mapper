@@ -8,7 +8,7 @@ use std::io::Write;
 
 // count = 232
 // size = 324
-#[derive(Debug, Clone, Default, LogDifferences)]
+#[derive(Debug, Clone, PartialEq, Default, LogDifferences)]
 pub struct TradeRouteData {
     pub header: [u8; 8],
     pub points: BoxedArray<TradeRoutePointData, 50>,
@@ -72,7 +72,7 @@ impl WriteTo for TradeRouteData {
     }
 }
 
-#[derive(Debug, Copy, Clone, Default, LogDifferences)]
+#[derive(Debug, Copy, Clone, PartialEq, Default, LogDifferences)]
 pub struct TradeRoutePointData {
     pub x: u16,
     pub y: u16,
@@ -96,5 +96,59 @@ impl WriteTo for TradeRoutePointData {
         bytes += WriteTo::write_to(&self.y, writer)?;
         bytes += WriteTo::write_to(&self.unknown, writer)?;
         return Ok(bytes);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io;
+    use std::io::Cursor;
+
+    #[test]
+    fn read_write_point() -> io::Result<()> {
+        let original = TradeRoutePointData { x: 1, y: 2, unknown: 3 };
+
+        let mut buffer = vec![];
+
+        original.write_to(&mut buffer)?;
+
+        let deserialized = TradeRoutePointData::read_from(&mut Cursor::new(buffer))?;
+
+        assert_eq!(original, deserialized);
+
+        return Ok(());
+    }
+
+    #[test]
+    fn read_write_route() -> io::Result<()> {
+        let mut points = vec![];
+        for i in 0..50 {
+            points.push(TradeRoutePointData {
+                x: i,
+                y: i + 1,
+                unknown: i + 2,
+            });
+        }
+
+        let original = TradeRouteData {
+            header: [1, 2, 3, 4, 5, 6, 7, 8],
+            points: BoxedArray::from_vec(points),
+            distance: [9; 12],
+            route_type: 10,
+            points_count: 11,
+            exists: 12,
+            unknown: 13,
+        };
+
+        let mut buffer = vec![];
+
+        original.write_to(&mut buffer)?;
+
+        let deserialized = TradeRouteData::read_from(&mut Cursor::new(buffer))?;
+
+        assert_eq!(original, deserialized);
+
+        return Ok(());
     }
 }
