@@ -5,7 +5,7 @@ use std::io;
 use std::io::Read;
 use std::io::Write;
 
-#[derive(Debug, PartialEq, Copy, Clone, Default, LogDifferences)]
+#[derive(Debug, PartialEq, Copy, Clone, LogDifferences)]
 pub struct EventData {
     pub id: u16,
     pub event_type: u8,
@@ -64,6 +64,71 @@ pub struct EventData {
     pub unknown_5: u16,
     pub quest: u8,
     pub tail: u8,
+}
+
+impl Default for EventData {
+    // Several fields use `u16::MAX`, not `0`, as their "unused" sentinel.
+    fn default() -> EventData {
+        return EventData {
+            id: 0,
+            event_type: 0,
+            month: 0,
+            item_chosen: 0,
+            first_item: u16::MAX,
+            second_item: u16::MAX,
+            third_item: u16::MAX,
+            amount: 0,
+            fixed_amount: u16::MAX,
+            min_amount: u16::MAX,
+            max_amount: u16::MAX,
+            time: 0,
+            fixed_time: u16::MAX,
+            min_time: u16::MAX,
+            max_time: u16::MAX,
+            target: 0,
+            fixed_target: u16::MAX,
+            min_target: u16::MAX,
+            max_target: u16::MAX,
+            on_success: u16::MAX,
+            on_failure: u16::MAX,
+            flags: 0,
+            warnings: 0,
+            time_ctr: 0,
+            status: 0,
+            need_msg_res: 0,
+            triggerer: u16::MAX,
+            god_or_mon_or_warship_id: 0,
+            mtar1: 0,
+            mtar2: 0,
+            mtar3: 0,
+            magg: 0,
+            unkown_row: [0; 9],
+            trigger_on_1: u16::MAX,
+            trigger_on_2: u16::MAX,
+            eff_on_city: 0,
+            source: 0,
+            source_fixed: u16::MAX,
+            source_min: 0,
+            source_max: 0,
+            subtype: 0,
+            prev_amount: 0,
+            related_to_triggered_evt: 0,
+            unknown_1: 0,
+            trig_reason: 0,
+            unknown_2: 0,
+            unknown_3: 0,
+            other_city: 0,
+            loot_type: 0,
+            loot_amount: 0,
+            unknown_4: 0,
+            ally_city: 0,
+            ally_strength: 0,
+            to_strength: 0,
+            unknown_5: 0,
+            quest: 0,
+            tail: 0,
+        };
+    }
 }
 
 impl ReadFrom for EventData {

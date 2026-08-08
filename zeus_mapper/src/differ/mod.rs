@@ -1,4 +1,3 @@
-use crate::file_data::world_location_data::LocationType;
 use std::fmt::Debug;
 
 pub trait LogDifferences {
@@ -47,6 +46,17 @@ where
     }
 }
 
+impl<T> LogDifferences for Option<T>
+where
+    T: PartialEq + Debug,
+{
+    fn log_differences(a: &Self, b: &Self, context: String) {
+        if a != b {
+            println!("{context}: difference: {a:?} vs {b:?}");
+        }
+    }
+}
+
 impl<T: DataConstant + PartialEq + Debug> LogDifferences for T {
     fn log_differences(a: &Self, b: &Self, context: String) {
         if a != b {
@@ -76,5 +86,5 @@ default_differ_impl!(u16);
 default_differ_impl!(i16);
 default_differ_impl!(u32);
 default_differ_impl!(u64);
+default_differ_impl!(usize);
 default_differ_impl!(String);
-default_differ_impl!(LocationType);

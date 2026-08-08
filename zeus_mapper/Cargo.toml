@@ -9,9 +9,6 @@ license = "MIT"
 workspace = true
 
 [dependencies]
-explode = "0.1.2"
-# pklib = "0.2.0" - has issue with compressing the data, using forked version with a fix for now
-pklib = { git = "https://github.com/zawapl/pklib-rs", branch = "issue-2" }
 encoding_rs = "0.8.35"
 my_macros = { path = "../my_macros" }
 regex = "1.12.2"

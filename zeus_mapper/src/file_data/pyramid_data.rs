@@ -5,7 +5,7 @@ use std::io;
 use std::io::Read;
 use std::io::Write;
 
-#[derive(Default, Debug, PartialEq, LogDifferences)]
+#[derive(Debug, Clone, PartialEq, Default, LogDifferences)]
 pub struct PyramidData {
     pub pyramid_type: u32,
     pub deity: u32,

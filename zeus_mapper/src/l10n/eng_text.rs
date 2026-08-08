@@ -96,7 +96,7 @@ mod tests {
         return Ok(());
     }
 
-    #[ignore]
+    #[ignore] // todo investigate why the performance is so slow and remove the ignored
     #[test]
     fn test_zeus_mm() -> Result<()> {
         let _file = test_file("Zeus_MM.eng")?;

@@ -129,3 +129,14 @@ The codebase is a layered pipeline, low-level binary parsing at the bottom, a fr
 - Read and write paths for a struct must stay symmetric (same manifest-driven conditionals, same compression calls)
   — a round-trip (`read_from` → `write_to` → `read_from`) should reproduce the original data, which is exactly what
   the `LogDifferences` derive is for when validating changes.
+- When new understanding of a `field_N`/`unknown` blob's content is confirmed, promote the relevant bytes to a
+  properly named field on the struct itself (splitting the blob around it, e.g. `unknown_240`/`old_format_favour`/
+  `unknown_341` in `world_location_data.rs`) rather than reading them out with a raw index/offset in `adventure`/
+  `model` conversion code. The `file_data` structs should stay the one place that reflects current understanding of
+  the layout — call sites should read named fields, not compute into blobs.
+- If applying new understanding surfaces a byte-alignment mismatch (data landing a few bytes early/late, a field
+  short/long by a constant), don't work around it in the read/decode logic — investigate until the exact offset is
+  known (diff raw bytes directly between two files expected to hold the same content in each format generation if
+  such a pair exists; ask for more real-file examples if none are available yet; cross-check any computed offset
+  against an already-independently-confirmed value before trusting it further), then
+  fix the struct's field boundaries themselves rather than patching around them.

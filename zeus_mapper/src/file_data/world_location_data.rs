@@ -1,13 +1,13 @@
+use crate::pkware::explode;
 use crate::utils::boxed_array::BoxedArray;
 use crate::utils::read_utils::ReadFrom;
 use crate::utils::read_utils::read_string_from;
 use crate::utils::read_utils::read_vec_from;
-use crate::utils::write_utils::COMPRESSION_MODE;
-use crate::utils::write_utils::DICTIONARY_SIZE;
+use crate::utils::read_utils::to_usize;
 use crate::utils::write_utils::WriteTo;
+use crate::utils::write_utils::write_maybe_compressed;
 use crate::utils::write_utils::write_string_to;
 use my_macros::LogDifferences;
-use pklib::implode::implode_bytes;
 use std::io;
 use std::io::Cursor;
 use std::io::Read;
@@ -17,21 +17,29 @@ use std::io::Write;
 pub struct WorldLocationData {
     pub exists: u16,
     pub location_type: u8,
-    pub unknown_3: BoxedArray<u8, 94>,
-    pub trade_quantities: BoxedArray<u8, 36>,
+    pub name: u8,
+    pub slot_index: u8,
+    pub unknown_3: BoxedArray<u8, 91>,
+    pub trade_quantities: BoxedArray<u8, 37>,
     pub unknown_133: BoxedArray<u8, 55>,
     pub buying: [u8; 8],
     pub selling: [u8; 8],
-    pub variant: u32,
+    pub civilization: u32,
     pub leader_name: u32,
     pub attitude: u32,
     pub economical_strength: u32,
     pub military_strength: u32,
     pub tribute: u32,
-    pub rec: u32,
-    pub pay: u32,
-    pub pay_resource: [u16; 2],
-    pub unknown_240: BoxedArray<u8, 116>,
+    pub tribute_rec_amount: u32,
+    pub tribute_pay_amount: u32,
+    pub tribute_pay_resource: u16,
+    pub tribute_rec_resource: u16,
+    pub unknown_240: BoxedArray<u8, 100>,
+    // Old-format (`version_2 != 26`) adventures store this location's real favour here instead of
+    // in the dedicated `favour` field below, which is left `0` for most locations in that format -
+    // see `WorldLocation::from_data`.
+    pub old_format_favour: u8,
+    pub unknown_341: BoxedArray<u8, 15>,
     pub favour: u32,
     pub unknown_360: [u8; 8],
     pub active: u32,
@@ -55,10 +63,12 @@ impl WorldLocationData {
                 result.push(Self::read_from(reader, include_extras)?);
             }
         } else {
-            let mut explode_reader = explode::ExplodeReader::new(reader);
+            let mut compressed = vec![0; to_usize(compressed_size)?];
+            reader.read_exact(&mut compressed)?;
+            let mut decompressed_reader = Cursor::new(explode(&compressed)?);
 
             for _ in 0..22 {
-                result.push(Self::read_from(&mut explode_reader, include_extras)?);
+                result.push(Self::read_from(&mut decompressed_reader, include_extras)?);
             }
         }
 
@@ -73,21 +83,26 @@ impl WorldLocationData {
         return Ok(WorldLocationData {
             exists: ReadFrom::read_from(reader)?,
             location_type: ReadFrom::read_from(reader)?,
+            name: ReadFrom::read_from(reader)?,
+            slot_index: ReadFrom::read_from(reader)?,
             unknown_3: ReadFrom::read_from(reader)?,
             trade_quantities: ReadFrom::read_from(reader)?,
             unknown_133: ReadFrom::read_from(reader)?,
             buying: ReadFrom::read_from(reader)?,
             selling: ReadFrom::read_from(reader)?,
-            variant: ReadFrom::read_from(reader)?,
+            civilization: ReadFrom::read_from(reader)?,
             leader_name: ReadFrom::read_from(reader)?,
             attitude: ReadFrom::read_from(reader)?,
             economical_strength: ReadFrom::read_from(reader)?,
             military_strength: ReadFrom::read_from(reader)?,
             tribute: ReadFrom::read_from(reader)?,
-            rec: ReadFrom::read_from(reader)?,
-            pay: ReadFrom::read_from(reader)?,
-            pay_resource: ReadFrom::read_from(reader)?,
+            tribute_rec_amount: ReadFrom::read_from(reader)?,
+            tribute_pay_amount: ReadFrom::read_from(reader)?,
+            tribute_pay_resource: ReadFrom::read_from(reader)?,
+            tribute_rec_resource: ReadFrom::read_from(reader)?,
             unknown_240: ReadFrom::read_from(reader)?,
+            old_format_favour: ReadFrom::read_from(reader)?,
+            unknown_341: ReadFrom::read_from(reader)?,
             favour: ReadFrom::read_from(reader)?,
             unknown_360: ReadFrom::read_from(reader)?,
             active: ReadFrom::read_from(reader)?,
@@ -111,13 +126,7 @@ impl WorldLocationData {
             world_location_data.write_to(&mut uncompressed, include_extras)?;
         }
 
-        let compressed = implode_bytes(uncompressed.get_ref().as_slice(), COMPRESSION_MODE, DICTIONARY_SIZE)
-            .map_err(|err| io::Error::new(io::ErrorKind::Other, err))?;
-
-        let mut bytes = 0;
-        bytes += WriteTo::write_to(&(compressed.len() as i32), writer)?;
-        bytes += WriteTo::write_to(&compressed, writer)?;
-        return Ok(bytes);
+        return write_maybe_compressed(uncompressed.get_ref(), writer);
     }
 
     fn write_to<W: Write>(&self, writer: &mut W, include_extras: bool) -> io::Result<usize> {
@@ -125,21 +134,26 @@ impl WorldLocationData {
 
         bytes += WriteTo::write_to(&self.exists, writer)?;
         bytes += WriteTo::write_to(&self.location_type, writer)?;
+        bytes += WriteTo::write_to(&self.name, writer)?;
+        bytes += WriteTo::write_to(&self.slot_index, writer)?;
         bytes += WriteTo::write_to(&self.unknown_3, writer)?;
         bytes += WriteTo::write_to(&self.trade_quantities, writer)?;
         bytes += WriteTo::write_to(&self.unknown_133, writer)?;
         bytes += WriteTo::write_to(&self.buying, writer)?;
         bytes += WriteTo::write_to(&self.selling, writer)?;
-        bytes += WriteTo::write_to(&self.variant, writer)?;
+        bytes += WriteTo::write_to(&self.civilization, writer)?;
         bytes += WriteTo::write_to(&self.leader_name, writer)?;
         bytes += WriteTo::write_to(&self.attitude, writer)?;
         bytes += WriteTo::write_to(&self.economical_strength, writer)?;
         bytes += WriteTo::write_to(&self.military_strength, writer)?;
         bytes += WriteTo::write_to(&self.tribute, writer)?;
-        bytes += WriteTo::write_to(&self.rec, writer)?;
-        bytes += WriteTo::write_to(&self.pay, writer)?;
-        bytes += WriteTo::write_to(&self.pay_resource, writer)?;
+        bytes += WriteTo::write_to(&self.tribute_rec_amount, writer)?;
+        bytes += WriteTo::write_to(&self.tribute_pay_amount, writer)?;
+        bytes += WriteTo::write_to(&self.tribute_pay_resource, writer)?;
+        bytes += WriteTo::write_to(&self.tribute_rec_resource, writer)?;
         bytes += WriteTo::write_to(&self.unknown_240, writer)?;
+        bytes += WriteTo::write_to(&self.old_format_favour, writer)?;
+        bytes += WriteTo::write_to(&self.unknown_341, writer)?;
         bytes += WriteTo::write_to(&self.favour, writer)?;
         bytes += WriteTo::write_to(&self.unknown_360, writer)?;
         bytes += WriteTo::write_to(&self.active, writer)?;
@@ -155,32 +169,6 @@ impl WorldLocationData {
         }
 
         return Ok(bytes);
-    }
-}
-
-// todo delete this
-#[allow(dead_code)]
-#[derive(PartialEq, Debug)]
-pub enum LocationType {
-    Parent    = 0,
-    Colony    = 1,
-    Foreign   = 2,
-    Distant   = 4,
-    Enchanted = 5,
-    Unknown,
-}
-
-impl ReadFrom for LocationType {
-    fn read_from(reader: &mut impl Read) -> io::Result<Self> {
-        let id: u8 = ReadFrom::read_from(reader)?;
-        match id {
-            0 => Ok(LocationType::Parent),
-            1 => Ok(LocationType::Colony),
-            2 => Ok(LocationType::Foreign),
-            4 => Ok(LocationType::Distant),
-            5 => Ok(LocationType::Enchanted),
-            _ => Ok(LocationType::Unknown),
-        }
     }
 }
 
@@ -229,21 +217,26 @@ mod tests {
         return WorldLocationData {
             exists: 1,
             location_type: 2,
-            unknown_3: BoxedArray::from_vec(vec![3; 94]),
-            trade_quantities: BoxedArray::from_vec(vec![4; 36]),
+            name: 3,
+            slot_index: 3,
+            unknown_3: BoxedArray::from_vec(vec![3; 91]),
+            trade_quantities: BoxedArray::from_vec(vec![4; 37]),
             unknown_133: BoxedArray::from_vec(vec![5; 55]),
             buying: [6; 8],
             selling: [7; 8],
-            variant: 8,
+            civilization: 8,
             leader_name: 9,
             attitude: 10,
             economical_strength: 11,
             military_strength: 12,
             tribute: 13,
-            rec: 14,
-            pay: 15,
-            pay_resource: [16, 17],
-            unknown_240: BoxedArray::from_vec(vec![18; 116]),
+            tribute_rec_amount: 14,
+            tribute_pay_amount: 15,
+            tribute_pay_resource: 16,
+            tribute_rec_resource: 17,
+            unknown_240: BoxedArray::from_vec(vec![18; 100]),
+            old_format_favour: 18,
+            unknown_341: BoxedArray::from_vec(vec![18; 15]),
             favour: 19,
             unknown_360: [20; 8],
             active: 21,

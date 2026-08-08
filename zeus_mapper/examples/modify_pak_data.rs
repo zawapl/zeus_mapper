@@ -1,12 +1,11 @@
-// Reads an adventure's PakData and text, then writes them back out under a "- Stripped" name,
-// matching the same file layout a real adventure folder has: the combined .pak plus its .set,
-// .map(s), and .txt written out separately. Modify `pak_data` before the writes below to
-// experiment with what the game tolerates having stripped out.
 use std::fs;
 use std::fs::File;
 use std::io;
 use std::io::BufReader;
+use std::io::ErrorKind;
 use zeus_mapper::prelude::AdventureText;
+use zeus_mapper::prelude::DataConstant;
+use zeus_mapper::prelude::God;
 use zeus_mapper::prelude::PakData;
 
 fn main() -> io::Result<()> {
@@ -16,16 +15,26 @@ fn main() -> io::Result<()> {
     let source_dir = format!("{game_root}/Adventures/{source_name}");
 
     let mut pak_reader = File::open(format!("{source_dir}/{source_name}.pak")).map(BufReader::new)?;
-    let pak_data = PakData::read_from(&mut pak_reader)?;
+    let mut pak_data = PakData::read_from(&mut pak_reader)?;
+    println!(
+        "Read '{source_name}', starting cash: {}",
+        pak_data.settings_data.real_episode_data[0].starting_cash
+    );
 
     let mut text_reader = File::open(format!("{source_dir}/{source_name}.txt")).map(BufReader::new)?;
     let adventure_text = AdventureText::read_from(&mut text_reader)?;
 
-    // Experiment here: mutate `pak_data` before it's written below, e.g.
-    // pak_data.settings_data.events.clear();
+    // Modify the adventure:
+    pak_data.settings_data.mythology[0].opponent_gods[3] = u32::MAX; // dissapears from opponent gods in 1st episode, but comes back after 1st episode
+    pak_data.settings_data.mythology[1].proponent_gods[6] = God::Hephaestus.value(); // doesn't seem to take effect
 
-    let dest_name = format!("{source_name} - Stripped");
+    let dest_name = format!("{source_name} - Modified");
     let dest_dir = format!("{game_root}/Adventures/{dest_name}");
+    if let Err(err) = fs::remove_dir_all(&dest_dir)
+        && err.kind() != ErrorKind::NotFound
+    {
+        return Err(err);
+    }
     fs::create_dir_all(&dest_dir)?;
 
     let pak_path = format!("{dest_dir}/{dest_name}.pak");

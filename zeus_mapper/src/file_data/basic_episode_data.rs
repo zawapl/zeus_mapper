@@ -8,7 +8,7 @@ use std::io;
 use std::io::Read;
 use std::io::Write;
 
-#[derive(Debug, PartialEq, Default, LogDifferences)]
+#[derive(Debug, Clone, PartialEq, Default, LogDifferences)]
 pub struct BasicEpisodeData {
     pub exists: u32,
     pub field_2: u32,

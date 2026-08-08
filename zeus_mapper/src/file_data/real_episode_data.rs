@@ -8,7 +8,7 @@ use my_macros::LogDifferences;
 use std::io::Read;
 use std::io::Write;
 
-#[derive(Debug, PartialEq, Default, LogDifferences)]
+#[derive(Debug, Clone, PartialEq, Default, LogDifferences)]
 pub struct RealEpisodeData {
     pub start_date: i16,
     pub field_2: [u8; 8],

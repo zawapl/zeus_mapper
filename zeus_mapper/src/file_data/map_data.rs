@@ -20,7 +20,7 @@ use std::io::Seek;
 use std::io::SeekFrom;
 use std::io::Write;
 
-#[derive(Debug, Default, LogDifferences)]
+#[derive(Debug, Clone, PartialEq, Default, LogDifferences)]
 pub struct MapData {
     pub version_1: u32,
     pub version_2: u32,

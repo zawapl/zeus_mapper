@@ -4,7 +4,7 @@ use std::io;
 use std::io::Read;
 use std::io::Write;
 
-#[derive(Default)]
+#[derive(Debug, PartialEq, Default)]
 pub struct AdventureText {
     pub title: String,
     pub introduction: String,
@@ -13,14 +13,14 @@ pub struct AdventureText {
     pub colony_text: Vec<ColonyText>,
 }
 
-#[derive(Default)]
+#[derive(Debug, PartialEq, Default)]
 pub struct EpisodeText {
     pub title: String,
     pub introduction: String,
     pub complete: String,
 }
 
-#[derive(Default)]
+#[derive(Debug, PartialEq, Default)]
 pub struct ColonyText {
     pub title: String,
     pub introduction: String,

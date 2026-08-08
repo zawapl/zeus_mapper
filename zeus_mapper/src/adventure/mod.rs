@@ -8,7 +8,11 @@ pub(crate) mod episode_goals;
 pub(crate) mod event;
 pub(crate) mod mythology;
 pub(crate) mod parent_city_episode;
+pub(crate) mod pyramid;
+pub(crate) mod resource;
 pub(crate) mod terrain_flags;
+pub(crate) mod trade_route;
+pub(crate) mod world_location;
 
 data_constants!(Civilization<u32>{
     Greek = 0,
@@ -100,7 +104,14 @@ data_constants!(NextEpisode<u32>{
     Parent = 2,
 });
 
+data_constants!(LocationType<u8>{
+    Parent = 0,
+    Colony = 1,
+    Foreign = 2,
+    Distant = 4,
+    Enchanted = 5,
+});
+
 pub type MonetaryAmount = u32;
 
-#[derive(PartialEq, Debug)]
-pub struct CityId(u16);
+pub type CityId = u16;

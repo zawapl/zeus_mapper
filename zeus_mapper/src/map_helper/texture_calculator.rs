@@ -1140,7 +1140,7 @@ mod tests {
     use std::io::Result;
     use std::path::PathBuf;
 
-    #[ignore]
+    #[ignore] // todo ignore plan terrain as that seems unstable and remove the ignored
     #[test]
     fn test_maps() -> Result<()> {
         let game_root = std::env::var("ZEUS_HOME").expect("ZEUS_HOME env var is not file_data");

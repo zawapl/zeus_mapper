@@ -1,8 +1,11 @@
+use crate::pkware::explode;
 use crate::utils::boxed_array::BoxedArray;
 use crate::utils::read_utils::ReadFrom;
+use crate::utils::read_utils::to_usize;
 use crate::utils::write_utils::WriteTo;
 use my_macros::LogDifferences;
 use std::io;
+use std::io::Cursor;
 use std::io::Read;
 use std::io::Write;
 
@@ -33,10 +36,12 @@ impl TradeRouteData {
                 result.push(Self::read_from(reader)?);
             }
         } else {
-            let mut explode_reader = explode::ExplodeReader::new(reader);
+            let mut compressed = vec![0; to_usize(compressed_size)?];
+            reader.read_exact(&mut compressed)?;
+            let mut decompressed_reader = Cursor::new(explode(&compressed)?);
 
             for _ in 0..232 {
-                result.push(Self::read_from(&mut explode_reader)?);
+                result.push(Self::read_from(&mut decompressed_reader)?);
             }
         }
 

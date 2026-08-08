@@ -1,6 +1,8 @@
+use crate::pkware::explode;
 use crate::utils::boxed_array::BoxedArray;
 use encoding_rs::WINDOWS_1252;
 use std::io;
+use std::io::Cursor;
 use std::io::Error;
 use std::io::ErrorKind;
 use std::io::Read;
@@ -121,8 +123,10 @@ pub(crate) fn read_compressed_boxed_array_from<T: ReadFrom + Default, const N: u
     if compressed_size < 0 {
         return BoxedArray::read_from(reader);
     } else {
-        let mut explode_reader = explode::ExplodeReader::new(reader);
-        return BoxedArray::read_from(&mut explode_reader);
+        let mut compressed = vec![0; to_usize(compressed_size)?];
+        reader.read_exact(&mut compressed)?;
+        let mut decompressed_reader = Cursor::new(explode(&compressed)?);
+        return BoxedArray::read_from(&mut decompressed_reader);
     };
 }
 

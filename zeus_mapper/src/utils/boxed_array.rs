@@ -10,7 +10,7 @@ use std::ops::DerefMut;
 
 /// A heap-allocated fixed-size array of `N` elements of `T`.
 #[derive(Debug, Clone, PartialEq)]
-pub struct BoxedArray<T, const N: usize>(Box<[T; N]>);
+pub struct BoxedArray<T, const N: usize>(pub(crate) Box<[T; N]>);
 
 impl<T: Default, const N: usize> BoxedArray<T, N> {
     /// Builds a `BoxedArray` from a `Vec`, padding with `T::default()` if it has fewer than `N`

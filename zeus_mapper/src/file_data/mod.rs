@@ -1,4 +1,5 @@
 pub(crate) mod basic_episode_data;
+pub(crate) mod episode_goal_data;
 pub(crate) mod event_data;
 pub(crate) mod manifest_data;
 pub(crate) mod map_data;

@@ -85,3 +85,135 @@ impl BuildingType {
         return BoxedArray::from_vec(data.to_vec());
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::adventure::adventure::Adventure;
+    use std::io::Result;
+
+    #[test]
+    fn parse_the_youngest_twins() -> Result<()> {
+        if let Ok(game_root) = std::env::var("ZEUS_HOME") {
+            let adventure = Adventure::read_from(format!("{game_root}/Adventures/The Youngest Twins"))?;
+
+            let episode_1 = adventure.parent_episodes.get(0).expect("Episode 1");
+            assert_eq!(
+                episode_1.building_allowed,
+                all_buildings_except([
+                    BuildingType::Corral,
+                    BuildingType::HeroHall,
+                    BuildingType::Armory,
+                    BuildingType::Wharf,
+                    BuildingType::ChariotFactory,
+                ])
+            );
+
+            let episode_2 = adventure.parent_episodes.get(1).expect("Episode 2");
+            assert_eq!(episode_2.building_allowed, all_buildings_except([BuildingType::Corral]));
+
+            let colony_episode = adventure.colony_episodes.get(0).expect("Colony episode");
+            assert_eq!(
+                colony_episode.building_allowed,
+                all_buildings_except([
+                    BuildingType::FishPond,
+                    BuildingType::FlowerGarden,
+                    BuildingType::Gatehouse,
+                    BuildingType::HeroHall,
+                    BuildingType::HorseRanch,
+                    BuildingType::Mint,
+                    BuildingType::SculptureStudio,
+                    BuildingType::Tower,
+                    BuildingType::Wharf,
+                    BuildingType::Wall,
+                    BuildingType::Hippodrome,
+                    BuildingType::Corral,
+                    BuildingType::ChariotFactory
+                ])
+            );
+        }
+
+        return Ok(());
+    }
+
+    #[test]
+    fn parse_the_odyssey() -> Result<()> {
+        if let Ok(game_root) = std::env::var("ZEUS_HOME") {
+            let adventure = Adventure::read_from(format!("{game_root}/Adventures/The Odyssey"))?;
+
+            let episode_1 = adventure.parent_episodes.get(0).expect("Episode 1");
+            assert_eq!(
+                episode_1.building_allowed,
+                all_buildings_except([
+                    BuildingType::Mint,
+                    BuildingType::GrandAgora,
+                    BuildingType::SculptureStudio,
+                    BuildingType::HorseRanch,
+                    BuildingType::HeroHall,
+                    BuildingType::Wall,
+                    BuildingType::Tower,
+                    BuildingType::Gatehouse,
+                    BuildingType::FishPond,
+                    BuildingType::Armory,
+                    BuildingType::Wharf,
+                    BuildingType::EliteHousing,
+                ])
+            );
+
+            let episode_2 = adventure.parent_episodes.get(1).expect("Episode 2");
+            assert_eq!(
+                episode_2.building_allowed,
+                all_buildings_except([
+                    BuildingType::Mint,
+                    BuildingType::HorseRanch,
+                    BuildingType::HeroHall,
+                    BuildingType::Wharf
+                ])
+            );
+
+            let episode_3 = adventure.parent_episodes.get(2).expect("Episode 3");
+            assert_eq!(
+                episode_3.building_allowed,
+                all_buildings_except([
+                    BuildingType::Mint,
+                    BuildingType::HorseRanch,
+                    BuildingType::HeroHall,
+                    BuildingType::Wharf
+                ])
+            );
+
+            let episode_4 = adventure.parent_episodes.get(3).expect("Episode 4");
+            assert_eq!(episode_4.building_allowed, all_buildings_except([BuildingType::Mint]));
+
+            let episode_5 = adventure.parent_episodes.get(4).expect("Episode 5");
+            assert_eq!(episode_5.building_allowed, all_buildings_except([BuildingType::Mint]));
+
+            let colony_episode_1 = adventure.colony_episodes.get(0).expect("Colony episode 1");
+            assert_eq!(
+                colony_episode_1.building_allowed,
+                all_buildings_except([BuildingType::Mint, BuildingType::Winery, BuildingType::Armory])
+            );
+
+            let colony_episode_2 = adventure.colony_episodes.get(1).expect("Colony episode 2");
+            assert_eq!(
+                colony_episode_2.building_allowed,
+                all_buildings_except([
+                    BuildingType::CultureBuildingUnique,
+                    BuildingType::Winery,
+                    BuildingType::SculptureStudio,
+                    BuildingType::HorseRanch,
+                ])
+            );
+        }
+
+        return Ok(());
+    }
+
+    fn all_buildings_except<const N: usize>(excluded: [BuildingType; N]) -> Vec<BuildingType> {
+        return BuildingType::values()
+            .iter()
+            .filter(|building_type| !excluded.contains(building_type))
+            .cloned()
+            .collect();
+    }
+}

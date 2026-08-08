@@ -10,7 +10,7 @@ use std::io::ErrorKind;
 use std::io::Read;
 use std::io::Write;
 
-#[derive(Debug, PartialEq, Default, LogDifferences)]
+#[derive(Debug, Clone, PartialEq, Default, LogDifferences)]
 pub struct MythologyData {
     pub opponent_gods: [u32; 12],
     pub proponent_gods: [u32; 12],

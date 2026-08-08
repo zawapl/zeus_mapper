@@ -1,12 +1,10 @@
+use crate::pkware::DictionarySize;
+use crate::pkware::implode;
 use encoding_rs::WINDOWS_1252;
-use pklib::CompressionMode;
-use pklib::DictionarySize;
-use pklib::implode::implode_bytes;
 use std::io;
 use std::io::Cursor;
 use std::io::Write;
 
-pub(crate) const COMPRESSION_MODE: CompressionMode = CompressionMode::Binary;
 pub(crate) const DICTIONARY_SIZE: DictionarySize = DictionarySize::Size4K;
 
 pub trait WriteTo: Sized {
@@ -85,16 +83,25 @@ impl<T: WriteTo> WriteTo for Vec<T> {
     }
 }
 
+pub(crate) fn write_maybe_compressed<W: Write>(uncompressed: &[u8], writer: &mut W) -> io::Result<usize> {
+    let compressed = implode(uncompressed, DICTIONARY_SIZE);
+
+    let mut bytes = 0;
+    if compressed.len() < uncompressed.len() {
+        bytes += WriteTo::write_to(&(compressed.len() as i32), writer)?;
+        bytes += WriteTo::write_to(&compressed, writer)?;
+    } else {
+        bytes += WriteTo::write_to(&i32::MIN, writer)?;
+        writer.write_all(uncompressed)?;
+        bytes += uncompressed.len();
+    }
+    return Ok(bytes);
+}
+
 pub(crate) fn write_compressed<T: WriteTo, W: Write>(data: &T, writer: &mut W) -> io::Result<usize> {
     let mut buf_writer = Cursor::new(vec![]);
     WriteTo::write_to(data, &mut buf_writer)?;
-    let compressed = implode_bytes(buf_writer.get_ref().as_slice(), COMPRESSION_MODE, DICTIONARY_SIZE)
-        .map_err(|err| io::Error::new(io::ErrorKind::Other, err))?;
-
-    let mut bytes = 0;
-    bytes += WriteTo::write_to(&(compressed.len() as i32), writer)?;
-    bytes += WriteTo::write_to(&compressed, writer)?;
-    return Ok(bytes);
+    return write_maybe_compressed(buf_writer.get_ref(), writer);
 }
 
 #[cfg(test)]
