@@ -35,14 +35,15 @@ pub struct WorldLocationData {
     pub tribute_pay_resource: u16,
     pub tribute_rec_resource: u16,
     pub unknown_240: BoxedArray<u8, 100>,
-    // Old-format (`version_2 != 26`) adventures store this location's real favour here instead of
-    // in the dedicated `favour` field below, which is left `0` for most locations in that format -
-    // see `WorldLocation::from_data`.
-    pub old_format_favour: u8,
-    pub unknown_341: BoxedArray<u8, 15>,
-    pub favour: u32,
+    // See `resolve_favour` for how this and `favour_new` combine.
+    pub favour_old: u8,
+    pub unknown_341: BoxedArray<u8, 11>,
+    // See `resolve_active` for how this and `active_new` combine. Not read for `ParentCity`.
+    pub active_old: u8,
+    pub unknown_353: BoxedArray<u8, 3>,
+    pub favour_new: u32,
     pub unknown_360: [u8; 8],
-    pub active: u32,
+    pub active_new: u32,
     pub visible: u32,
     pub unknown_376: BoxedArray<u8, 100>,
     pub unknown_476: Vec<u8>,
@@ -101,11 +102,13 @@ impl WorldLocationData {
             tribute_pay_resource: ReadFrom::read_from(reader)?,
             tribute_rec_resource: ReadFrom::read_from(reader)?,
             unknown_240: ReadFrom::read_from(reader)?,
-            old_format_favour: ReadFrom::read_from(reader)?,
+            favour_old: ReadFrom::read_from(reader)?,
             unknown_341: ReadFrom::read_from(reader)?,
-            favour: ReadFrom::read_from(reader)?,
+            active_old: ReadFrom::read_from(reader)?,
+            unknown_353: ReadFrom::read_from(reader)?,
+            favour_new: ReadFrom::read_from(reader)?,
             unknown_360: ReadFrom::read_from(reader)?,
-            active: ReadFrom::read_from(reader)?,
+            active_new: ReadFrom::read_from(reader)?,
             visible: ReadFrom::read_from(reader)?,
             unknown_376: ReadFrom::read_from(reader)?,
             unknown_476: read_vec_from(reader, unknown_476_length)?,
@@ -152,11 +155,13 @@ impl WorldLocationData {
         bytes += WriteTo::write_to(&self.tribute_pay_resource, writer)?;
         bytes += WriteTo::write_to(&self.tribute_rec_resource, writer)?;
         bytes += WriteTo::write_to(&self.unknown_240, writer)?;
-        bytes += WriteTo::write_to(&self.old_format_favour, writer)?;
+        bytes += WriteTo::write_to(&self.favour_old, writer)?;
         bytes += WriteTo::write_to(&self.unknown_341, writer)?;
-        bytes += WriteTo::write_to(&self.favour, writer)?;
+        bytes += WriteTo::write_to(&self.active_old, writer)?;
+        bytes += WriteTo::write_to(&self.unknown_353, writer)?;
+        bytes += WriteTo::write_to(&self.favour_new, writer)?;
         bytes += WriteTo::write_to(&self.unknown_360, writer)?;
-        bytes += WriteTo::write_to(&self.active, writer)?;
+        bytes += WriteTo::write_to(&self.active_new, writer)?;
         bytes += WriteTo::write_to(&self.visible, writer)?;
         bytes += WriteTo::write_to(&self.unknown_376, writer)?;
 
@@ -235,11 +240,13 @@ mod tests {
             tribute_pay_resource: 16,
             tribute_rec_resource: 17,
             unknown_240: BoxedArray::from_vec(vec![18; 100]),
-            old_format_favour: 18,
-            unknown_341: BoxedArray::from_vec(vec![18; 15]),
-            favour: 19,
+            favour_old: 18,
+            unknown_341: BoxedArray::from_vec(vec![18; 11]),
+            active_old: 18,
+            unknown_353: BoxedArray::from_vec(vec![18; 3]),
+            favour_new: 19,
             unknown_360: [20; 8],
-            active: 21,
+            active_new: 21,
             visible: 22,
             unknown_376: BoxedArray::from_vec(vec![23; 100]),
             unknown_476: vec![],

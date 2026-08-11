@@ -1,3 +1,4 @@
+use crate::adventure::AdventureType;
 use crate::adventure::Civilization;
 use crate::adventure::MonetaryAmount;
 use crate::adventure::NextEpisode;
@@ -37,6 +38,7 @@ pub struct Adventure {
     pub introduction_text: String,
     pub complete_text: String,
     pub civilization: Civilization,
+    pub adventure_type: AdventureType,
     pub bitmap: u16,
     pub world_bitmap: u32,
     pub parent_city: CityMap,
@@ -69,6 +71,7 @@ impl Adventure {
             complete_text: adventure_text.complete.to_owned(),
             civilization: Civilization::try_resolve(&pak_data.settings_data.real_episode_data[0].civilization)
                 .unwrap_or(Civilization::Greek),
+            adventure_type: AdventureType::try_resolve(&pak_data.settings_data.adventure_type).unwrap_or(AdventureType::ZeusCampaign),
             bitmap: pak_data.settings_data.bitmap as u16,
             world_bitmap: pak_data.map_data[0].background_image,
             parent_city: CityMap::from_map_data(&pak_data.map_data[0]),
@@ -204,9 +207,21 @@ impl Adventure {
             map_data.push(colony_episode.city_map.to_map_data());
         }
 
-        let (world_locations, world_map_elements) = WorldLocation::vec_to_data(&self.world_locations);
+        let (world_locations, world_map_elements) = WorldLocation::vec_to_data(&self.world_locations, self.civilization);
         let trade_routes = TradeRoute::vec_to_data(&self.trade_routes);
         let prices = BoxedArray::from_vec(self.prices.clone());
+
+        // `SettingsData.colony_location_names` mirrors `world_locations[].name` for the up to 4
+        // Colony-type locations, in scan order - not stored independently on `Adventure`, always
+        // derived from `world_locations` itself; see DATA_MAPPING.md.
+        const COLONY_LOCATION_TYPE: u8 = 1;
+        let mut colony_location_names = [u32::MAX; 4];
+        let mut colony_slots = colony_location_names.iter_mut();
+        for location in world_locations.iter().filter(|l| l.location_type == COLONY_LOCATION_TYPE) {
+            if let Some(slot) = colony_slots.next() {
+                *slot = location.name as u32;
+            }
+        }
 
         for map in &mut map_data {
             map.scenario_data.civilization = self.civilization.value();
@@ -266,10 +281,13 @@ impl Adventure {
             colony_episodes_available: self.colony_episodes.len() as u32,
             basic_episode_data,
             real_episode_data,
-            field_4: Default::default(),
+            field_15: Default::default(),
+            colony_location_names,
+            field_16: Default::default(),
             mythology,
             events: BoxedArray::from_vec(events.into()),
-            field_8: Default::default(),
+            adventure_type: self.adventure_type.value(),
+            field_10: Default::default(),
             data_length: 0,
             field_9: Default::default(),
             map_data: map_data_duplicate,
@@ -280,7 +298,12 @@ impl Adventure {
             parent_city_favor,
             field_11: Default::default(),
             bitmap: self.bitmap as u32,
-            field_13: Default::default(),
+            tab_visibility: [1; 11],
+            buffer_0x01_a: BoxedArray::from_vec(vec![1; 143]),
+            buffer_0x00_a: BoxedArray::from_vec(vec![0; 66]),
+            world_map_enabled: 1,
+            buffer_0x01_b: [1; 9],
+            buffer_0x00_b: [0; 4],
             field_14: Default::default(),
             colony_episode_goal_counts,
             colony_episode_goals,

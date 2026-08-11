@@ -15,8 +15,8 @@ pub struct MythologyData {
     pub opponent_gods: [u32; 12],
     pub proponent_gods: [u32; 12],
     pub monster: u32,
-    pub field_4: BoxedArray<u8, 96>,
-    pub field_5: [u8; 12],
+    pub buffer_0xff: BoxedArray<u8, 96>,
+    pub buffer_0x00: [u8; 12],
     pub sanctuaries_allowed: [u8; 12],
     pub max_sanctuaries: u32,
     pub max_pyramids: u32,
@@ -41,8 +41,8 @@ impl MythologyData {
             opponent_gods: ReadFrom::read_from(reader)?,
             proponent_gods: ReadFrom::read_from(reader)?,
             monster: ReadFrom::read_from(reader)?,
-            field_4: ReadFrom::read_from(reader)?,
-            field_5: ReadFrom::read_from(reader)?,
+            buffer_0xff: ReadFrom::read_from(reader)?,
+            buffer_0x00: ReadFrom::read_from(reader)?,
             sanctuaries_allowed: ReadFrom::read_from(reader)?,
             max_sanctuaries: ReadFrom::read_from(reader)?,
             max_pyramids: if include_pyramids { ReadFrom::read_from(reader)? } else { 0 },
@@ -70,8 +70,8 @@ impl MythologyData {
         bytes += WriteTo::write_to(&self.opponent_gods, writer)?;
         bytes += WriteTo::write_to(&self.proponent_gods, writer)?;
         bytes += WriteTo::write_to(&self.monster, writer)?;
-        bytes += WriteTo::write_to(&self.field_4, writer)?;
-        bytes += WriteTo::write_to(&self.field_5, writer)?;
+        bytes += WriteTo::write_to(&self.buffer_0xff, writer)?;
+        bytes += WriteTo::write_to(&self.buffer_0x00, writer)?;
         bytes += WriteTo::write_to(&self.sanctuaries_allowed, writer)?;
         bytes += WriteTo::write_to(&self.max_sanctuaries, writer)?;
 
@@ -81,6 +81,18 @@ impl MythologyData {
         }
 
         return Ok(bytes);
+    }
+
+    pub fn validate(&self) -> Result<(), String> {
+        if let Some(offset) = self.buffer_0xff.as_ref().iter().position(|b| *b != 0xFF) {
+            return Err(format!("buffer_0xff[{offset}] is not 0xFF"));
+        }
+
+        if let Some(offset) = self.buffer_0x00.iter().position(|b| *b != 0) {
+            return Err(format!("buffer_0x00[{offset}] is non-zero"));
+        }
+
+        return Ok(());
     }
 }
 
@@ -96,8 +108,8 @@ mod tests {
             opponent_gods: [1; 12],
             proponent_gods: [2; 12],
             monster: 3,
-            field_4: BoxedArray::from_vec(vec![4; 96]),
-            field_5: [5; 12],
+            buffer_0xff: BoxedArray::from_vec(vec![4; 96]),
+            buffer_0x00: [5; 12],
             sanctuaries_allowed: [6; 12],
             max_sanctuaries: 7,
             max_pyramids: 0,
@@ -121,8 +133,8 @@ mod tests {
             opponent_gods: [1; 12],
             proponent_gods: [2; 12],
             monster: 3,
-            field_4: BoxedArray::from_vec(vec![4; 96]),
-            field_5: [5; 12],
+            buffer_0xff: BoxedArray::from_vec(vec![4; 96]),
+            buffer_0x00: [5; 12],
             sanctuaries_allowed: [6; 12],
             max_sanctuaries: 7,
             max_pyramids: 6,

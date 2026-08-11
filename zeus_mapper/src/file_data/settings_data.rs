@@ -24,10 +24,13 @@ pub struct SettingsData {
     pub colony_episodes_available: u32,
     pub basic_episode_data: [BasicEpisodeData; 20],
     pub real_episode_data: [RealEpisodeData; 14],
-    pub field_4: BoxedArray<u32, 37>,
-    pub mythology: [MythologyData; 14], // 300 or 224
+    pub field_15: [u32; 2],              // still otherwise-undeciphered
+    pub colony_location_names: [u32; 4], // `world_locations[].name` for up to 4 Colony locations, in order; see DATA_MAPPING.md
+    pub field_16: [u32; 31],             // still otherwise-undeciphered
+    pub mythology: [MythologyData; 14],  // 300 or 224
     pub events: BoxedArray<BoxedArray<EventData, 150>, 14>,
-    pub field_8: [u8; 5],
+    pub adventure_type: u8,
+    pub field_10: [u8; 4], // still otherwise-undeciphered; always 0 in every sample observed so far
     pub data_length: u32,
     pub field_9: [u32; 4],
     pub map_data: MapData,
@@ -38,8 +41,13 @@ pub struct SettingsData {
     pub parent_city_favor: [u32; 10],
     pub field_11: BoxedArray<u8, 4112>, // still otherwise-undeciphered; see DATA_MAPPING.md
     pub bitmap: u32,
-    pub field_13: BoxedArray<u8, 234>, // still otherwise-undeciphered; see DATA_MAPPING.md
-    pub field_14: u32,                 // only present for new file format; see DATA_MAPPING.md
+    pub tab_visibility: [u8; 11],
+    pub buffer_0x01_a: BoxedArray<u8, 143>,
+    pub buffer_0x00_a: BoxedArray<u8, 66>,
+    pub world_map_enabled: u8,
+    pub buffer_0x01_b: [u8; 9],
+    pub buffer_0x00_b: [u8; 4],
+    pub field_14: u32, // only present for new file format; see DATA_MAPPING.md
     pub colony_episode_goal_counts: [u32; 4],
     pub colony_episode_goals: [[EpisodeGoalData; 6]; 4],
     pub parent_episode_goal_counts: [u32; 10],
@@ -53,6 +61,34 @@ impl SettingsData {
 
     pub fn write_to<W: Write>(&self, writer: &mut W) -> io::Result<usize> {
         return WriteTo::write_to(self, writer);
+    }
+
+    pub fn validate(&self) -> Result<(), String> {
+        if self.version_1 != 8871 {
+            return Err(format!("version_1 is {}, expected 8871", self.version_1));
+        }
+
+        for mythology in &self.mythology {
+            mythology.validate()?;
+        }
+
+        if let Some(offset) = self.buffer_0x01_a.iter().position(|b| *b != 1) {
+            return Err(format!("buffer_0x01_a[{offset}] is not 1"));
+        }
+
+        if let Some(offset) = self.buffer_0x00_a.iter().position(|b| *b != 0) {
+            return Err(format!("buffer_0x00_a[{offset}] is non-zero"));
+        }
+
+        if let Some(offset) = self.buffer_0x01_b.iter().position(|b| *b != 1) {
+            return Err(format!("buffer_0x01_b[{offset}] is not 1"));
+        }
+
+        if let Some(offset) = self.buffer_0x00_b.iter().position(|b| *b != 0) {
+            return Err(format!("buffer_0x00_b[{offset}] is non-zero"));
+        }
+
+        return Ok(());
     }
 }
 
@@ -79,10 +115,13 @@ impl ReadFrom for SettingsData {
             colony_episodes_available: ReadFrom::read_from(&mut map_data_reader)?,
             basic_episode_data: ReadFrom::read_from(&mut map_data_reader)?,
             real_episode_data: ReadFrom::read_from(&mut map_data_reader)?,
-            field_4: ReadFrom::read_from(&mut map_data_reader)?,
+            field_15: ReadFrom::read_from(&mut map_data_reader)?,
+            colony_location_names: ReadFrom::read_from(&mut map_data_reader)?,
+            field_16: ReadFrom::read_from(&mut map_data_reader)?,
             mythology: MythologyData::read_arr_from(&mut map_data_reader, new_file_ver)?,
             events: ReadFrom::read_from(&mut map_data_reader)?,
-            field_8: ReadFrom::read_from(&mut map_data_reader)?,
+            adventure_type: ReadFrom::read_from(&mut map_data_reader)?,
+            field_10: ReadFrom::read_from(&mut map_data_reader)?,
             data_length: ReadFrom::read_from(&mut map_data_reader)?,
             field_9: ReadFrom::read_from(&mut map_data_reader)?,
             map_data: MapData::read_from(&mut map_data_reader)?,
@@ -93,7 +132,12 @@ impl ReadFrom for SettingsData {
             parent_city_favor: ReadFrom::read_from(&mut limited_reader)?,
             field_11: ReadFrom::read_from(&mut limited_reader)?,
             bitmap: ReadFrom::read_from(&mut limited_reader)?,
-            field_13: ReadFrom::read_from(&mut limited_reader)?,
+            tab_visibility: ReadFrom::read_from(&mut limited_reader)?,
+            buffer_0x01_a: ReadFrom::read_from(&mut limited_reader)?,
+            buffer_0x00_a: ReadFrom::read_from(&mut limited_reader)?,
+            world_map_enabled: ReadFrom::read_from(&mut limited_reader)?,
+            buffer_0x01_b: ReadFrom::read_from(&mut limited_reader)?,
+            buffer_0x00_b: ReadFrom::read_from(&mut limited_reader)?,
             field_14: if new_file_ver {
                 ReadFrom::read_from(&mut limited_reader)?
             } else {
@@ -121,10 +165,13 @@ impl WriteTo for SettingsData {
         bytes += WriteTo::write_to(&self.colony_episodes_available, writer)?;
         bytes += WriteTo::write_to(&self.basic_episode_data, writer)?;
         bytes += WriteTo::write_to(&self.real_episode_data, writer)?;
-        bytes += WriteTo::write_to(&self.field_4, writer)?;
+        bytes += WriteTo::write_to(&self.field_15, writer)?;
+        bytes += WriteTo::write_to(&self.colony_location_names, writer)?;
+        bytes += WriteTo::write_to(&self.field_16, writer)?;
         bytes += MythologyData::write_arr_to(&self.mythology, writer, new_file_ver)?;
         bytes += WriteTo::write_to(&self.events, writer)?;
-        bytes += WriteTo::write_to(&self.field_8, writer)?;
+        bytes += WriteTo::write_to(&self.adventure_type, writer)?;
+        bytes += WriteTo::write_to(&self.field_10, writer)?;
         bytes += WriteTo::write_to(&self.data_length, writer)?;
         bytes += WriteTo::write_to(&self.field_9, writer)?;
         bytes += WriteTo::write_to(&self.map_data, writer)?;
@@ -150,7 +197,12 @@ impl WriteTo for SettingsData {
         bytes += WriteTo::write_to(&self.parent_city_favor, writer)?;
         bytes += WriteTo::write_to(&self.field_11, writer)?;
         bytes += WriteTo::write_to(&self.bitmap, writer)?;
-        bytes += WriteTo::write_to(&self.field_13, writer)?;
+        bytes += WriteTo::write_to(&self.tab_visibility, writer)?;
+        bytes += WriteTo::write_to(&self.buffer_0x01_a, writer)?;
+        bytes += WriteTo::write_to(&self.buffer_0x00_a, writer)?;
+        bytes += WriteTo::write_to(&self.world_map_enabled, writer)?;
+        bytes += WriteTo::write_to(&self.buffer_0x01_b, writer)?;
+        bytes += WriteTo::write_to(&self.buffer_0x00_b, writer)?;
         if new_file_ver {
             bytes += WriteTo::write_to(&self.field_14, writer)?;
         }
@@ -168,46 +220,42 @@ mod tests {
     use crate::file_data::settings_data::SettingsData;
     use std::fs;
     use std::fs::File;
+    use std::io;
     use std::io::BufReader;
-    use std::io::Result;
     use std::io::Seek;
     use std::io::SeekFrom;
 
     #[test]
-    fn test_set_files() -> Result<()> {
-        let game_root = std::env::var("ZEUS_HOME").expect("ZEUS_HOME env var is not set");
+    fn validate_set_files() -> io::Result<()> {
+        if let Ok(game_root) = std::env::var("ZEUS_HOME") {
+            let adventures_folder = fs::read_dir(format!("{}/Adventures", game_root))?;
 
-        let adventures_folder = fs::read_dir(format!("{}/Adventures", game_root))?;
+            for adventure_folder in adventures_folder {
+                let folder_path = adventure_folder?.path();
 
-        let mut files_tested = 0;
+                if folder_path.is_dir() {
+                    for adventure_file in fs::read_dir(folder_path)? {
+                        let path = adventure_file?.path();
+                        let extension = path.extension().map_or("", |x| x.to_str().unwrap_or(""));
+                        if extension == "set" {
+                            let mut reader = File::open(&path).map(BufReader::new)?;
+                            let settings_data = SettingsData::read_from(&mut reader)?;
 
-        for adventure in adventures_folder {
-            let folder_path = adventure?.path();
-            if folder_path.is_dir() {
-                let files = fs::read_dir(folder_path)?;
-                for file in files {
-                    let file_path = file?.path();
-                    let extension = file_path.extension().map_or("", |x| x.to_str().unwrap_or(""));
-                    if extension == "set" {
-                        let mut reader = File::open(&file_path).map(BufReader::new)?;
-                        let settings_data = SettingsData::read_from(&mut reader)?;
+                            let current_pos = reader.stream_position()?;
+                            reader.seek(SeekFrom::End(0))?;
+                            let end_pos = reader.stream_position()?;
+                            let unread = end_pos - current_pos;
 
-                        let current_pos = reader.stream_position()?;
-                        reader.seek(SeekFrom::End(0))?;
-                        let end_pos = reader.stream_position()?;
-                        let unread = end_pos - current_pos;
+                            assert_eq!(unread, 0, "{path:?}: {} unread bytes", end_pos - current_pos);
 
-                        assert_eq!(unread, 0);
-
-                        assert_eq!(settings_data.version_1, 8871);
-
-                        files_tested += 1;
+                            if let Err(e) = settings_data.validate() {
+                                panic!("{path:?}: {e}");
+                            }
+                        }
                     }
                 }
             }
         }
-
-        assert!(files_tested >= 8, "Files checked = {files_tested}");
 
         return Ok(());
     }

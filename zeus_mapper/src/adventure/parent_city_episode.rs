@@ -28,9 +28,10 @@ pub struct ParentEpisode {
     pub pyramid_settings: Vec<PyramidSetting>,
 }
 
-/// The player's own city's world-facing stats, in the same shape `WorldLocation` carries for
-/// every other city - it's assembled from `SettingsData` fields for trade/favour rather than
-/// read directly off one `WorldLocationData` record.
+/// The player's own city's world-facing trade/favour stats - unlike `WorldLocationType::ParentCity`
+/// (which has no `traded_resources`/`favour` of its own; see `WorldLocationType`'s doc comment),
+/// this is assembled from separate `SettingsData` fields rather than read off one
+/// `WorldLocationData` record.
 #[derive(LogDifferences, PartialEq, Debug)]
 pub struct ParentCityWorldSettings {
     pub traded_resources: Vec<TradedGoods>,

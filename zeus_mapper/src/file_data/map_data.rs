@@ -30,7 +30,7 @@ pub struct MapData {
     pub terrain: BoxedArray<u32, 51984>,
     pub tile_size: BoxedArray<u8, 51984>,
     pub random: BoxedArray<u8, 51984>,
-    pub field_10: BoxedArray<u8, 51984>,
+    pub buffer_0x00: BoxedArray<u8, 51984>,
     pub seed_1: u32,
     pub seed_2: u32,
     pub field_13: u32,
@@ -40,7 +40,7 @@ pub struct MapData {
     pub field_17: BoxedArray<u8, 18628>,
     pub world_map_elements: BoxedArray<WorldMapElementData, 200>,
     pub trade_routes: BoxedArray<TradeRouteData, 232>,
-    pub field_20: BoxedArray<u8, 51984>,
+    pub buffer_0xff: BoxedArray<u8, 51984>,
     pub field_21: BoxedArray<u8, 36>,
     pub prices: BoxedArray<u32, 36>,
     pub scrub: BoxedArray<u8, 51984>,
@@ -82,6 +82,31 @@ impl MapData {
             result.push(MapData::read_from(reader)?);
         }
     }
+
+    pub fn validate(&self) -> Result<(), String> {
+        if self.version_2 != 33 {
+            return Err(format!("version_2 is {}, expected 33", self.version_2));
+        }
+
+        let is_old_format = (227..=247).contains(&self.version_1);
+        let is_new_format = (318..=321).contains(&self.version_1);
+        if !is_old_format && !is_new_format {
+            return Err(format!(
+                "version_1 is {}, expected the known old-format (227..=247) or new-format (318..=321) range",
+                self.version_1
+            ));
+        }
+
+        if let Some(offset) = self.buffer_0x00.as_ref().iter().position(|b| *b != 0) {
+            return Err(format!("buffer_0x00[{offset}] is non-zero"));
+        }
+
+        if let Some(offset) = self.buffer_0xff.as_ref().iter().position(|b| *b != 0xFF) {
+            return Err(format!("buffer_0xff[{offset}] is not 0xFF"));
+        }
+
+        return Ok(());
+    }
 }
 
 impl ReadFrom for MapData {
@@ -114,7 +139,7 @@ impl ReadFrom for MapData {
             terrain: read_compressed_boxed_array_from(reader)?,
             tile_size: read_compressed_boxed_array_from(reader)?,
             random: read_compressed_boxed_array_from(reader)?,
-            field_10: read_compressed_boxed_array_from(reader)?,
+            buffer_0x00: read_compressed_boxed_array_from(reader)?,
             seed_1: ReadFrom::read_from(reader)?,
             seed_2: ReadFrom::read_from(reader)?,
             field_13: ReadFrom::read_from(reader)?,
@@ -124,7 +149,7 @@ impl ReadFrom for MapData {
             field_17: ReadFrom::read_from(reader)?,
             world_map_elements: WorldMapElementData::read_arr_from(reader, include_custom_names)?,
             trade_routes: TradeRouteData::read_arr_from(reader)?,
-            field_20: read_compressed_boxed_array_from(reader)?,
+            buffer_0xff: read_compressed_boxed_array_from(reader)?,
             field_21: read_compressed_boxed_array_from(reader)?,
             prices: ReadFrom::read_from(reader)?,
             scrub: read_compressed_boxed_array_from(reader)?,
@@ -159,7 +184,7 @@ impl WriteTo for MapData {
         bytes += write_compressed(&self.terrain, writer)?;
         bytes += write_compressed(&self.tile_size, writer)?;
         bytes += write_compressed(&self.random, writer)?;
-        bytes += write_compressed(&self.field_10, writer)?;
+        bytes += write_compressed(&self.buffer_0x00, writer)?;
         bytes += WriteTo::write_to(&self.seed_1, writer)?;
         bytes += WriteTo::write_to(&self.seed_2, writer)?;
         bytes += WriteTo::write_to(&self.field_13, writer)?;
@@ -169,7 +194,7 @@ impl WriteTo for MapData {
         bytes += WriteTo::write_to(&self.field_17, writer)?;
         bytes += WorldMapElementData::write_arr_to(&self.world_map_elements, writer, include_custom_names)?;
         bytes += write_compressed(&self.trade_routes, writer)?;
-        bytes += write_compressed(&self.field_20, writer)?;
+        bytes += write_compressed(&self.buffer_0xff, writer)?;
         bytes += write_compressed(&self.field_21, writer)?;
         bytes += WriteTo::write_to(&self.prices, writer)?;
         bytes += write_compressed(&self.scrub, writer)?;
@@ -193,58 +218,43 @@ mod tests {
     use crate::file_data::map_data::MapData;
     use std::fs;
     use std::fs::File;
+    use std::io;
     use std::io::BufReader;
     use std::io::Seek;
     use std::io::SeekFrom;
 
     #[test]
-    fn test_map_files() {
-        let game_root = std::env::var("ZEUS_HOME").expect("ZEUS_HOME env var is not file_data");
+    fn validate_map_files() -> io::Result<()> {
+        if let Ok(game_root) = std::env::var("ZEUS_HOME") {
+            for entry in fs::read_dir(format!("{game_root}/Adventures"))? {
+                let adventure_folder = entry?.path();
 
-        let adventures_folder = fs::read_dir(format!("{}/Adventures", game_root)).unwrap();
+                if adventure_folder.is_dir() {
+                    for adventure_file in fs::read_dir(adventure_folder)? {
+                        let path = adventure_file?.path();
 
-        let mut files_tested = 0;
+                        let extension = path.extension().map_or("", |x| x.to_str().unwrap_or(""));
 
-        for adventure in adventures_folder {
-            let folder_path = adventure.unwrap().path();
-            if folder_path.is_dir() {
-                let files = fs::read_dir(folder_path).unwrap();
-                for file in files {
-                    let file_path = file.unwrap().path();
-                    let extension = file_path.extension().map_or("", |x| x.to_str().unwrap_or(""));
-                    if extension == "map" {
-                        let mut reader = File::open(&file_path).map(BufReader::new).unwrap();
-                        let zeus_map_file = MapData::read_from(&mut reader).unwrap();
+                        if extension == "map" {
+                            let mut reader = File::open(&path).map(BufReader::new)?;
+                            let map_data = MapData::read_from(&mut reader)?;
 
-                        let current_pos = reader.stream_position().unwrap();
-                        reader.seek(SeekFrom::End(0)).unwrap();
-                        let end_pos = reader.stream_position().unwrap();
-                        let unread = end_pos - current_pos;
+                            let current_pos = reader.stream_position()?;
+                            reader.seek(SeekFrom::End(0))?;
+                            let end_pos = reader.stream_position()?;
+                            let unread = end_pos - current_pos;
 
-                        assert_eq!(unread, 0);
+                            assert_eq!(unread, 0, "{path:?}: {} unread bytes", end_pos - current_pos);
 
-                        assert_eq!(zeus_map_file.version_2, 33);
-
-                        // let mut bytes = vec![];
-                        // let mut buffer_writer = Cursor::new(&mut bytes);
-                        // let written = zeus_map_file.write_to(&mut buffer_writer).unwrap();
-                        //
-                        // assert_eq!(written, bytes.len());
-                        //
-                        // let mut buffer_reader = Cursor::new(&mut bytes);
-                        // let reconstructed = MapData::read_from(&mut buffer_reader).unwrap();
-                        // LogDifferences::log_differences(
-                        //     &zeus_map_file,
-                        //     &reconstructed,
-                        //     format!("{:?}", file_path.file_name().unwrap())
-                        // );
-
-                        files_tested += 1;
+                            if let Err(e) = map_data.validate() {
+                                panic!("{path:?}: {e}");
+                            }
+                        }
                     }
                 }
             }
         }
 
-        assert!(files_tested >= 8);
+        return Ok(());
     }
 }

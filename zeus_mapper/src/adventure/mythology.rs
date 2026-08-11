@@ -1,5 +1,6 @@
 use crate::adventure::God;
 use crate::adventure::Monster;
+use crate::prelude::BoxedArray;
 use crate::prelude::DataConstant;
 use crate::prelude::MythologyData;
 use my_macros::LogDifferences;
@@ -44,8 +45,8 @@ impl Mythology {
             opponent_gods,
             proponent_gods,
             monster: self.monster.value(),
-            field_4: Default::default(),
-            field_5: [0; 12],
+            buffer_0xff: BoxedArray::from_vec(vec![0xFF; 96]),
+            buffer_0x00: [0; 12],
             sanctuaries_allowed,
             max_sanctuaries: self.max_sanctuaries as u32,
             max_pyramids: 0,

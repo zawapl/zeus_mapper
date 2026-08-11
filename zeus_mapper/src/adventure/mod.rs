@@ -19,6 +19,14 @@ data_constants!(Civilization<u32>{
     Atlantean = 1,
 });
 
+data_constants!(AdventureType<u8>{
+    ZeusCampaign = 0,
+    ZeusCustom = 1,
+    Tutorial = 2,
+    PoseidonCampaign = 3,
+    PoseidonCustom = 4,
+});
+
 data_constants!(God<u32> {
     Zeus = 0,
     Poseidon = 1,
@@ -102,14 +110,6 @@ data_constants!(NextEpisode<u32>{
     Victory = 0,
     Colony = 1,
     Parent = 2,
-});
-
-data_constants!(LocationType<u8>{
-    Parent = 0,
-    Colony = 1,
-    Foreign = 2,
-    Distant = 4,
-    Enchanted = 5,
 });
 
 pub type MonetaryAmount = u32;
