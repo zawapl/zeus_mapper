@@ -69,8 +69,7 @@ impl Adventure {
             title: adventure_text.title.to_owned(),
             introduction_text: adventure_text.introduction.to_owned(),
             complete_text: adventure_text.complete.to_owned(),
-            civilization: Civilization::try_resolve(&pak_data.settings_data.real_episode_data[0].civilization)
-                .unwrap_or(Civilization::Greek),
+            civilization: pak_data.civilization(),
             adventure_type: AdventureType::try_resolve(&pak_data.settings_data.adventure_type).unwrap_or(AdventureType::ZeusCampaign),
             bitmap: pak_data.settings_data.bitmap as u16,
             world_bitmap: pak_data.map_data[0].background_image,

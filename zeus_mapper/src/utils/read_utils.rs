@@ -61,6 +61,14 @@ impl<T: ReadFrom, const N: usize> ReadFrom for [T; N] {
     }
 }
 
+/// Reads a fixed-width string, trimming only trailing NUL padding.
+///
+/// **Assumptions**: callers that need a clean C-style string (stopping at the first NUL rather than
+/// just the trailing run) must trim it themselves - this function deliberately preserves any bytes
+/// between an embedded NUL and the buffer's own trailing padding, since a shorter string written into
+/// a buffer that previously held a longer one can leave stray non-NUL bytes behind the true
+/// terminator, and several callers round-trip that content byte-for-byte (see
+/// `byte_identical_adventures_round_trip_exactly` in `file_data/pak_data.rs`).
 pub fn read_string_from(reader: &mut impl Read, bytes: usize) -> io::Result<String> {
     let mut buffer = vec![0; bytes];
 
@@ -134,6 +142,22 @@ pub fn read_bytes_to_end(reader: &mut impl Read) -> io::Result<Vec<u8>> {
     let mut buf = vec![];
     reader.read_to_end(&mut buf)?;
     return Ok(buf);
+}
+
+/// Same shape as `read_compressed_boxed_array_from`, but for a `Vec<u8>` whose length is only known
+/// at read time (not a compile-time constant), e.g. a field whose decompressed size depends on a
+/// runtime condition such as vanilla-vs-Poseidon.
+pub(crate) fn read_compressed_vec_from(reader: &mut impl Read, expected_len: usize) -> io::Result<Vec<u8>> {
+    let compressed_size = i32::read_from(reader)?;
+
+    if compressed_size < 0 {
+        return read_vec_from(reader, expected_len);
+    } else {
+        let mut compressed = vec![0; to_usize(compressed_size)?];
+        reader.read_exact(&mut compressed)?;
+        let mut decompressed_reader = Cursor::new(explode(&compressed)?);
+        return read_vec_from(&mut decompressed_reader, expected_len);
+    };
 }
 pub fn to_usize<T>(value: T) -> io::Result<usize>
 where

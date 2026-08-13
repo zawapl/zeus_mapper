@@ -1,3 +1,5 @@
+use crate::adventure::Civilization;
+use crate::constants::data_constant::DataConstant;
 use crate::file_data::map_data::MapData;
 use crate::file_data::settings_data::SettingsData;
 use crate::utils::write_utils::WriteTo;
@@ -22,6 +24,16 @@ impl PakData {
 
     pub fn write_to<W: Write>(&self, writer: &mut W) -> io::Result<usize> {
         return WriteTo::write_to(self, writer);
+    }
+
+    /// This adventure's civilization, resolved from `settings_data.real_episode_data[0].civilization`.
+    ///
+    /// The same resolution `Adventure::from_pak` already performs - exposed directly here too so
+    /// callers with only a `PakData` (no `AdventureText`, which `Adventure::from_pak` requires) can
+    /// still get it, and so `SavData::civilization` (the `.sav` equivalent) has a `.pak`-side
+    /// counterpart at the same layer.
+    pub fn civilization(&self) -> Civilization {
+        return Civilization::try_resolve(&self.settings_data.real_episode_data[0].civilization).unwrap_or(Civilization::Greek);
     }
 }
 
