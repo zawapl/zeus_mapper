@@ -51,6 +51,14 @@ impl WriteTo for i32 {
     }
 }
 
+impl WriteTo for u64 {
+    fn write_to<W: Write>(&self, writer: &mut W) -> io::Result<usize> {
+        let bytes = u64::to_le_bytes(*self);
+        writer.write_all(&bytes)?;
+        return Ok(bytes.len());
+    }
+}
+
 impl<T: WriteTo, const N: usize> WriteTo for [T; N] {
     fn write_to<W: Write>(&self, writer: &mut W) -> io::Result<usize> {
         let mut written_bytes = 0;

@@ -23,9 +23,9 @@ pub struct WorldMapElementData {
     // 121 = Zeus_Interface.sg3#1090
     // Zeus_empire_bits.BMP starts at 1038 (note atlantean sprites are in Poseidon_loaded.sg3#247)
     pub sprite_id: u8,
-    pub unknown_a: [u8; 6], // @0 is set to 13 for atlantean rival
+    pub unknown_1: [u8; 6], // @0 is set to 13 for atlantean rival
     pub label_position: u8,
-    pub unknown_b: [u8; 4],
+    pub unknown_2: [u8; 4],
     pub region_name: u8, // also something else for a old_city?
     pub city_name: u8,
     pub data_d: [u8; 14],
@@ -65,9 +65,9 @@ impl WorldMapElementData {
             sprite_width: ReadFrom::read_from(reader)?,
             sprite_height: ReadFrom::read_from(reader)?,
             sprite_id: ReadFrom::read_from(reader)?,
-            unknown_a: ReadFrom::read_from(reader)?,
+            unknown_1: ReadFrom::read_from(reader)?,
             label_position: ReadFrom::read_from(reader)?,
-            unknown_b: ReadFrom::read_from(reader)?,
+            unknown_2: ReadFrom::read_from(reader)?,
             region_name: ReadFrom::read_from(reader)?,
             city_name: ReadFrom::read_from(reader)?,
             data_d: ReadFrom::read_from(reader)?,
@@ -98,9 +98,9 @@ impl WorldMapElementData {
         bytes += WriteTo::write_to(&self.sprite_width, writer)?;
         bytes += WriteTo::write_to(&self.sprite_height, writer)?;
         bytes += WriteTo::write_to(&self.sprite_id, writer)?;
-        bytes += WriteTo::write_to(&self.unknown_a, writer)?;
+        bytes += WriteTo::write_to(&self.unknown_1, writer)?;
         bytes += WriteTo::write_to(&self.label_position, writer)?;
-        bytes += WriteTo::write_to(&self.unknown_b, writer)?;
+        bytes += WriteTo::write_to(&self.unknown_2, writer)?;
         bytes += WriteTo::write_to(&self.region_name, writer)?;
         bytes += WriteTo::write_to(&self.city_name, writer)?;
         bytes += WriteTo::write_to(&self.data_d, writer)?;
@@ -159,9 +159,9 @@ mod tests {
             sprite_width: 7,
             sprite_height: 8,
             sprite_id: 9,
-            unknown_a: [10; 6],
+            unknown_1: [10; 6],
             label_position: 10,
-            unknown_b: [10; 4],
+            unknown_2: [10; 4],
             region_name: 11,
             city_name: 12,
             data_d: [13; 14],

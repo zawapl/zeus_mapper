@@ -30,30 +30,30 @@ pub struct MapData {
     pub terrain: BoxedArray<u32, 51984>,
     pub tile_size: BoxedArray<u8, 51984>,
     pub random: BoxedArray<u8, 51984>,
-    pub buffer_0x00: BoxedArray<u8, 51984>,
+    pub constant_1_0x00: BoxedArray<u8, 51984>,
     pub seed_1: u32,
     pub seed_2: u32,
-    pub field_13: u32,
-    pub field_14: u32,
+    pub unknown_1: u32,
+    pub unknown_2: u32,
     pub scenario_data: RealEpisodeData,
     pub meadow: BoxedArray<u8, 51984>,
-    pub field_17: BoxedArray<u8, 18628>,
+    pub unknown_3: BoxedArray<u8, 18628>,
     pub world_map_elements: BoxedArray<WorldMapElementData, 200>,
     pub trade_routes: BoxedArray<TradeRouteData, 232>,
-    pub buffer_0xff: BoxedArray<u8, 51984>,
-    pub field_21: BoxedArray<u8, 36>,
+    pub constant_2_0xff: BoxedArray<u8, 51984>,
+    pub unknown_4: BoxedArray<u8, 36>,
     pub prices: BoxedArray<u32, 36>,
     pub scrub: BoxedArray<u8, 51984>,
     pub elevation: BoxedArray<u8, 51984>,
     pub elevation_rotation: BoxedArray<u8, 51984>,
     pub world_locations: BoxedArray<WorldLocationData, 22>,
     pub background_image: u32,
-    pub field_28: Vec<Vec<u8>>,
+    pub unknown_5: Vec<Vec<u8>>,
     pub mythology: MythologyData,
-    pub field_30: [BoxedArray<u8, 76>; 6],
-    pub field_31: u32,
-    pub field_32: u32,
-    pub field_33: [BoxedArray<u8, 36>; 10],
+    pub unknown_6: [BoxedArray<u8, 76>; 6],
+    pub unknown_7: u32,
+    pub unknown_8: u32,
+    pub unknown_9: [BoxedArray<u8, 36>; 10],
 }
 
 impl MapData {
@@ -97,12 +97,22 @@ impl MapData {
             ));
         }
 
-        if let Some(offset) = self.buffer_0x00.as_ref().iter().position(|b| *b != 0) {
-            return Err(format!("buffer_0x00[{offset}] is non-zero"));
+        if let Some(offset) = self.constant_1_0x00.as_ref().iter().position(|b| *b != 0) {
+            return Err(format!("constant_1_0x00[{offset}] is non-zero"));
         }
 
-        if let Some(offset) = self.buffer_0xff.as_ref().iter().position(|b| *b != 0xFF) {
-            return Err(format!("buffer_0xff[{offset}] is not 0xFF"));
+        if let Some(offset) = self.constant_2_0xff.as_ref().iter().position(|b| *b != 0xFF) {
+            return Err(format!("constant_2_0xff[{offset}] is not 0xFF"));
+        }
+
+        self.scenario_data.validate().map_err(|e| format!("scenario_data: {e}"))?;
+
+        for (i, trade_route) in self.trade_routes.iter().enumerate() {
+            trade_route.validate().map_err(|e| format!("trade_routes[{i}]: {e}"))?;
+        }
+
+        for (i, world_location) in self.world_locations.iter().enumerate() {
+            world_location.validate().map_err(|e| format!("world_locations[{i}]: {e}"))?;
         }
 
         return Ok(());
@@ -139,30 +149,30 @@ impl ReadFrom for MapData {
             terrain: read_compressed_boxed_array_from(reader)?,
             tile_size: read_compressed_boxed_array_from(reader)?,
             random: read_compressed_boxed_array_from(reader)?,
-            buffer_0x00: read_compressed_boxed_array_from(reader)?,
+            constant_1_0x00: read_compressed_boxed_array_from(reader)?,
             seed_1: ReadFrom::read_from(reader)?,
             seed_2: ReadFrom::read_from(reader)?,
-            field_13: ReadFrom::read_from(reader)?,
-            field_14: ReadFrom::read_from(reader)?,
+            unknown_1: ReadFrom::read_from(reader)?,
+            unknown_2: ReadFrom::read_from(reader)?,
             scenario_data: ReadFrom::read_from(reader)?,
             meadow: read_compressed_boxed_array_from(reader)?,
-            field_17: ReadFrom::read_from(reader)?,
+            unknown_3: ReadFrom::read_from(reader)?,
             world_map_elements: WorldMapElementData::read_arr_from(reader, include_custom_names)?,
             trade_routes: TradeRouteData::read_arr_from(reader)?,
-            buffer_0xff: read_compressed_boxed_array_from(reader)?,
-            field_21: read_compressed_boxed_array_from(reader)?,
+            constant_2_0xff: read_compressed_boxed_array_from(reader)?,
+            unknown_4: read_compressed_boxed_array_from(reader)?,
             prices: ReadFrom::read_from(reader)?,
             scrub: read_compressed_boxed_array_from(reader)?,
             elevation: read_compressed_boxed_array_from(reader)?,
             elevation_rotation: read_compressed_boxed_array_from(reader)?,
             world_locations: WorldLocationData::read_arr_from(reader, include_world_locations_extras)?,
             background_image: ReadFrom::read_from(reader)?,
-            field_28: read_segment(reader, &manifest_field_28)?,
+            unknown_5: read_segment(reader, &manifest_field_28)?,
             mythology: MythologyData::read_from(reader, include_pyramids)?,
-            field_30: ReadFrom::read_from(reader)?,
-            field_31: ReadFrom::read_from(reader)?,
-            field_32: ReadFrom::read_from(reader)?,
-            field_33: ReadFrom::read_from(reader)?,
+            unknown_6: ReadFrom::read_from(reader)?,
+            unknown_7: ReadFrom::read_from(reader)?,
+            unknown_8: ReadFrom::read_from(reader)?,
+            unknown_9: ReadFrom::read_from(reader)?,
         });
     }
 }
@@ -184,30 +194,30 @@ impl WriteTo for MapData {
         bytes += write_compressed(&self.terrain, writer)?;
         bytes += write_compressed(&self.tile_size, writer)?;
         bytes += write_compressed(&self.random, writer)?;
-        bytes += write_compressed(&self.buffer_0x00, writer)?;
+        bytes += write_compressed(&self.constant_1_0x00, writer)?;
         bytes += WriteTo::write_to(&self.seed_1, writer)?;
         bytes += WriteTo::write_to(&self.seed_2, writer)?;
-        bytes += WriteTo::write_to(&self.field_13, writer)?;
-        bytes += WriteTo::write_to(&self.field_14, writer)?;
+        bytes += WriteTo::write_to(&self.unknown_1, writer)?;
+        bytes += WriteTo::write_to(&self.unknown_2, writer)?;
         bytes += WriteTo::write_to(&self.scenario_data, writer)?;
         bytes += write_compressed(&self.meadow, writer)?;
-        bytes += WriteTo::write_to(&self.field_17, writer)?;
+        bytes += WriteTo::write_to(&self.unknown_3, writer)?;
         bytes += WorldMapElementData::write_arr_to(&self.world_map_elements, writer, include_custom_names)?;
         bytes += write_compressed(&self.trade_routes, writer)?;
-        bytes += write_compressed(&self.buffer_0xff, writer)?;
-        bytes += write_compressed(&self.field_21, writer)?;
+        bytes += write_compressed(&self.constant_2_0xff, writer)?;
+        bytes += write_compressed(&self.unknown_4, writer)?;
         bytes += WriteTo::write_to(&self.prices, writer)?;
         bytes += write_compressed(&self.scrub, writer)?;
         bytes += write_compressed(&self.elevation, writer)?;
         bytes += write_compressed(&self.elevation_rotation, writer)?;
         bytes += WorldLocationData::write_arr_to(&self.world_locations, writer, include_world_locations_extras)?;
         bytes += WriteTo::write_to(&self.background_image, writer)?;
-        bytes += WriteTo::write_to(&self.field_28, writer)?;
+        bytes += WriteTo::write_to(&self.unknown_5, writer)?;
         bytes += MythologyData::write_to(&self.mythology, writer, include_pyramids)?;
-        bytes += WriteTo::write_to(&self.field_30, writer)?;
-        bytes += WriteTo::write_to(&self.field_31, writer)?;
-        bytes += WriteTo::write_to(&self.field_32, writer)?;
-        bytes += WriteTo::write_to(&self.field_33, writer)?;
+        bytes += WriteTo::write_to(&self.unknown_6, writer)?;
+        bytes += WriteTo::write_to(&self.unknown_7, writer)?;
+        bytes += WriteTo::write_to(&self.unknown_8, writer)?;
+        bytes += WriteTo::write_to(&self.unknown_9, writer)?;
 
         return Ok(bytes);
     }

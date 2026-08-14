@@ -53,6 +53,14 @@ impl ReadFrom for i32 {
     }
 }
 
+impl ReadFrom for u64 {
+    fn read_from(reader: &mut impl Read) -> io::Result<Self> {
+        let mut tmp = [0; 8];
+        reader.read_exact(&mut tmp)?;
+        return Ok(u64::from_le_bytes(tmp));
+    }
+}
+
 impl<T: ReadFrom, const N: usize> ReadFrom for [T; N] {
     // todo Use MaybeUninit with array transposing once stable: https://github.com/rust-lang/rust/issues/96097
     fn read_from(reader: &mut impl Read) -> io::Result<Self> {

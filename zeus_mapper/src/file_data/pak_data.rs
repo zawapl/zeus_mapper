@@ -35,6 +35,16 @@ impl PakData {
     pub fn civilization(&self) -> Civilization {
         return Civilization::try_resolve(&self.settings_data.real_episode_data[0].civilization).unwrap_or(Civilization::Greek);
     }
+
+    pub fn validate(&self) -> Result<(), String> {
+        self.settings_data.validate().map_err(|e| format!("settings_data: {e}"))?;
+
+        for (i, map_data) in self.map_data.iter().enumerate() {
+            map_data.validate().map_err(|e| format!("map_data[{i}]: {e}"))?;
+        }
+
+        return Ok(());
+    }
 }
 
 impl WriteTo for PakData {
@@ -66,9 +76,54 @@ mod tests {
     use crate::prelude::WorldLocationData;
     use crate::prelude::WorldMapElementData;
     use std::fs;
+    use std::fs::File;
+    use std::io::BufReader;
     use std::io::Cursor;
     use std::io::Result;
+    use std::io::Seek;
+    use std::io::SeekFrom;
+    use std::path::Path;
     use std::path::PathBuf;
+
+    #[test]
+    fn validate_pak_files() -> Result<()> {
+        if let Ok(game_root) = std::env::var("ZEUS_HOME") {
+            let mut pak_paths = vec![];
+            collect_paks(&PathBuf::from(format!("{game_root}/Adventures")), &mut pak_paths)?;
+
+            for path in pak_paths {
+                let mut reader = File::open(&path).map(BufReader::new)?;
+                let pak_data = PakData::read_from(&mut reader)?;
+
+                let current_pos = reader.stream_position()?;
+                reader.seek(SeekFrom::End(0))?;
+                let end_pos = reader.stream_position()?;
+                let unread = end_pos - current_pos;
+
+                assert_eq!(unread, 0, "{path:?}: {unread} unread bytes");
+
+                if let Err(e) = pak_data.validate() {
+                    panic!("{path:?}: {e}");
+                }
+            }
+        }
+
+        return Ok(());
+    }
+
+    fn collect_paks(dir: &Path, out: &mut Vec<PathBuf>) -> Result<()> {
+        for entry in fs::read_dir(dir)? {
+            let path = entry?.path();
+
+            if path.is_dir() {
+                collect_paks(&path, out)?;
+            } else if path.extension().map_or(false, |e| e == "pak") {
+                out.push(path);
+            }
+        }
+
+        return Ok(());
+    }
 
     #[test]
     fn byte_identical_adventures_round_trip_exactly() -> Result<()> {
@@ -151,30 +206,39 @@ mod tests {
                 colony_episodes_available: 1,
                 basic_episode_data: self.generate_data(),
                 real_episode_data: self.generate_data(),
-                field_15: self.generate_data(),
+                unknown_1: self.generate_data(),
                 colony_location_names: self.generate_data(),
-                field_16: self.generate_data(),
+                unknown_2: self.generate_data(),
                 mythology: self.generate_data(),
                 events: self.generate_data(),
                 adventure_type: self.generate_data(),
-                field_10: self.generate_data(),
+                constant_1_0x00: self.generate_data(),
                 data_length: self.generate_data(),
-                field_9: self.generate_data(),
+                unknown_3: self.generate_data(),
                 map_data: self.generate_data(),
                 padding: vec![],
                 parent_event_counts: self.generate_data(),
                 colony_event_counts: self.generate_data(),
                 unused_blocks: self.generate_data(),
                 parent_city_favor: self.generate_data(),
-                field_11: self.generate_data(),
+                constant_2_0x00: self.generate_data(),
                 bitmap: self.generate_data(),
                 tab_visibility: self.generate_data(),
-                buffer_0x01_a: self.generate_data(),
-                buffer_0x00_a: self.generate_data(),
+                constant_3_0x01: self.generate_data(),
+                unknown_4: self.generate_data(),
+                constant_4_0x01: self.generate_data(),
+                unknown_5: self.generate_data(),
+                constant_5_0x01: self.generate_data(),
+                unknown_6: self.generate_data(),
+                unknown_7: self.generate_data(),
+                constant_6_0x01: self.generate_data(),
+                unknown_8: self.generate_data(),
+                constant_7_0x01: self.generate_data(),
+                constant_8_0x00: self.generate_data(),
                 world_map_enabled: self.generate_data(),
-                buffer_0x01_b: self.generate_data(),
-                buffer_0x00_b: self.generate_data(),
-                field_14: self.generate_data(),
+                constant_9_0x01: self.generate_data(),
+                unknown_9: self.generate_data(),
+                unknown_10: self.generate_data(),
                 colony_episode_goal_counts: self.generate_data(),
                 colony_episode_goals: self.generate_data(),
                 parent_episode_goal_counts: self.generate_data(),
@@ -200,8 +264,8 @@ mod tests {
             let mut manifest: BoxedArray<ManifestData, 300> = self.generate_data();
             manifest[17].size = 72; // include_custom_names
             manifest[25].size = 572; // include_world_locations_extras
-            manifest[27].size = 10; // field_28 row size
-            manifest[27].count = 3; // field_28 row count
+            manifest[27].size = 10; // unknown_5 row size
+            manifest[27].count = 3; // unknown_5 row count
             manifest[28].size = 300; // include_pyramids
 
             return MapData {
@@ -213,30 +277,30 @@ mod tests {
                 terrain: self.generate_data(),
                 tile_size: self.generate_data(),
                 random: self.generate_data(),
-                buffer_0x00: self.generate_data(),
+                constant_1_0x00: self.generate_data(),
                 seed_1: self.generate_data(),
                 seed_2: self.generate_data(),
-                field_13: self.generate_data(),
-                field_14: self.generate_data(),
+                unknown_1: self.generate_data(),
+                unknown_2: self.generate_data(),
                 scenario_data: self.generate_data(),
                 meadow: self.generate_data(),
-                field_17: self.generate_data(),
+                unknown_3: self.generate_data(),
                 world_map_elements: self.generate_data(),
                 trade_routes: self.generate_data(),
-                buffer_0xff: self.generate_data(),
-                field_21: self.generate_data(),
+                constant_2_0xff: self.generate_data(),
+                unknown_4: self.generate_data(),
                 prices: self.generate_data(),
                 scrub: self.generate_data(),
                 elevation: self.generate_data(),
                 elevation_rotation: self.generate_data(),
                 world_locations: self.generate_data(),
                 background_image: self.generate_data(),
-                field_28: (0..3).map(|_| (0..10).map(|_| self.generate_data()).collect()).collect(),
+                unknown_5: (0..3).map(|_| (0..10).map(|_| self.generate_data()).collect()).collect(),
                 mythology: self.generate_data(),
-                field_30: self.generate_data(),
-                field_31: self.generate_data(),
-                field_32: self.generate_data(),
-                field_33: self.generate_data(),
+                unknown_6: self.generate_data(),
+                unknown_7: self.generate_data(),
+                unknown_8: self.generate_data(),
+                unknown_9: self.generate_data(),
             };
         }
     }
@@ -248,7 +312,7 @@ mod tests {
                 address: self.generate_data(),
                 size: self.generate_data(),
                 count: self.generate_data(),
-                unknown: self.generate_data(),
+                unknown_1: self.generate_data(),
             };
         }
     }
@@ -259,8 +323,8 @@ mod tests {
                 opponent_gods: self.generate_data(),
                 proponent_gods: self.generate_data(),
                 monster: self.generate_data(),
-                buffer_0xff: self.generate_data(),
-                buffer_0x00: self.generate_data(),
+                constant_1_0xff: self.generate_data(),
+                constant_2_0x00: self.generate_data(),
                 sanctuaries_allowed: self.generate_data(),
                 max_sanctuaries: self.generate_data(),
                 max_pyramids: self.generate_data(),
@@ -325,18 +389,18 @@ mod tests {
                 subtype: self.generate_data(),
                 prev_amount: self.generate_data(),
                 related_to_triggered_evt: self.generate_data(),
-                unknown_1: self.generate_data(),
+                constant_1_0x00: self.generate_data(),
                 trig_reason: self.generate_data(),
-                unknown_2: self.generate_data(),
-                unknown_3: self.generate_data(),
+                constant_2_0x00: self.generate_data(),
+                constant_3_0x00: self.generate_data(),
                 other_city: self.generate_data(),
                 loot_type: self.generate_data(),
                 loot_amount: self.generate_data(),
-                unknown_4: self.generate_data(),
+                constant_4_0x00: self.generate_data(),
                 ally_city: self.generate_data(),
                 ally_strength: self.generate_data(),
                 to_strength: self.generate_data(),
-                unknown_5: self.generate_data(),
+                unknown_1: self.generate_data(),
                 quest: self.generate_data(),
                 tail: self.generate_data(),
             };
@@ -346,13 +410,13 @@ mod tests {
     impl GenerateData<TradeRouteData> for TestDataGenerator {
         fn generate_data(&mut self) -> TradeRouteData {
             return TradeRouteData {
-                header: self.generate_data(),
+                constant_1_0x05: self.generate_data(),
                 points: self.generate_data(),
                 distance: self.generate_data(),
                 route_type: self.generate_data(),
                 points_count: self.generate_data(),
                 exists: self.generate_data(),
-                unknown: self.generate_data(),
+                constant_2_0x00: self.generate_data(),
             };
         }
     }
@@ -362,7 +426,7 @@ mod tests {
             return TradeRoutePointData {
                 x: self.generate_data(),
                 y: self.generate_data(),
-                unknown: self.generate_data(),
+                unknown_1: self.generate_data(),
             };
         }
     }
@@ -374,9 +438,9 @@ mod tests {
                 location_type: self.generate_data(),
                 name: self.generate_data(),
                 slot_index: self.generate_data(),
-                unknown_3: self.generate_data(),
+                unknown_1: self.generate_data(),
                 trade_quantities: self.generate_data(),
-                unknown_133: self.generate_data(),
+                unknown_2: self.generate_data(),
                 buying: self.generate_data(),
                 selling: self.generate_data(),
                 civilization: self.generate_data(),
@@ -389,17 +453,16 @@ mod tests {
                 tribute_pay_amount: self.generate_data(),
                 tribute_pay_resource: self.generate_data(),
                 tribute_rec_resource: self.generate_data(),
-                unknown_240: self.generate_data(),
+                unknown_3: self.generate_data(),
                 favour_old: self.generate_data(),
-                unknown_341: self.generate_data(),
+                constant_1_0x00: self.generate_data(),
                 active_old: self.generate_data(),
-                unknown_353: self.generate_data(),
                 favour_new: self.generate_data(),
-                unknown_360: self.generate_data(),
+                constant_3_0x00: self.generate_data(),
                 active_new: self.generate_data(),
                 visible: self.generate_data(),
-                unknown_376: self.generate_data(),
-                unknown_476: (0..28).map(|_| self.generate_data()).collect(),
+                unknown_4: self.generate_data(),
+                unknown_5: (0..28).map(|_| self.generate_data()).collect(),
                 trade_route_visible: self.generate_data(),
                 custom_name: self.generate_data(),
                 custom_leader_name: self.generate_data(),
@@ -418,9 +481,9 @@ mod tests {
                 sprite_width: self.generate_data(),
                 sprite_height: self.generate_data(),
                 sprite_id: self.generate_data(),
-                unknown_a: self.generate_data(),
+                unknown_1: self.generate_data(),
                 label_position: self.generate_data(),
-                unknown_b: self.generate_data(),
+                unknown_2: self.generate_data(),
                 region_name: self.generate_data(),
                 city_name: self.generate_data(),
                 data_d: self.generate_data(),
@@ -433,13 +496,13 @@ mod tests {
         fn generate_data(&mut self) -> RealEpisodeData {
             return RealEpisodeData {
                 start_date: self.generate_data(),
-                field_2: self.generate_data(),
+                constant_1_0x00: self.generate_data(),
                 months_elapsed: self.generate_data(),
-                field_4: self.generate_data(),
+                constant_2_0x00: self.generate_data(),
                 starting_cash: self.generate_data(),
-                field_6: self.generate_data(),
+                unknown_1: self.generate_data(),
                 map_size: self.generate_data(),
-                field_8: self.generate_data(),
+                unknown_2: self.generate_data(),
                 text_buffer_1: self.generate_data(),
                 text_buffer_2: self.generate_data(),
                 civilization: self.generate_data(),
@@ -449,14 +512,14 @@ mod tests {
                 fish_y: self.generate_data(),
                 urchin_x: self.generate_data(),
                 urchin_y: self.generate_data(),
-                field_17: self.generate_data(),
+                constant_3_0x00: self.generate_data(),
                 invasion_x: self.generate_data(),
                 invasion_y: self.generate_data(),
                 panhellenic_games: self.generate_data(),
                 colonies_done: self.generate_data(),
                 deer_x: self.generate_data(),
                 deer_y: self.generate_data(),
-                field_24: self.generate_data(),
+                unknown_3: self.generate_data(),
                 earthquake_area: self.generate_data(),
                 entry_x: self.generate_data(),
                 entry_y: self.generate_data(),
@@ -468,26 +531,26 @@ mod tests {
                 river_entry_y: self.generate_data(),
                 river_exit_x: self.generate_data(),
                 river_exit_y: self.generate_data(),
-                field_36: self.generate_data(),
+                unknown_4: self.generate_data(),
                 tropical: self.generate_data(),
                 boar_x: self.generate_data(),
                 boar_y: self.generate_data(),
                 building_flags: self.generate_data(),
-                field_41: self.generate_data(),
+                constant_4_0x00: self.generate_data(),
                 monster_x: self.generate_data(),
                 monster_y: self.generate_data(),
                 disembark_x: self.generate_data(),
                 disembark_y: self.generate_data(),
-                field_46: self.generate_data(),
+                constant_5_0x00: self.generate_data(),
                 landslide_x: self.generate_data(),
                 landslide_y: self.generate_data(),
-                field_49: self.generate_data(),
+                constant_6_0x00: self.generate_data(),
                 basic_episode_data: self.generate_data(),
                 city_resources: self.generate_data(),
                 city_resources_bought: self.generate_data(),
-                field_53: self.generate_data(),
+                constant_7_0x00: self.generate_data(),
                 city_resources_sold: self.generate_data(),
-                field_55: self.generate_data(),
+                unknown_5: self.generate_data(),
                 city_resources_quantity: self.generate_data(),
             };
         }
@@ -497,12 +560,12 @@ mod tests {
         fn generate_data(&mut self) -> BasicEpisodeData {
             return BasicEpisodeData {
                 exists: self.generate_data(),
-                field_2: self.generate_data(),
-                field_3: self.generate_data(),
+                constant_1_0x00: self.generate_data(),
+                unknown_1: self.generate_data(),
                 episode_no: self.generate_data(),
-                field_5: self.generate_data(),
-                field_6: self.generate_data(),
-                field_7: self.generate_data(),
+                unknown_2: self.generate_data(),
+                unknown_3: self.generate_data(),
+                unknown_4: self.generate_data(),
                 next_episode: self.generate_data(),
                 episode_type: self.generate_data(),
                 name_padding: self.generate_data(),
@@ -517,7 +580,7 @@ mod tests {
                 goal_type: self.generate_data(),
                 resource_id: self.generate_data(),
                 amount: self.generate_data(),
-                field_4: self.generate_data(),
+                unknown_1: self.generate_data(),
             };
         }
     }
@@ -571,6 +634,12 @@ mod tests {
     impl GenerateData<u32> for TestDataGenerator {
         fn generate_data(&mut self) -> u32 {
             return self.next() as u32;
+        }
+    }
+
+    impl GenerateData<u64> for TestDataGenerator {
+        fn generate_data(&mut self) -> u64 {
+            return self.next() as u64;
         }
     }
 

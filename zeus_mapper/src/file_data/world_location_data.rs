@@ -19,9 +19,9 @@ pub struct WorldLocationData {
     pub location_type: u8,
     pub name: u8,
     pub slot_index: u8,
-    pub unknown_3: BoxedArray<u8, 91>,
+    pub unknown_1: BoxedArray<u8, 91>,
     pub trade_quantities: BoxedArray<u8, 37>,
-    pub unknown_133: BoxedArray<u8, 55>,
+    pub unknown_2: BoxedArray<u8, 55>,
     pub buying: [u8; 8],
     pub selling: [u8; 8],
     pub civilization: u32,
@@ -34,19 +34,21 @@ pub struct WorldLocationData {
     pub tribute_pay_amount: u32,
     pub tribute_pay_resource: u16,
     pub tribute_rec_resource: u16,
-    pub unknown_240: BoxedArray<u8, 100>,
+    pub unknown_3: BoxedArray<u8, 100>,
     // See `resolve_favour` for how this and `favour_new` combine.
     pub favour_old: u8,
-    pub unknown_341: BoxedArray<u8, 11>,
-    // See `resolve_active` for how this and `active_new` combine. Not read for `ParentCity`.
-    pub active_old: u8,
-    pub unknown_353: BoxedArray<u8, 3>,
+    pub constant_1_0x00: BoxedArray<u8, 11>,
+    // See `resolve_active` for how this and `active_new` combine. Not read for `ParentCity`. Top
+    // 3 bytes confirmed always 0 across every real record sampled, so this is a single
+    // little-endian u32 (matching a C `BOOL`/`int` field's natural width) rather than a flag byte
+    // plus 3 bytes of padding.
+    pub active_old: u32,
     pub favour_new: u32,
-    pub unknown_360: [u8; 8],
+    pub constant_3_0x00: [u8; 8],
     pub active_new: u32,
     pub visible: u32,
-    pub unknown_376: BoxedArray<u8, 100>,
-    pub unknown_476: Vec<u8>,
+    pub unknown_4: BoxedArray<u8, 100>,
+    pub unknown_5: Vec<u8>,
     pub trade_route_visible: u8,
     pub custom_name: String,
     pub custom_leader_name: String,
@@ -54,6 +56,23 @@ pub struct WorldLocationData {
 }
 
 impl WorldLocationData {
+    pub fn validate(&self) -> Result<(), String> {
+        if self.constant_1_0x00.as_ref().iter().any(|b| *b != 0) {
+            return Err("constant_1_0x00 is non-zero".to_owned());
+        }
+
+        // todo check in game if value sin higher bytes actually affect how the game interprets this
+        if self.active_old > 0xFF {
+            return Err(format!("active_old is {}, expected top 3 bytes to be 0", self.active_old));
+        }
+
+        if self.constant_3_0x00.iter().any(|b| *b != 0) {
+            return Err("constant_3_0x00 is non-zero".to_owned());
+        }
+
+        return Ok(());
+    }
+
     pub(crate) fn read_arr_from(reader: &mut impl Read, include_extras: bool) -> io::Result<BoxedArray<Self, 22>> {
         let mut result = Vec::with_capacity(22);
 
@@ -86,9 +105,9 @@ impl WorldLocationData {
             location_type: ReadFrom::read_from(reader)?,
             name: ReadFrom::read_from(reader)?,
             slot_index: ReadFrom::read_from(reader)?,
-            unknown_3: ReadFrom::read_from(reader)?,
+            unknown_1: ReadFrom::read_from(reader)?,
             trade_quantities: ReadFrom::read_from(reader)?,
-            unknown_133: ReadFrom::read_from(reader)?,
+            unknown_2: ReadFrom::read_from(reader)?,
             buying: ReadFrom::read_from(reader)?,
             selling: ReadFrom::read_from(reader)?,
             civilization: ReadFrom::read_from(reader)?,
@@ -101,17 +120,16 @@ impl WorldLocationData {
             tribute_pay_amount: ReadFrom::read_from(reader)?,
             tribute_pay_resource: ReadFrom::read_from(reader)?,
             tribute_rec_resource: ReadFrom::read_from(reader)?,
-            unknown_240: ReadFrom::read_from(reader)?,
+            unknown_3: ReadFrom::read_from(reader)?,
             favour_old: ReadFrom::read_from(reader)?,
-            unknown_341: ReadFrom::read_from(reader)?,
+            constant_1_0x00: ReadFrom::read_from(reader)?,
             active_old: ReadFrom::read_from(reader)?,
-            unknown_353: ReadFrom::read_from(reader)?,
             favour_new: ReadFrom::read_from(reader)?,
-            unknown_360: ReadFrom::read_from(reader)?,
+            constant_3_0x00: ReadFrom::read_from(reader)?,
             active_new: ReadFrom::read_from(reader)?,
             visible: ReadFrom::read_from(reader)?,
-            unknown_376: ReadFrom::read_from(reader)?,
-            unknown_476: read_vec_from(reader, unknown_476_length)?,
+            unknown_4: ReadFrom::read_from(reader)?,
+            unknown_5: read_vec_from(reader, unknown_476_length)?,
             trade_route_visible: if include_extras { ReadFrom::read_from(reader)? } else { 4 },
             custom_name: read_string_from(reader, strings_length)?,
             custom_leader_name: read_string_from(reader, strings_length)?,
@@ -139,9 +157,9 @@ impl WorldLocationData {
         bytes += WriteTo::write_to(&self.location_type, writer)?;
         bytes += WriteTo::write_to(&self.name, writer)?;
         bytes += WriteTo::write_to(&self.slot_index, writer)?;
-        bytes += WriteTo::write_to(&self.unknown_3, writer)?;
+        bytes += WriteTo::write_to(&self.unknown_1, writer)?;
         bytes += WriteTo::write_to(&self.trade_quantities, writer)?;
-        bytes += WriteTo::write_to(&self.unknown_133, writer)?;
+        bytes += WriteTo::write_to(&self.unknown_2, writer)?;
         bytes += WriteTo::write_to(&self.buying, writer)?;
         bytes += WriteTo::write_to(&self.selling, writer)?;
         bytes += WriteTo::write_to(&self.civilization, writer)?;
@@ -154,19 +172,18 @@ impl WorldLocationData {
         bytes += WriteTo::write_to(&self.tribute_pay_amount, writer)?;
         bytes += WriteTo::write_to(&self.tribute_pay_resource, writer)?;
         bytes += WriteTo::write_to(&self.tribute_rec_resource, writer)?;
-        bytes += WriteTo::write_to(&self.unknown_240, writer)?;
+        bytes += WriteTo::write_to(&self.unknown_3, writer)?;
         bytes += WriteTo::write_to(&self.favour_old, writer)?;
-        bytes += WriteTo::write_to(&self.unknown_341, writer)?;
+        bytes += WriteTo::write_to(&self.constant_1_0x00, writer)?;
         bytes += WriteTo::write_to(&self.active_old, writer)?;
-        bytes += WriteTo::write_to(&self.unknown_353, writer)?;
         bytes += WriteTo::write_to(&self.favour_new, writer)?;
-        bytes += WriteTo::write_to(&self.unknown_360, writer)?;
+        bytes += WriteTo::write_to(&self.constant_3_0x00, writer)?;
         bytes += WriteTo::write_to(&self.active_new, writer)?;
         bytes += WriteTo::write_to(&self.visible, writer)?;
-        bytes += WriteTo::write_to(&self.unknown_376, writer)?;
+        bytes += WriteTo::write_to(&self.unknown_4, writer)?;
 
         if include_extras {
-            bytes += WriteTo::write_to(&self.unknown_476, writer)?;
+            bytes += WriteTo::write_to(&self.unknown_5, writer)?;
             bytes += WriteTo::write_to(&self.trade_route_visible, writer)?;
             bytes += write_string_to(&self.custom_name, writer, 32)?;
             bytes += write_string_to(&self.custom_leader_name, writer, 32)?;
@@ -201,7 +218,7 @@ mod tests {
     #[test]
     fn read_write_with_extras() -> io::Result<()> {
         let mut original = base();
-        original.unknown_476 = vec![24; 28];
+        original.unknown_5 = vec![24; 28];
         original.trade_route_visible = 25;
         original.custom_name = "Custom Name".to_string();
         original.custom_leader_name = "Custom Leader".to_string();
@@ -224,9 +241,9 @@ mod tests {
             location_type: 2,
             name: 3,
             slot_index: 3,
-            unknown_3: BoxedArray::from_vec(vec![3; 91]),
+            unknown_1: BoxedArray::from_vec(vec![3; 91]),
             trade_quantities: BoxedArray::from_vec(vec![4; 37]),
-            unknown_133: BoxedArray::from_vec(vec![5; 55]),
+            unknown_2: BoxedArray::from_vec(vec![5; 55]),
             buying: [6; 8],
             selling: [7; 8],
             civilization: 8,
@@ -239,17 +256,16 @@ mod tests {
             tribute_pay_amount: 15,
             tribute_pay_resource: 16,
             tribute_rec_resource: 17,
-            unknown_240: BoxedArray::from_vec(vec![18; 100]),
+            unknown_3: BoxedArray::from_vec(vec![18; 100]),
             favour_old: 18,
-            unknown_341: BoxedArray::from_vec(vec![18; 11]),
+            constant_1_0x00: BoxedArray::from_vec(vec![18; 11]),
             active_old: 18,
-            unknown_353: BoxedArray::from_vec(vec![18; 3]),
             favour_new: 19,
-            unknown_360: [20; 8],
+            constant_3_0x00: [20; 8],
             active_new: 21,
             visible: 22,
-            unknown_376: BoxedArray::from_vec(vec![23; 100]),
-            unknown_476: vec![],
+            unknown_4: BoxedArray::from_vec(vec![23; 100]),
+            unknown_5: vec![],
             trade_route_visible: 4,
             custom_name: "".to_string(),
             custom_leader_name: "".to_string(),

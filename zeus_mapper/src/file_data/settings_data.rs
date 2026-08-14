@@ -24,30 +24,54 @@ pub struct SettingsData {
     pub colony_episodes_available: u32,
     pub basic_episode_data: [BasicEpisodeData; 20],
     pub real_episode_data: [RealEpisodeData; 14],
-    pub field_15: [u32; 2],              // still otherwise-undeciphered
+    pub unknown_1: [u32; 2],             // still otherwise-undeciphered
     pub colony_location_names: [u32; 4], // `world_locations[].name` for up to 4 Colony locations, in order; see DATA_MAPPING.md
-    pub field_16: [u32; 31],             // still otherwise-undeciphered
+    pub unknown_2: [u32; 31],            // still otherwise-undeciphered
     pub mythology: [MythologyData; 14],  // 300 or 224
     pub events: BoxedArray<BoxedArray<EventData, 150>, 14>,
     pub adventure_type: u8,
-    pub field_10: [u8; 4], // still otherwise-undeciphered; always 0 in every sample observed so far
+    pub constant_1_0x00: [u8; 4],
     pub data_length: u32,
-    pub field_9: [u32; 4],
+    pub unknown_3: [u32; 4],
     pub map_data: MapData,
     pub padding: Vec<u8>, // Should not contain useful data, we should be able to remove this in the future
     pub parent_event_counts: [u32; 10],
     pub colony_event_counts: [u8; 3],
     pub unused_blocks: BoxedArray<u8, 31_693>, // "10 different blocks of data, all apparently never used" per notes.md
     pub parent_city_favor: [u32; 10],
-    pub field_11: BoxedArray<u8, 4112>, // still otherwise-undeciphered; see DATA_MAPPING.md
+    pub constant_2_0x00: BoxedArray<u8, 4112>,
     pub bitmap: u32,
     pub tab_visibility: [u8; 11],
-    pub buffer_0x01_a: BoxedArray<u8, 143>,
-    pub buffer_0x00_a: BoxedArray<u8, 66>,
+    pub constant_3_0x01: [u8; 7],
+    // Varies across the game's tutorial/demo `.pak`s specifically (0 on colony/palace/peacewar/
+    // warrior, 1 everywhere else including bigcity and every real adventure); meaning otherwise
+    // undeciphered. See "Extending the correlation sweep" in docs/adventure_model_todo.md.
+    pub unknown_4: u8,
+    pub constant_4_0x01: BoxedArray<u8, 93>,
+    // Varies on bigcity/peacewar specifically (0 there, 1 everywhere else); meaning otherwise
+    // undeciphered.
+    pub unknown_5: u8,
+    pub constant_5_0x01: [u8; 3],
+    // Varies on bigcity/peacewar specifically (0 there, 1 everywhere else); meaning otherwise
+    // undeciphered.
+    pub unknown_6: u8,
+    // Varies on bigcity/colony/peacewar specifically (0 there, 1 everywhere else); meaning
+    // otherwise undeciphered.
+    pub unknown_7: u8,
+    pub constant_6_0x01: [u8; 2],
+    // Varies on bigcity/peacewar specifically (0 there, 1 everywhere else); meaning otherwise
+    // undeciphered.
+    pub unknown_8: u8,
+    pub constant_7_0x01: BoxedArray<u8, 33>,
+    pub constant_8_0x00: BoxedArray<u8, 66>,
     pub world_map_enabled: u8,
-    pub buffer_0x01_b: [u8; 9],
-    pub buffer_0x00_b: [u8; 4],
-    pub field_14: u32, // only present for new file format; see DATA_MAPPING.md
+    pub constant_9_0x01: [u8; 9],
+    // Varies on colony specifically (1 there, 0 everywhere else including every other tutorial/
+    // demo `.pak`); meaning otherwise undeciphered. Top 3 bytes confirmed always 0 across every
+    // real `.set` file sampled, so this is a single little-endian u32 (matching a C `BOOL`/`int`
+    // field's natural width) rather than a flag byte plus 3 bytes of padding.
+    pub unknown_9: u32,
+    pub unknown_10: u32, // only present for new file format; see DATA_MAPPING.md
     pub colony_episode_goal_counts: [u32; 4],
     pub colony_episode_goals: [[EpisodeGoalData; 6]; 4],
     pub parent_episode_goal_counts: [u32; 10],
@@ -72,21 +96,57 @@ impl SettingsData {
             mythology.validate()?;
         }
 
-        if let Some(offset) = self.buffer_0x01_a.iter().position(|b| *b != 1) {
-            return Err(format!("buffer_0x01_a[{offset}] is not 1"));
+        if let Some(offset) = self.constant_3_0x01.iter().position(|b| *b != 1) {
+            return Err(format!("constant_3_0x01[{offset}] is not 1"));
         }
 
-        if let Some(offset) = self.buffer_0x00_a.iter().position(|b| *b != 0) {
-            return Err(format!("buffer_0x00_a[{offset}] is non-zero"));
+        if let Some(offset) = self.constant_4_0x01.iter().position(|b| *b != 1) {
+            return Err(format!("constant_4_0x01[{offset}] is not 1"));
         }
 
-        if let Some(offset) = self.buffer_0x01_b.iter().position(|b| *b != 1) {
-            return Err(format!("buffer_0x01_b[{offset}] is not 1"));
+        if let Some(offset) = self.constant_5_0x01.iter().position(|b| *b != 1) {
+            return Err(format!("constant_5_0x01[{offset}] is not 1"));
         }
 
-        if let Some(offset) = self.buffer_0x00_b.iter().position(|b| *b != 0) {
-            return Err(format!("buffer_0x00_b[{offset}] is non-zero"));
+        if let Some(offset) = self.constant_6_0x01.iter().position(|b| *b != 1) {
+            return Err(format!("constant_6_0x01[{offset}] is not 1"));
         }
+
+        if let Some(offset) = self.constant_7_0x01.iter().position(|b| *b != 1) {
+            return Err(format!("constant_7_0x01[{offset}] is not 1"));
+        }
+
+        if let Some(offset) = self.constant_8_0x00.iter().position(|b| *b != 0) {
+            return Err(format!("constant_8_0x00[{offset}] is non-zero"));
+        }
+
+        if let Some(offset) = self.constant_9_0x01.iter().position(|b| *b != 1) {
+            return Err(format!("constant_9_0x01[{offset}] is not 1"));
+        }
+
+        if self.constant_1_0x00.iter().any(|b| *b != 0) {
+            return Err("constant_1_0x00 is non-zero".to_owned());
+        }
+
+        if let Some(offset) = self.constant_2_0x00.as_ref().iter().position(|b| *b != 0) {
+            return Err(format!("constant_2_0x00[{offset}] is non-zero"));
+        }
+
+        for (i, basic_episode_data) in self.basic_episode_data.iter().enumerate() {
+            basic_episode_data.validate().map_err(|e| format!("basic_episode_data[{i}]: {e}"))?;
+        }
+
+        for (i, real_episode_data) in self.real_episode_data.iter().enumerate() {
+            real_episode_data.validate().map_err(|e| format!("real_episode_data[{i}]: {e}"))?;
+        }
+
+        for (i, row) in self.events.iter().enumerate() {
+            for (j, event) in row.iter().enumerate() {
+                event.validate().map_err(|e| format!("events[{i}][{j}]: {e}"))?;
+            }
+        }
+
+        self.map_data.validate().map_err(|e| format!("map_data: {e}"))?;
 
         return Ok(());
     }
@@ -115,30 +175,39 @@ impl ReadFrom for SettingsData {
             colony_episodes_available: ReadFrom::read_from(&mut map_data_reader)?,
             basic_episode_data: ReadFrom::read_from(&mut map_data_reader)?,
             real_episode_data: ReadFrom::read_from(&mut map_data_reader)?,
-            field_15: ReadFrom::read_from(&mut map_data_reader)?,
+            unknown_1: ReadFrom::read_from(&mut map_data_reader)?,
             colony_location_names: ReadFrom::read_from(&mut map_data_reader)?,
-            field_16: ReadFrom::read_from(&mut map_data_reader)?,
+            unknown_2: ReadFrom::read_from(&mut map_data_reader)?,
             mythology: MythologyData::read_arr_from(&mut map_data_reader, new_file_ver)?,
             events: ReadFrom::read_from(&mut map_data_reader)?,
             adventure_type: ReadFrom::read_from(&mut map_data_reader)?,
-            field_10: ReadFrom::read_from(&mut map_data_reader)?,
+            constant_1_0x00: ReadFrom::read_from(&mut map_data_reader)?,
             data_length: ReadFrom::read_from(&mut map_data_reader)?,
-            field_9: ReadFrom::read_from(&mut map_data_reader)?,
+            unknown_3: ReadFrom::read_from(&mut map_data_reader)?,
             map_data: MapData::read_from(&mut map_data_reader)?,
             padding: read_bytes_to_end(&mut map_data_reader)?,
             parent_event_counts: ReadFrom::read_from(&mut limited_reader)?,
             colony_event_counts: ReadFrom::read_from(&mut limited_reader)?,
             unused_blocks: ReadFrom::read_from(&mut limited_reader)?,
             parent_city_favor: ReadFrom::read_from(&mut limited_reader)?,
-            field_11: ReadFrom::read_from(&mut limited_reader)?,
+            constant_2_0x00: ReadFrom::read_from(&mut limited_reader)?,
             bitmap: ReadFrom::read_from(&mut limited_reader)?,
             tab_visibility: ReadFrom::read_from(&mut limited_reader)?,
-            buffer_0x01_a: ReadFrom::read_from(&mut limited_reader)?,
-            buffer_0x00_a: ReadFrom::read_from(&mut limited_reader)?,
+            constant_3_0x01: ReadFrom::read_from(&mut limited_reader)?,
+            unknown_4: ReadFrom::read_from(&mut limited_reader)?,
+            constant_4_0x01: ReadFrom::read_from(&mut limited_reader)?,
+            unknown_5: ReadFrom::read_from(&mut limited_reader)?,
+            constant_5_0x01: ReadFrom::read_from(&mut limited_reader)?,
+            unknown_6: ReadFrom::read_from(&mut limited_reader)?,
+            unknown_7: ReadFrom::read_from(&mut limited_reader)?,
+            constant_6_0x01: ReadFrom::read_from(&mut limited_reader)?,
+            unknown_8: ReadFrom::read_from(&mut limited_reader)?,
+            constant_7_0x01: ReadFrom::read_from(&mut limited_reader)?,
+            constant_8_0x00: ReadFrom::read_from(&mut limited_reader)?,
             world_map_enabled: ReadFrom::read_from(&mut limited_reader)?,
-            buffer_0x01_b: ReadFrom::read_from(&mut limited_reader)?,
-            buffer_0x00_b: ReadFrom::read_from(&mut limited_reader)?,
-            field_14: if new_file_ver {
+            constant_9_0x01: ReadFrom::read_from(&mut limited_reader)?,
+            unknown_9: ReadFrom::read_from(&mut limited_reader)?,
+            unknown_10: if new_file_ver {
                 ReadFrom::read_from(&mut limited_reader)?
             } else {
                 0
@@ -165,15 +234,15 @@ impl WriteTo for SettingsData {
         bytes += WriteTo::write_to(&self.colony_episodes_available, writer)?;
         bytes += WriteTo::write_to(&self.basic_episode_data, writer)?;
         bytes += WriteTo::write_to(&self.real_episode_data, writer)?;
-        bytes += WriteTo::write_to(&self.field_15, writer)?;
+        bytes += WriteTo::write_to(&self.unknown_1, writer)?;
         bytes += WriteTo::write_to(&self.colony_location_names, writer)?;
-        bytes += WriteTo::write_to(&self.field_16, writer)?;
+        bytes += WriteTo::write_to(&self.unknown_2, writer)?;
         bytes += MythologyData::write_arr_to(&self.mythology, writer, new_file_ver)?;
         bytes += WriteTo::write_to(&self.events, writer)?;
         bytes += WriteTo::write_to(&self.adventure_type, writer)?;
-        bytes += WriteTo::write_to(&self.field_10, writer)?;
+        bytes += WriteTo::write_to(&self.constant_1_0x00, writer)?;
         bytes += WriteTo::write_to(&self.data_length, writer)?;
-        bytes += WriteTo::write_to(&self.field_9, writer)?;
+        bytes += WriteTo::write_to(&self.unknown_3, writer)?;
         bytes += WriteTo::write_to(&self.map_data, writer)?;
 
         if bytes > event_counts_offset {
@@ -195,16 +264,25 @@ impl WriteTo for SettingsData {
         bytes += WriteTo::write_to(&self.colony_event_counts, writer)?;
         bytes += WriteTo::write_to(&self.unused_blocks, writer)?;
         bytes += WriteTo::write_to(&self.parent_city_favor, writer)?;
-        bytes += WriteTo::write_to(&self.field_11, writer)?;
+        bytes += WriteTo::write_to(&self.constant_2_0x00, writer)?;
         bytes += WriteTo::write_to(&self.bitmap, writer)?;
         bytes += WriteTo::write_to(&self.tab_visibility, writer)?;
-        bytes += WriteTo::write_to(&self.buffer_0x01_a, writer)?;
-        bytes += WriteTo::write_to(&self.buffer_0x00_a, writer)?;
+        bytes += WriteTo::write_to(&self.constant_3_0x01, writer)?;
+        bytes += WriteTo::write_to(&self.unknown_4, writer)?;
+        bytes += WriteTo::write_to(&self.constant_4_0x01, writer)?;
+        bytes += WriteTo::write_to(&self.unknown_5, writer)?;
+        bytes += WriteTo::write_to(&self.constant_5_0x01, writer)?;
+        bytes += WriteTo::write_to(&self.unknown_6, writer)?;
+        bytes += WriteTo::write_to(&self.unknown_7, writer)?;
+        bytes += WriteTo::write_to(&self.constant_6_0x01, writer)?;
+        bytes += WriteTo::write_to(&self.unknown_8, writer)?;
+        bytes += WriteTo::write_to(&self.constant_7_0x01, writer)?;
+        bytes += WriteTo::write_to(&self.constant_8_0x00, writer)?;
         bytes += WriteTo::write_to(&self.world_map_enabled, writer)?;
-        bytes += WriteTo::write_to(&self.buffer_0x01_b, writer)?;
-        bytes += WriteTo::write_to(&self.buffer_0x00_b, writer)?;
+        bytes += WriteTo::write_to(&self.constant_9_0x01, writer)?;
+        bytes += WriteTo::write_to(&self.unknown_9, writer)?;
         if new_file_ver {
-            bytes += WriteTo::write_to(&self.field_14, writer)?;
+            bytes += WriteTo::write_to(&self.unknown_10, writer)?;
         }
         bytes += WriteTo::write_to(&self.colony_episode_goal_counts, writer)?;
         bytes += WriteTo::write_to(&self.colony_episode_goals, writer)?;

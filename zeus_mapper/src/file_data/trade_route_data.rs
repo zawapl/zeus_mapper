@@ -13,19 +13,30 @@ use std::io::Write;
 // size = 324
 #[derive(Debug, Clone, PartialEq, Default, LogDifferences)]
 pub struct TradeRouteData {
-    pub header: [u8; 8],
+    pub constant_1_0x05: u64,
     pub points: BoxedArray<TradeRoutePointData, 50>,
     pub distance: [u8; 12],
     pub route_type: u8,
     pub points_count: u8,
     pub exists: u8,
-    pub unknown: u8,
+    pub constant_2_0x00: u8,
 }
 // @320 = sea/land route?
 // @321 = points count
 // @322 = exists?
 
 impl TradeRouteData {
+    pub fn validate(&self) -> Result<(), String> {
+        if self.constant_1_0x05 != 5 {
+            return Err(format!("constant_1_0x05 is {}, expected 5", self.constant_1_0x05));
+        }
+        if self.constant_2_0x00 != 0 {
+            return Err(format!("constant_2_0x00 is {}, expected 0", self.constant_2_0x00));
+        }
+
+        return Ok(());
+    }
+
     pub(crate) fn read_arr_from(reader: &mut impl Read) -> io::Result<BoxedArray<Self, 232>> {
         let mut result = Vec::with_capacity(232);
 
@@ -52,13 +63,13 @@ impl TradeRouteData {
 impl ReadFrom for TradeRouteData {
     fn read_from(reader: &mut impl Read) -> io::Result<Self> {
         return Ok(TradeRouteData {
-            header: ReadFrom::read_from(reader)?,
+            constant_1_0x05: ReadFrom::read_from(reader)?,
             points: ReadFrom::read_from(reader)?,
             distance: ReadFrom::read_from(reader)?,
             route_type: ReadFrom::read_from(reader)?,
             points_count: ReadFrom::read_from(reader)?,
             exists: ReadFrom::read_from(reader)?,
-            unknown: ReadFrom::read_from(reader)?,
+            constant_2_0x00: ReadFrom::read_from(reader)?,
         });
     }
 }
@@ -66,13 +77,13 @@ impl ReadFrom for TradeRouteData {
 impl WriteTo for TradeRouteData {
     fn write_to<W: Write>(&self, writer: &mut W) -> io::Result<usize> {
         let mut bytes = 0;
-        bytes += WriteTo::write_to(&self.header, writer)?;
+        bytes += WriteTo::write_to(&self.constant_1_0x05, writer)?;
         bytes += WriteTo::write_to(&self.points, writer)?;
         bytes += WriteTo::write_to(&self.distance, writer)?;
         bytes += WriteTo::write_to(&self.route_type, writer)?;
         bytes += WriteTo::write_to(&self.points_count, writer)?;
         bytes += WriteTo::write_to(&self.exists, writer)?;
-        bytes += WriteTo::write_to(&self.unknown, writer)?;
+        bytes += WriteTo::write_to(&self.constant_2_0x00, writer)?;
         return Ok(bytes);
     }
 }
@@ -81,7 +92,7 @@ impl WriteTo for TradeRouteData {
 pub struct TradeRoutePointData {
     pub x: u16,
     pub y: u16,
-    pub unknown: u16,
+    pub unknown_1: u16,
 }
 
 impl ReadFrom for TradeRoutePointData {
@@ -89,7 +100,7 @@ impl ReadFrom for TradeRoutePointData {
         return Ok(TradeRoutePointData {
             x: ReadFrom::read_from(reader)?,
             y: ReadFrom::read_from(reader)?,
-            unknown: ReadFrom::read_from(reader)?,
+            unknown_1: ReadFrom::read_from(reader)?,
         });
     }
 }
@@ -99,7 +110,7 @@ impl WriteTo for TradeRoutePointData {
         let mut bytes = 0;
         bytes += WriteTo::write_to(&self.x, writer)?;
         bytes += WriteTo::write_to(&self.y, writer)?;
-        bytes += WriteTo::write_to(&self.unknown, writer)?;
+        bytes += WriteTo::write_to(&self.unknown_1, writer)?;
         return Ok(bytes);
     }
 }
@@ -112,7 +123,7 @@ mod tests {
 
     #[test]
     fn read_write_point() -> io::Result<()> {
-        let original = TradeRoutePointData { x: 1, y: 2, unknown: 3 };
+        let original = TradeRoutePointData { x: 1, y: 2, unknown_1: 3 };
 
         let mut buffer = vec![];
 
@@ -132,18 +143,18 @@ mod tests {
             points.push(TradeRoutePointData {
                 x: i,
                 y: i + 1,
-                unknown: i + 2,
+                unknown_1: i + 2,
             });
         }
 
         let original = TradeRouteData {
-            header: [1, 2, 3, 4, 5, 6, 7, 8],
+            constant_1_0x05: 0x0807060504030201,
             points: BoxedArray::from_vec(points),
             distance: [9; 12],
             route_type: 10,
             points_count: 11,
             exists: 12,
-            unknown: 13,
+            constant_2_0x00: 13,
         };
 
         let mut buffer = vec![];

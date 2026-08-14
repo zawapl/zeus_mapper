@@ -15,23 +15,23 @@ use std::io::Write;
 /// not implemented/decoded here yet.
 #[derive(Debug, Clone, PartialEq, Default, LogDifferences)]
 pub struct UnitData {
-    pub field_1: BoxedArray<u8, 10>,
+    pub unknown_1: BoxedArray<u8, 10>,
     pub type_id: u16,
-    pub field_2: BoxedArray<u8, 8>,
+    pub unknown_2: BoxedArray<u8, 8>,
     pub x: u16,
     pub y: u16,
-    pub field_3: BoxedArray<u8, 364>,
+    pub unknown_3: BoxedArray<u8, 364>,
 }
 
 impl ReadFrom for UnitData {
     fn read_from(reader: &mut impl Read) -> io::Result<Self> {
         return Ok(UnitData {
-            field_1: ReadFrom::read_from(reader)?,
+            unknown_1: ReadFrom::read_from(reader)?,
             type_id: ReadFrom::read_from(reader)?,
-            field_2: ReadFrom::read_from(reader)?,
+            unknown_2: ReadFrom::read_from(reader)?,
             x: ReadFrom::read_from(reader)?,
             y: ReadFrom::read_from(reader)?,
-            field_3: ReadFrom::read_from(reader)?,
+            unknown_3: ReadFrom::read_from(reader)?,
         });
     }
 }
@@ -39,12 +39,12 @@ impl ReadFrom for UnitData {
 impl WriteTo for UnitData {
     fn write_to<W: Write>(&self, writer: &mut W) -> io::Result<usize> {
         let mut bytes = 0;
-        bytes += WriteTo::write_to(&self.field_1, writer)?;
+        bytes += WriteTo::write_to(&self.unknown_1, writer)?;
         bytes += WriteTo::write_to(&self.type_id, writer)?;
-        bytes += WriteTo::write_to(&self.field_2, writer)?;
+        bytes += WriteTo::write_to(&self.unknown_2, writer)?;
         bytes += WriteTo::write_to(&self.x, writer)?;
         bytes += WriteTo::write_to(&self.y, writer)?;
-        bytes += WriteTo::write_to(&self.field_3, writer)?;
+        bytes += WriteTo::write_to(&self.unknown_3, writer)?;
         return Ok(bytes);
     }
 }

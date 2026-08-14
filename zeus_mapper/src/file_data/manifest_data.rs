@@ -12,7 +12,7 @@ pub struct ManifestData {
     pub address: u32,
     pub size: u32,
     pub count: u32,
-    pub unknown: u32,
+    pub unknown_1: u32,
 }
 
 impl ReadFrom for ManifestData {
@@ -22,7 +22,7 @@ impl ReadFrom for ManifestData {
             address: ReadFrom::read_from(reader)?,
             size: ReadFrom::read_from(reader)?,
             count: ReadFrom::read_from(reader)?,
-            unknown: ReadFrom::read_from(reader)?,
+            unknown_1: ReadFrom::read_from(reader)?,
         });
     }
 }
@@ -46,7 +46,7 @@ impl WriteTo for ManifestData {
         bytes += WriteTo::write_to(&self.address, writer)?;
         bytes += WriteTo::write_to(&self.size, writer)?;
         bytes += WriteTo::write_to(&self.count, writer)?;
-        bytes += WriteTo::write_to(&self.unknown, writer)?;
+        bytes += WriteTo::write_to(&self.unknown_1, writer)?;
         return Ok(bytes);
     }
 }
@@ -64,7 +64,7 @@ mod tests {
             address: 2,
             size: 3,
             count: 4,
-            unknown: 5,
+            unknown_1: 5,
         };
 
         let mut buffer = vec![];

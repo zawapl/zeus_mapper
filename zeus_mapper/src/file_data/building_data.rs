@@ -14,31 +14,31 @@ use std::io::Write;
 /// `docs/sav_investigation.md`.
 #[derive(Debug, Clone, PartialEq, Default, LogDifferences)]
 pub struct BuildingData {
-    pub field_1: BoxedArray<u8, 3>,
+    pub unknown_1: BoxedArray<u8, 3>,
     pub size: u8,
-    pub field_2: BoxedArray<u8, 2>,
+    pub unknown_2: BoxedArray<u8, 2>,
     pub x: u16,
     pub y: u16,
-    pub field_3: BoxedArray<u8, 6>,
+    pub unknown_3: BoxedArray<u8, 6>,
     pub type_id: u16,
-    pub field_4: BoxedArray<u8, 154>,
+    pub unknown_4: BoxedArray<u8, 154>,
     pub rotation: u8,
-    pub field_5: BoxedArray<u8, 107>,
+    pub unknown_5: BoxedArray<u8, 107>,
 }
 
 impl ReadFrom for BuildingData {
     fn read_from(reader: &mut impl Read) -> io::Result<Self> {
         return Ok(BuildingData {
-            field_1: ReadFrom::read_from(reader)?,
+            unknown_1: ReadFrom::read_from(reader)?,
             size: ReadFrom::read_from(reader)?,
-            field_2: ReadFrom::read_from(reader)?,
+            unknown_2: ReadFrom::read_from(reader)?,
             x: ReadFrom::read_from(reader)?,
             y: ReadFrom::read_from(reader)?,
-            field_3: ReadFrom::read_from(reader)?,
+            unknown_3: ReadFrom::read_from(reader)?,
             type_id: ReadFrom::read_from(reader)?,
-            field_4: ReadFrom::read_from(reader)?,
+            unknown_4: ReadFrom::read_from(reader)?,
             rotation: ReadFrom::read_from(reader)?,
-            field_5: ReadFrom::read_from(reader)?,
+            unknown_5: ReadFrom::read_from(reader)?,
         });
     }
 }
@@ -46,16 +46,16 @@ impl ReadFrom for BuildingData {
 impl WriteTo for BuildingData {
     fn write_to<W: Write>(&self, writer: &mut W) -> io::Result<usize> {
         let mut bytes = 0;
-        bytes += WriteTo::write_to(&self.field_1, writer)?;
+        bytes += WriteTo::write_to(&self.unknown_1, writer)?;
         bytes += WriteTo::write_to(&self.size, writer)?;
-        bytes += WriteTo::write_to(&self.field_2, writer)?;
+        bytes += WriteTo::write_to(&self.unknown_2, writer)?;
         bytes += WriteTo::write_to(&self.x, writer)?;
         bytes += WriteTo::write_to(&self.y, writer)?;
-        bytes += WriteTo::write_to(&self.field_3, writer)?;
+        bytes += WriteTo::write_to(&self.unknown_3, writer)?;
         bytes += WriteTo::write_to(&self.type_id, writer)?;
-        bytes += WriteTo::write_to(&self.field_4, writer)?;
+        bytes += WriteTo::write_to(&self.unknown_4, writer)?;
         bytes += WriteTo::write_to(&self.rotation, writer)?;
-        bytes += WriteTo::write_to(&self.field_5, writer)?;
+        bytes += WriteTo::write_to(&self.unknown_5, writer)?;
         return Ok(bytes);
     }
 }

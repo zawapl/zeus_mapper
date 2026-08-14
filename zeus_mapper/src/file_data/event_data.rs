@@ -50,20 +50,39 @@ pub struct EventData {
     pub subtype: u16,
     pub prev_amount: u16,
     pub related_to_triggered_evt: u32,
-    pub unknown_1: u16,
+    pub constant_1_0x00: u16,
     pub trig_reason: u16,
-    pub unknown_2: u16,
-    pub unknown_3: u8,
+    pub constant_2_0x00: u16,
+    pub constant_3_0x00: u8,
     pub other_city: u8,
     pub loot_type: u16,
     pub loot_amount: u16,
-    pub unknown_4: u8,
+    pub constant_4_0x00: u8,
     pub ally_city: u8,
     pub ally_strength: u8,
     pub to_strength: u8,
-    pub unknown_5: u16,
+    pub unknown_1: u16,
     pub quest: u8,
     pub tail: u8,
+}
+
+impl EventData {
+    pub fn validate(&self) -> Result<(), String> {
+        if self.constant_1_0x00 != 0 {
+            return Err(format!("constant_1_0x00 is {}, expected 0", self.constant_1_0x00));
+        }
+        if self.constant_2_0x00 != 0 {
+            return Err(format!("constant_2_0x00 is {}, expected 0", self.constant_2_0x00));
+        }
+        if self.constant_3_0x00 != 0 {
+            return Err(format!("constant_3_0x00 is {}, expected 0", self.constant_3_0x00));
+        }
+        if self.constant_4_0x00 != 0 {
+            return Err(format!("constant_4_0x00 is {}, expected 0", self.constant_4_0x00));
+        }
+
+        return Ok(());
+    }
 }
 
 impl Default for EventData {
@@ -113,18 +132,18 @@ impl Default for EventData {
             subtype: 0,
             prev_amount: 0,
             related_to_triggered_evt: 0,
-            unknown_1: 0,
+            constant_1_0x00: 0,
             trig_reason: 0,
-            unknown_2: 0,
-            unknown_3: 0,
+            constant_2_0x00: 0,
+            constant_3_0x00: 0,
             other_city: 0,
             loot_type: 0,
             loot_amount: 0,
-            unknown_4: 0,
+            constant_4_0x00: 0,
             ally_city: 0,
             ally_strength: 0,
             to_strength: 0,
-            unknown_5: 0,
+            unknown_1: 0,
             quest: 0,
             tail: 0,
         };
@@ -177,18 +196,18 @@ impl ReadFrom for EventData {
             subtype: ReadFrom::read_from(reader)?,
             prev_amount: ReadFrom::read_from(reader)?,
             related_to_triggered_evt: ReadFrom::read_from(reader)?,
-            unknown_1: ReadFrom::read_from(reader)?,
+            constant_1_0x00: ReadFrom::read_from(reader)?,
             trig_reason: ReadFrom::read_from(reader)?,
-            unknown_2: ReadFrom::read_from(reader)?,
-            unknown_3: ReadFrom::read_from(reader)?,
+            constant_2_0x00: ReadFrom::read_from(reader)?,
+            constant_3_0x00: ReadFrom::read_from(reader)?,
             other_city: ReadFrom::read_from(reader)?,
             loot_type: ReadFrom::read_from(reader)?,
             loot_amount: ReadFrom::read_from(reader)?,
-            unknown_4: ReadFrom::read_from(reader)?,
+            constant_4_0x00: ReadFrom::read_from(reader)?,
             ally_city: ReadFrom::read_from(reader)?,
             ally_strength: ReadFrom::read_from(reader)?,
             to_strength: ReadFrom::read_from(reader)?,
-            unknown_5: ReadFrom::read_from(reader)?,
+            unknown_1: ReadFrom::read_from(reader)?,
             quest: ReadFrom::read_from(reader)?,
             tail: ReadFrom::read_from(reader)?,
         });
@@ -242,18 +261,18 @@ impl WriteTo for EventData {
         bytes += WriteTo::write_to(&self.subtype, writer)?;
         bytes += WriteTo::write_to(&self.prev_amount, writer)?;
         bytes += WriteTo::write_to(&self.related_to_triggered_evt, writer)?;
-        bytes += WriteTo::write_to(&self.unknown_1, writer)?;
+        bytes += WriteTo::write_to(&self.constant_1_0x00, writer)?;
         bytes += WriteTo::write_to(&self.trig_reason, writer)?;
-        bytes += WriteTo::write_to(&self.unknown_2, writer)?;
-        bytes += WriteTo::write_to(&self.unknown_3, writer)?;
+        bytes += WriteTo::write_to(&self.constant_2_0x00, writer)?;
+        bytes += WriteTo::write_to(&self.constant_3_0x00, writer)?;
         bytes += WriteTo::write_to(&self.other_city, writer)?;
         bytes += WriteTo::write_to(&self.loot_type, writer)?;
         bytes += WriteTo::write_to(&self.loot_amount, writer)?;
-        bytes += WriteTo::write_to(&self.unknown_4, writer)?;
+        bytes += WriteTo::write_to(&self.constant_4_0x00, writer)?;
         bytes += WriteTo::write_to(&self.ally_city, writer)?;
         bytes += WriteTo::write_to(&self.ally_strength, writer)?;
         bytes += WriteTo::write_to(&self.to_strength, writer)?;
-        bytes += WriteTo::write_to(&self.unknown_5, writer)?;
+        bytes += WriteTo::write_to(&self.unknown_1, writer)?;
         bytes += WriteTo::write_to(&self.quest, writer)?;
         bytes += WriteTo::write_to(&self.tail, writer)?;
 
@@ -313,18 +332,18 @@ mod tests {
             subtype: 49,
             prev_amount: 50,
             related_to_triggered_evt: 51,
-            unknown_1: 52,
+            constant_1_0x00: 52,
             trig_reason: 53,
-            unknown_2: 54,
-            unknown_3: 55,
+            constant_2_0x00: 54,
+            constant_3_0x00: 55,
             other_city: 56,
             loot_type: 57,
             loot_amount: 58,
-            unknown_4: 59,
+            constant_4_0x00: 59,
             ally_city: 60,
             ally_strength: 61,
             to_strength: 62,
-            unknown_5: 63,
+            unknown_1: 63,
             quest: 64,
             tail: 65,
         };

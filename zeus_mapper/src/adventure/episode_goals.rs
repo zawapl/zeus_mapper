@@ -80,10 +80,10 @@ impl EpisodeGoal {
             0 if resource_id > 0 => Some(EpisodeGoal::Population(resource_id)),
             1 if resource_id > 0 => Some(EpisodeGoal::Treasury(resource_id)),
             // Old-format only: an unspecified count of *any* god's sanctuary, with the count in
-            // `field_4[0]` rather than `amount` - confirmed against `#Zeus and Europa.pak`, where
-            // `field_4[0] == 2` matches a real, user-confirmed `Sanctuaries(2)`. No confirmed
+            // `unknown_1[0]` rather than `amount` - confirmed against `#Zeus and Europa.pak`, where
+            // `unknown_1[0] == 2` matches a real, user-confirmed `Sanctuaries(2)`. No confirmed
             // new-format example exists, so this shape is only attempted for old-format data.
-            2 if !new_file_ver && resource_id == u32::MAX => Some(EpisodeGoal::Sanctuaries(u32_at(slot.field_4.as_slice(), 0) as u8)),
+            2 if !new_file_ver && resource_id == u32::MAX => Some(EpisodeGoal::Sanctuaries(u32_at(slot.unknown_1.as_slice(), 0) as u8)),
             2 => God::try_resolve(&resource_id).map(EpisodeGoal::Sanctuary),
             3 => UnitType::try_resolve(&resource_id).map(|unit| EpisodeGoal::Army(unit, amount)),
             4 => resolve_quest(resource_id, events),
@@ -96,7 +96,7 @@ impl EpisodeGoal {
             10 if resource_id > 0 => Some(EpisodeGoal::TradingPartners(resource_id)),
             14 if amount > 0 && amount < 256 => ResourceType::try_resolve_for_format(&(resource_id as u8), new_file_ver)
                 .map(|resource| EpisodeGoal::SetAsideGoods(resource, amount)),
-            15 if new_file_ver && amount == 0 => Some(EpisodeGoal::Pyramids(u32_at(slot.field_4.as_slice(), 4) as u8)),
+            15 if new_file_ver && amount == 0 => Some(EpisodeGoal::Pyramids(u32_at(slot.unknown_1.as_slice(), 4) as u8)),
             15 if new_file_ver => PyramidType::try_resolve(&amount).map(EpisodeGoal::Pyramid),
             16 if new_file_ver && resource_id > 0 => Some(EpisodeGoal::Hippodrome(resource_id)),
             _ => None,
@@ -128,7 +128,7 @@ impl EpisodeGoal {
     }
 
     fn to_raw_fields(&self) -> Option<EpisodeGoalData> {
-        let (goal_type, resource_id, amount, field_4) = match self {
+        let (goal_type, resource_id, amount, unknown_1) = match self {
             EpisodeGoal::Population(count) => (0, *count, 0, Default::default()),
             EpisodeGoal::Treasury(amount) => (1, *amount, 0, Default::default()),
             EpisodeGoal::Sanctuary(god) => (2, god.value(), 0, Default::default()),
@@ -151,7 +151,7 @@ impl EpisodeGoal {
             goal_type,
             resource_id,
             amount,
-            field_4,
+            unknown_1,
         });
     }
 }
@@ -209,7 +209,7 @@ fn resolve_quest(goal_index: u32, events: &BoxedArray<EventData, 150>) -> Option
 
 /// `Pyramids(count)`'s raw encoding: `resource_id`/`amount` are both otherwise-unused for this
 /// goal (`resource_id` a constant `1`, `amount` `0`, matching the one real `Pyramids` goal seen so
-/// far), and `count` itself lives at byte offset 4 (the second `u32`) of `field_4`, preceded by a
+/// far), and `count` itself lives at byte offset 4 (the second `u32`) of `unknown_1`, preceded by a
 /// `u32::MAX` sentinel at offset 0 whose purpose isn't confirmed but is reproduced here to match
 /// the one real record observed.
 fn pyramids_field_4(count: u8) -> BoxedArray<u8, 64> {

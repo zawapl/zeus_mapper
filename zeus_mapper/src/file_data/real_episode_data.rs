@@ -11,13 +11,13 @@ use std::io::Write;
 #[derive(Debug, Clone, PartialEq, Default, LogDifferences)]
 pub struct RealEpisodeData {
     pub start_date: i16,
-    pub field_2: [u8; 8],
+    pub constant_1_0x00: [u8; 8],
     pub months_elapsed: u16,
-    pub field_4: [u8; 20],
+    pub constant_2_0x00: [u8; 20],
     pub starting_cash: u32,
-    pub field_6: [u8; 8],
+    pub unknown_1: [u8; 8],
     pub map_size: u32,
-    pub field_8: [u8; 12],
+    pub unknown_2: [u8; 12],
     pub text_buffer_1: String,
     pub text_buffer_2: String,
     pub civilization: u32,
@@ -27,14 +27,14 @@ pub struct RealEpisodeData {
     pub fish_y: [u16; 8],
     pub urchin_x: [u16; 8],
     pub urchin_y: [u16; 8],
-    pub field_17: [u8; 12],
+    pub constant_3_0x00: [u8; 12],
     pub invasion_x: [u16; 16],
     pub invasion_y: [u16; 16],
     pub panhellenic_games: u16,
     pub colonies_done: u16,
     pub deer_x: [u16; 4],
     pub deer_y: [u16; 4],
-    pub field_24: BoxedArray<u8, 76>,
+    pub unknown_3: BoxedArray<u8, 76>,
     pub earthquake_area: [u16; 2],
     pub entry_x: u16,
     pub entry_y: u16,
@@ -46,40 +46,68 @@ pub struct RealEpisodeData {
     pub river_entry_y: u16,
     pub river_exit_x: u16,
     pub river_exit_y: u16,
-    pub field_36: BoxedArray<u8, 40>,
+    pub unknown_4: BoxedArray<u8, 40>,
     pub tropical: u32,
     pub boar_x: [u16; 8],
     pub boar_y: [u16; 8],
     pub building_flags: BoxedArray<u16, 100>,
-    pub field_41: [u8; 16],
+    pub constant_4_0x00: [u8; 16],
     pub monster_x: [u32; 3],
     pub monster_y: [u32; 3],
     pub disembark_x: [u16; 6],
     pub disembark_y: [u16; 6],
-    pub field_46: BoxedArray<u8, 276>,
+    pub constant_5_0x00: BoxedArray<u8, 276>,
     pub landslide_x: [u16; 6],
     pub landslide_y: [u16; 6],
-    pub field_49: [u8; 8],
+    pub constant_6_0x00: [u8; 8],
     pub basic_episode_data: BasicEpisodeData,
     pub city_resources: [u8; 20],
     pub city_resources_bought: [u8; 4],
-    pub field_53: [u8; 2],
+    pub constant_7_0x00: [u8; 2],
     pub city_resources_sold: [u8; 4],
-    pub field_55: [u8; 2],
+    pub unknown_5: [u8; 2],
     pub city_resources_quantity: BoxedArray<u8, 40>,
+}
+
+impl RealEpisodeData {
+    pub fn validate(&self) -> Result<(), String> {
+        if self.constant_1_0x00.iter().any(|b| *b != 0) {
+            return Err("constant_1_0x00 is non-zero".to_owned());
+        }
+        if self.constant_2_0x00.iter().any(|b| *b != 0) {
+            return Err("constant_2_0x00 is non-zero".to_owned());
+        }
+        if self.constant_3_0x00.iter().any(|b| *b != 0) {
+            return Err("constant_3_0x00 is non-zero".to_owned());
+        }
+        if self.constant_4_0x00.iter().any(|b| *b != 0) {
+            return Err("constant_4_0x00 is non-zero".to_owned());
+        }
+        if self.constant_5_0x00.as_ref().iter().any(|b| *b != 0) {
+            return Err("constant_5_0x00 is non-zero".to_owned());
+        }
+        if self.constant_6_0x00.iter().any(|b| *b != 0) {
+            return Err("constant_6_0x00 is non-zero".to_owned());
+        }
+        if self.constant_7_0x00.iter().any(|b| *b != 0) {
+            return Err("constant_7_0x00 is non-zero".to_owned());
+        }
+
+        return self.basic_episode_data.validate();
+    }
 }
 
 impl ReadFrom for RealEpisodeData {
     fn read_from(reader: &mut impl Read) -> std::io::Result<Self> {
         return Ok(RealEpisodeData {
             start_date: ReadFrom::read_from(reader)?,
-            field_2: ReadFrom::read_from(reader)?,
+            constant_1_0x00: ReadFrom::read_from(reader)?,
             months_elapsed: ReadFrom::read_from(reader)?,
-            field_4: ReadFrom::read_from(reader)?,
+            constant_2_0x00: ReadFrom::read_from(reader)?,
             starting_cash: ReadFrom::read_from(reader)?,
-            field_6: ReadFrom::read_from(reader)?,
+            unknown_1: ReadFrom::read_from(reader)?,
             map_size: ReadFrom::read_from(reader)?,
-            field_8: ReadFrom::read_from(reader)?,
+            unknown_2: ReadFrom::read_from(reader)?,
             text_buffer_1: read_string_from(reader, 64)?,
             text_buffer_2: read_string_from(reader, 524)?,
             civilization: ReadFrom::read_from(reader)?,
@@ -89,14 +117,14 @@ impl ReadFrom for RealEpisodeData {
             fish_y: ReadFrom::read_from(reader)?,
             urchin_x: ReadFrom::read_from(reader)?,
             urchin_y: ReadFrom::read_from(reader)?,
-            field_17: ReadFrom::read_from(reader)?,
+            constant_3_0x00: ReadFrom::read_from(reader)?,
             invasion_x: ReadFrom::read_from(reader)?,
             invasion_y: ReadFrom::read_from(reader)?,
             panhellenic_games: ReadFrom::read_from(reader)?,
             colonies_done: ReadFrom::read_from(reader)?,
             deer_x: ReadFrom::read_from(reader)?,
             deer_y: ReadFrom::read_from(reader)?,
-            field_24: ReadFrom::read_from(reader)?,
+            unknown_3: ReadFrom::read_from(reader)?,
             earthquake_area: ReadFrom::read_from(reader)?,
             entry_x: ReadFrom::read_from(reader)?,
             entry_y: ReadFrom::read_from(reader)?,
@@ -108,26 +136,26 @@ impl ReadFrom for RealEpisodeData {
             river_entry_y: ReadFrom::read_from(reader)?,
             river_exit_x: ReadFrom::read_from(reader)?,
             river_exit_y: ReadFrom::read_from(reader)?,
-            field_36: ReadFrom::read_from(reader)?,
+            unknown_4: ReadFrom::read_from(reader)?,
             tropical: ReadFrom::read_from(reader)?,
             boar_x: ReadFrom::read_from(reader)?,
             boar_y: ReadFrom::read_from(reader)?,
             building_flags: ReadFrom::read_from(reader)?,
-            field_41: ReadFrom::read_from(reader)?,
+            constant_4_0x00: ReadFrom::read_from(reader)?,
             monster_x: ReadFrom::read_from(reader)?,
             monster_y: ReadFrom::read_from(reader)?,
             disembark_x: ReadFrom::read_from(reader)?,
             disembark_y: ReadFrom::read_from(reader)?,
-            field_46: ReadFrom::read_from(reader)?,
+            constant_5_0x00: ReadFrom::read_from(reader)?,
             landslide_x: ReadFrom::read_from(reader)?,
             landslide_y: ReadFrom::read_from(reader)?,
-            field_49: ReadFrom::read_from(reader)?,
+            constant_6_0x00: ReadFrom::read_from(reader)?,
             basic_episode_data: ReadFrom::read_from(reader)?,
             city_resources: ReadFrom::read_from(reader)?,
             city_resources_bought: ReadFrom::read_from(reader)?,
-            field_53: ReadFrom::read_from(reader)?,
+            constant_7_0x00: ReadFrom::read_from(reader)?,
             city_resources_sold: ReadFrom::read_from(reader)?,
-            field_55: ReadFrom::read_from(reader)?,
+            unknown_5: ReadFrom::read_from(reader)?,
             city_resources_quantity: ReadFrom::read_from(reader)?,
         });
     }
@@ -138,13 +166,13 @@ impl WriteTo for RealEpisodeData {
         let mut bytes = 0;
 
         bytes += WriteTo::write_to(&self.start_date, writer)?;
-        bytes += WriteTo::write_to(&self.field_2, writer)?;
+        bytes += WriteTo::write_to(&self.constant_1_0x00, writer)?;
         bytes += WriteTo::write_to(&self.months_elapsed, writer)?;
-        bytes += WriteTo::write_to(&self.field_4, writer)?;
+        bytes += WriteTo::write_to(&self.constant_2_0x00, writer)?;
         bytes += WriteTo::write_to(&self.starting_cash, writer)?;
-        bytes += WriteTo::write_to(&self.field_6, writer)?;
+        bytes += WriteTo::write_to(&self.unknown_1, writer)?;
         bytes += WriteTo::write_to(&self.map_size, writer)?;
-        bytes += WriteTo::write_to(&self.field_8, writer)?;
+        bytes += WriteTo::write_to(&self.unknown_2, writer)?;
         bytes += write_string_to(&self.text_buffer_1, writer, 64)?;
         bytes += write_string_to(&self.text_buffer_2, writer, 524)?;
         bytes += WriteTo::write_to(&self.civilization, writer)?;
@@ -154,14 +182,14 @@ impl WriteTo for RealEpisodeData {
         bytes += WriteTo::write_to(&self.fish_y, writer)?;
         bytes += WriteTo::write_to(&self.urchin_x, writer)?;
         bytes += WriteTo::write_to(&self.urchin_y, writer)?;
-        bytes += WriteTo::write_to(&self.field_17, writer)?;
+        bytes += WriteTo::write_to(&self.constant_3_0x00, writer)?;
         bytes += WriteTo::write_to(&self.invasion_x, writer)?;
         bytes += WriteTo::write_to(&self.invasion_y, writer)?;
         bytes += WriteTo::write_to(&self.panhellenic_games, writer)?;
         bytes += WriteTo::write_to(&self.colonies_done, writer)?;
         bytes += WriteTo::write_to(&self.deer_x, writer)?;
         bytes += WriteTo::write_to(&self.deer_y, writer)?;
-        bytes += WriteTo::write_to(&self.field_24, writer)?;
+        bytes += WriteTo::write_to(&self.unknown_3, writer)?;
         bytes += WriteTo::write_to(&self.earthquake_area, writer)?;
         bytes += WriteTo::write_to(&self.entry_x, writer)?;
         bytes += WriteTo::write_to(&self.entry_y, writer)?;
@@ -173,26 +201,26 @@ impl WriteTo for RealEpisodeData {
         bytes += WriteTo::write_to(&self.river_entry_y, writer)?;
         bytes += WriteTo::write_to(&self.river_exit_x, writer)?;
         bytes += WriteTo::write_to(&self.river_exit_y, writer)?;
-        bytes += WriteTo::write_to(&self.field_36, writer)?;
+        bytes += WriteTo::write_to(&self.unknown_4, writer)?;
         bytes += WriteTo::write_to(&self.tropical, writer)?;
         bytes += WriteTo::write_to(&self.boar_x, writer)?;
         bytes += WriteTo::write_to(&self.boar_y, writer)?;
         bytes += WriteTo::write_to(&self.building_flags, writer)?;
-        bytes += WriteTo::write_to(&self.field_41, writer)?;
+        bytes += WriteTo::write_to(&self.constant_4_0x00, writer)?;
         bytes += WriteTo::write_to(&self.monster_x, writer)?;
         bytes += WriteTo::write_to(&self.monster_y, writer)?;
         bytes += WriteTo::write_to(&self.disembark_x, writer)?;
         bytes += WriteTo::write_to(&self.disembark_y, writer)?;
-        bytes += WriteTo::write_to(&self.field_46, writer)?;
+        bytes += WriteTo::write_to(&self.constant_5_0x00, writer)?;
         bytes += WriteTo::write_to(&self.landslide_x, writer)?;
         bytes += WriteTo::write_to(&self.landslide_y, writer)?;
-        bytes += WriteTo::write_to(&self.field_49, writer)?;
+        bytes += WriteTo::write_to(&self.constant_6_0x00, writer)?;
         bytes += WriteTo::write_to(&self.basic_episode_data, writer)?;
         bytes += WriteTo::write_to(&self.city_resources, writer)?;
         bytes += WriteTo::write_to(&self.city_resources_bought, writer)?;
-        bytes += WriteTo::write_to(&self.field_53, writer)?;
+        bytes += WriteTo::write_to(&self.constant_7_0x00, writer)?;
         bytes += WriteTo::write_to(&self.city_resources_sold, writer)?;
-        bytes += WriteTo::write_to(&self.field_55, writer)?;
+        bytes += WriteTo::write_to(&self.unknown_5, writer)?;
         bytes += WriteTo::write_to(&self.city_resources_quantity, writer)?;
 
         return Ok(bytes);
@@ -210,13 +238,13 @@ mod tests {
     fn read_write() -> io::Result<()> {
         let original = RealEpisodeData {
             start_date: 1,
-            field_2: seq_u8(2),
+            constant_1_0x00: seq_u8(2),
             months_elapsed: 3,
-            field_4: seq_u8(4),
+            constant_2_0x00: seq_u8(4),
             starting_cash: 5,
-            field_6: seq_u8(6),
+            unknown_1: seq_u8(6),
             map_size: 7,
-            field_8: seq_u8(8),
+            unknown_2: seq_u8(8),
             text_buffer_1: "Text buffer one".to_owned(),
             text_buffer_2: "Text buffer two".to_owned(),
             civilization: 9,
@@ -226,14 +254,14 @@ mod tests {
             fish_y: seq_u16(13),
             urchin_x: seq_u16(14),
             urchin_y: seq_u16(15),
-            field_17: seq_u8(16),
+            constant_3_0x00: seq_u8(16),
             invasion_x: seq_u16(17),
             invasion_y: seq_u16(18),
             panhellenic_games: 19,
             colonies_done: 20,
             deer_x: seq_u16(21),
             deer_y: seq_u16(22),
-            field_24: BoxedArray::from_vec(seq_u8::<76>(23).to_vec()),
+            unknown_3: BoxedArray::from_vec(seq_u8::<76>(23).to_vec()),
             earthquake_area: seq_u16(24),
             entry_x: 25,
             entry_y: 26,
@@ -245,28 +273,28 @@ mod tests {
             river_entry_y: 32,
             river_exit_x: 33,
             river_exit_y: 34,
-            field_36: BoxedArray::from_vec(seq_u8::<40>(35).to_vec()),
+            unknown_4: BoxedArray::from_vec(seq_u8::<40>(35).to_vec()),
             tropical: 36,
             boar_x: seq_u16(37),
             boar_y: seq_u16(38),
             building_flags: BoxedArray::from_vec(seq_u16::<100>(39).to_vec()),
-            field_41: seq_u8(40),
+            constant_4_0x00: seq_u8(40),
             monster_x: seq_u32(41),
             monster_y: seq_u32(42),
             disembark_x: seq_u16(43),
             disembark_y: seq_u16(44),
-            field_46: BoxedArray::from_vec(seq_u8::<276>(45).to_vec()),
+            constant_5_0x00: BoxedArray::from_vec(seq_u8::<276>(45).to_vec()),
             landslide_x: seq_u16(46),
             landslide_y: seq_u16(47),
-            field_49: seq_u8(48),
+            constant_6_0x00: seq_u8(48),
             basic_episode_data: BasicEpisodeData {
                 exists: 49,
-                field_2: 50,
-                field_3: 51,
+                constant_1_0x00: 50,
+                unknown_1: 51,
                 episode_no: 52,
-                field_5: 53,
-                field_6: 54,
-                field_7: BoxedArray::from_vec(seq_u8::<60>(55).to_vec()),
+                unknown_2: 53,
+                unknown_3: 54,
+                unknown_4: BoxedArray::from_vec(seq_u8::<60>(55).to_vec()),
                 next_episode: 56,
                 episode_type: 57,
                 name_padding: 58,
@@ -274,9 +302,9 @@ mod tests {
             },
             city_resources: seq_u8(59),
             city_resources_bought: seq_u8(60),
-            field_53: seq_u8(61),
+            constant_7_0x00: seq_u8(61),
             city_resources_sold: seq_u8(62),
-            field_55: seq_u8(63),
+            unknown_5: seq_u8(63),
             city_resources_quantity: BoxedArray::from_vec(seq_u8::<40>(64).to_vec()),
         };
 

@@ -46,17 +46,17 @@ impl TradeRoute {
             .points
             .iter()
             .take(50)
-            .map(|&(x, y)| TradeRoutePointData { x, y, unknown: 0 })
+            .map(|&(x, y)| TradeRoutePointData { x, y, unknown_1: 0 })
             .collect();
 
         return TradeRouteData {
-            header: [5, 0, 0, 0, 0, 0, 0, 0],
+            constant_1_0x05: 5,
             points: BoxedArray::from_vec(points),
             distance,
             route_type: self.route_type,
             points_count: self.points.len().min(50) as u8,
             exists: 1,
-            unknown: 0,
+            constant_2_0x00: 0,
         };
     }
 

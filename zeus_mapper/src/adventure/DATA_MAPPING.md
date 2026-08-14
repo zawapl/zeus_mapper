@@ -489,7 +489,7 @@ in both the active and inactive state). Findings, now fully implemented in `Worl
   one `(width, height)`, no exceptions once tutorial/single-building mission `.pak` files are
   excluded (those hold unused template data, not real content - see "Map-editor template leftovers"
   above).
-- **`WorldLocationData.active_old`** (a single byte split out of what was a 15-byte `unknown_341`
+- **`WorldLocationData.active_old`** (a `u32` split out of what was a 15-byte `unknown_341`
   block - see below; formerly named `unknown_352`, then `legacy_active`) and `active_new` are
   format-version duplicates of one "visually active" concept, not two independent triggers:
   surveyed across 250 real `Colony`/`ForeignCity`/`DistantCity`/`EnchantedPlace` records,
@@ -560,7 +560,7 @@ the matching record length so the whole array stays self-consistent.
 
 Still unmodeled (meaning unknown) on `WorldLocationData`: ~371 bytes across `unknown_*` blocks
 (`unknown_240` and `unknown_341`/`unknown_353` flank the resolved `favour_old` byte between them -
-see `favour` above). `active_old` (a single byte, split out of what used to be one 15-byte
+see `favour` above). `active_old` (a `u32`, split out of what used to be one 15-byte
 `unknown_341` block) sits in that same gap but is fully understood now - see the `sprite_id`/
 `sprite_size` investigation above - so it's promoted out of the `unknown_*` naming, unlike its
 still-unmodeled neighbors. Still unmodeled on `WorldMapElementData`: `data_a`/`data_d`, and

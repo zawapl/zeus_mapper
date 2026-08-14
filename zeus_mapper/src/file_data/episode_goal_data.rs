@@ -16,7 +16,7 @@ pub struct EpisodeGoalData {
     pub goal_type: u32,
     pub resource_id: u32,
     pub amount: u32,
-    pub field_4: BoxedArray<u8, 64>,
+    pub unknown_1: BoxedArray<u8, 64>,
 }
 
 impl ReadFrom for EpisodeGoalData {
@@ -25,7 +25,7 @@ impl ReadFrom for EpisodeGoalData {
             goal_type: ReadFrom::read_from(reader)?,
             resource_id: ReadFrom::read_from(reader)?,
             amount: ReadFrom::read_from(reader)?,
-            field_4: ReadFrom::read_from(reader)?,
+            unknown_1: ReadFrom::read_from(reader)?,
         });
     }
 }
@@ -37,7 +37,7 @@ impl WriteTo for EpisodeGoalData {
         bytes += WriteTo::write_to(&self.goal_type, writer)?;
         bytes += WriteTo::write_to(&self.resource_id, writer)?;
         bytes += WriteTo::write_to(&self.amount, writer)?;
-        bytes += WriteTo::write_to(&self.field_4, writer)?;
+        bytes += WriteTo::write_to(&self.unknown_1, writer)?;
 
         return Ok(bytes);
     }
@@ -55,7 +55,7 @@ mod tests {
             goal_type: 14,
             resource_id: 17,
             amount: 8,
-            field_4: BoxedArray::from_vec((0..64).collect()),
+            unknown_1: BoxedArray::from_vec((0..64).collect()),
         };
 
         let mut buffer = vec![];
