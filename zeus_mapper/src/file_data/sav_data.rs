@@ -448,16 +448,7 @@ mod tests {
     use std::io;
     use std::io::BufReader;
 
-    /// Confirms every real `.sav` under `$ZEUS_HOME` reads cleanly, passes `validate`, and
-    /// round-trips (`read_from` -> `write_to` -> `read_from`) to an equal `SavData`. Doesn't assert
-    /// byte-for-byte file identity - several fields (e.g. `terrain`, `field_11`) are decompressed and
-    /// PKWARE-recompressed on write, which isn't guaranteed to reproduce the exact original
-    /// compressed bytes (see `docs/ghidra_investigation_handover.md`) - only that the decoded content
-    /// survives intact. `#[ignore]`d (unlike `validate_map_files`/`validate_set_files`) because the
-    /// round trip alone takes roughly a minute against the ~60 real save files this crate has access
-    /// to; run explicitly with `cargo test -- --ignored` when touching `SavData`.
     #[test]
-    #[ignore]
     fn validate_sav_files() -> io::Result<()> {
         if let Ok(game_root) = std::env::var("ZEUS_HOME") {
             let mut sav_files = vec![];
@@ -474,7 +465,7 @@ mod tests {
 
                 let mut buffer = vec![];
                 original.write_to(&mut buffer)?;
-                let reread = SavData::read_from(&mut std::io::Cursor::new(&buffer))?;
+                let reread = SavData::read_from(&mut io::Cursor::new(&buffer))?;
                 assert_eq!(original, reread, "{path:?} did not round-trip to an equal SavData");
             }
         }

@@ -8,6 +8,7 @@ pub(crate) mod episode_goals;
 pub(crate) mod event;
 pub(crate) mod mythology;
 pub(crate) mod parent_city_episode;
+pub(crate) mod placed_building_type;
 pub(crate) mod pyramid;
 pub(crate) mod resource;
 pub(crate) mod terrain_flags;
