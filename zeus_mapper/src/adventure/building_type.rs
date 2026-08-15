@@ -7,7 +7,7 @@ data_constants!(BuildingType<u16> {
     HuntingLodge = 2,
     OlivePress = 3,
     GrandAgora = 4,
-    Reserved = 5,
+    // Unused = 5,
     Corral = 6,
     Granary = 7,
     CommonAgora = 8,

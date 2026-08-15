@@ -1,6 +1,7 @@
 use crate::constants::data_constant::data_constants;
 
 pub(crate) mod adventure;
+pub(crate) mod build_model_id;
 pub(crate) mod building_type;
 pub(crate) mod city_map;
 pub(crate) mod colony_episode;
@@ -8,7 +9,6 @@ pub(crate) mod episode_goals;
 pub(crate) mod event;
 pub(crate) mod mythology;
 pub(crate) mod parent_city_episode;
-pub(crate) mod placed_building_type;
 pub(crate) mod pyramid;
 pub(crate) mod resource;
 pub(crate) mod terrain_flags;
