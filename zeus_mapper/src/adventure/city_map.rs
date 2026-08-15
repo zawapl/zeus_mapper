@@ -163,7 +163,7 @@ impl CityMap {
             world_map_elements: Default::default(),
             trade_routes: Default::default(),
             constant_2_0xff: BoxedArray::from_vec(vec![0xFF; 51984]),
-            unknown_4: Default::default(),
+            constant_3: BoxedArray::from_vec(vec![180, 70, 100, 180, 70, 100, 0, 100, 0]),
             prices: Default::default(),
             scrub: BoxedArray::from_vec(self.scrub.clone()),
             elevation: BoxedArray::from_vec(self.elevation.clone()),

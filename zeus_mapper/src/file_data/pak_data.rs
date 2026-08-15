@@ -288,7 +288,7 @@ mod tests {
                 world_map_elements: self.generate_data(),
                 trade_routes: self.generate_data(),
                 constant_2_0xff: self.generate_data(),
-                unknown_4: self.generate_data(),
+                constant_3: BoxedArray::from_vec(vec![180, 70, 100, 180, 70, 100, 0, 100, 0]),
                 prices: self.generate_data(),
                 scrub: self.generate_data(),
                 elevation: self.generate_data(),

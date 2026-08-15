@@ -1,6 +1,6 @@
 use crate::constants::data_constant::data_constants;
 
-data_constants!(PlacedBuildingType<u16> {
+data_constants!(BuildingModelId<u16> {
     CommonHouseTier1 = 2,
     CommonHouseTier2 = 3,
     CommonHouseTier3 = 4,

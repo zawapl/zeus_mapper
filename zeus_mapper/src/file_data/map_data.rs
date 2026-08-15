@@ -41,7 +41,7 @@ pub struct MapData {
     pub world_map_elements: BoxedArray<WorldMapElementData, 200>,
     pub trade_routes: BoxedArray<TradeRouteData, 232>,
     pub constant_2_0xff: BoxedArray<u8, 51984>,
-    pub unknown_4: BoxedArray<u8, 36>,
+    pub constant_3: BoxedArray<u32, 9>,
     pub prices: BoxedArray<u32, 36>,
     pub scrub: BoxedArray<u8, 51984>,
     pub elevation: BoxedArray<u8, 51984>,
@@ -105,6 +105,11 @@ impl MapData {
             return Err(format!("constant_2_0xff[{offset}] is not 0xFF"));
         }
 
+        const CONSTANT_3_EXPECTED: [u32; 9] = [180, 70, 100, 180, 70, 100, 0, 100, 0];
+        if *self.constant_3 != CONSTANT_3_EXPECTED {
+            return Err(format!("constant_3 is {:?}, expected {:?}", *self.constant_3, CONSTANT_3_EXPECTED));
+        }
+
         self.scenario_data.validate().map_err(|e| format!("scenario_data: {e}"))?;
 
         for (i, trade_route) in self.trade_routes.iter().enumerate() {
@@ -160,7 +165,7 @@ impl ReadFrom for MapData {
             world_map_elements: WorldMapElementData::read_arr_from(reader, include_custom_names)?,
             trade_routes: TradeRouteData::read_arr_from(reader)?,
             constant_2_0xff: read_compressed_boxed_array_from(reader)?,
-            unknown_4: read_compressed_boxed_array_from(reader)?,
+            constant_3: read_compressed_boxed_array_from(reader)?,
             prices: ReadFrom::read_from(reader)?,
             scrub: read_compressed_boxed_array_from(reader)?,
             elevation: read_compressed_boxed_array_from(reader)?,
@@ -205,7 +210,7 @@ impl WriteTo for MapData {
         bytes += WorldMapElementData::write_arr_to(&self.world_map_elements, writer, include_custom_names)?;
         bytes += write_compressed(&self.trade_routes, writer)?;
         bytes += write_compressed(&self.constant_2_0xff, writer)?;
-        bytes += write_compressed(&self.unknown_4, writer)?;
+        bytes += write_compressed(&self.constant_3, writer)?;
         bytes += WriteTo::write_to(&self.prices, writer)?;
         bytes += write_compressed(&self.scrub, writer)?;
         bytes += write_compressed(&self.elevation, writer)?;
