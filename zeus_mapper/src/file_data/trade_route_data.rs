@@ -11,7 +11,7 @@ use std::io::Write;
 
 // count = 232
 // size = 324
-#[derive(Debug, Clone, PartialEq, Default, LogDifferences)]
+#[derive(Debug, Clone, PartialEq, LogDifferences)]
 pub struct TradeRouteData {
     pub constant_1_0x05: u64,
     pub points: BoxedArray<TradeRoutePointData, 50>,
@@ -24,6 +24,20 @@ pub struct TradeRouteData {
 // @320 = sea/land route?
 // @321 = points count
 // @322 = exists?
+
+impl Default for TradeRouteData {
+    fn default() -> Self {
+        return TradeRouteData {
+            constant_1_0x05: 5,
+            points: Default::default(),
+            distance: [0, 0, 0, 0, 0, 0, 0, 0, 0xFF, 0xFF, 0xFF, 0xFF],
+            route_type: 1,
+            points_count: 0,
+            exists: 0,
+            constant_2_0x00: 0,
+        };
+    }
+}
 
 impl TradeRouteData {
     pub fn validate(&self) -> Result<(), String> {

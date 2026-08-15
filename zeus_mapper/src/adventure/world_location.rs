@@ -26,7 +26,7 @@ pub struct WorldLocation {
 /// on a `ParentCity`, `name`/`civilization` on an `EnchantedPlace`) are intentionally not modeled
 /// here even where real, non-zero data exists for them - they don't appear to be meaningful for
 /// those location types in-game. `to_data` writes sensible defaults back for whatever a variant
-/// doesn't carry, the same way `empty_extras_shaped_location` does for unused slots.
+/// doesn't carry, the same way `WorldLocationData::default()` does for unused slots.
 #[derive(PartialEq, Debug)]
 pub enum WorldLocationType {
     ParentCity(ParentCity),
@@ -178,7 +178,7 @@ impl WorldLocationType {
     // Returns `(raw_location_type, WorldLocationData field overrides)`; `WorldLocation::to_data`
     // layers these onto a base record built from the fields common to every variant.
     fn to_data(&self) -> (u8, WorldLocationData) {
-        let mut data = empty_extras_shaped_location();
+        let mut data = WorldLocationData::default();
 
         let (location_type, leader_name) = match self {
             WorldLocationType::ParentCity(parent) => (0, &parent.leader_name),
@@ -483,7 +483,7 @@ impl WorldLocation {
         adventure_civilization: Civilization,
     ) -> (BoxedArray<WorldLocationData, 22>, BoxedArray<WorldMapElementData, 200>) {
         // `WorldLocation::default()` padding would be unsafe here - see DATA_MAPPING.md.
-        let mut locations = vec![empty_extras_shaped_location(); 22];
+        let mut locations = vec![WorldLocationData::default(); 22];
         let mut elements = vec![WorldMapElementData::default(); 200];
 
         for world_location in world_locations {
@@ -503,43 +503,6 @@ fn resolve_pay_resource(resource_id: u16, new_file_ver: bool) -> ResourceType {
     return ResourceType::try_resolve_for_format(&(resource_id as u8), new_file_ver).unwrap_or(ResourceType::Drachmas);
 }
 
-fn empty_extras_shaped_location() -> WorldLocationData {
-    return WorldLocationData {
-        exists: 0,
-        location_type: 0,
-        name: 0,
-        slot_index: 0,
-        unknown_1: Default::default(),
-        trade_quantities: Default::default(),
-        unknown_2: Default::default(),
-        buying: [0; 8],
-        selling: [0; 8],
-        civilization: 0,
-        leader_name: 0,
-        attitude: 0,
-        economical_strength: 0,
-        military_strength: 0,
-        tribute: 0,
-        tribute_rec_amount: 0,
-        tribute_pay_amount: 0,
-        tribute_pay_resource: 0,
-        tribute_rec_resource: 0,
-        unknown_3: Default::default(),
-        favour_old: 0,
-        constant_1_0x00: Default::default(),
-        active_old: 0,
-        favour_new: 0,
-        constant_3_0x00: Default::default(),
-        active_new: 0,
-        visible: 0,
-        unknown_4: Default::default(),
-        unknown_5: vec![0; 28],
-        trade_route_visible: 4,
-        custom_name: String::new(),
-        custom_leader_name: String::new(),
-        tail: vec![0; 3],
-    };
-}
 #[derive(PartialEq, Debug)]
 pub enum EntityName {
     Custom(String),

@@ -20,7 +20,7 @@ use std::io::Seek;
 use std::io::SeekFrom;
 use std::io::Write;
 
-#[derive(Debug, Clone, PartialEq, Default, LogDifferences)]
+#[derive(Debug, Clone, PartialEq, LogDifferences)]
 pub struct MapData {
     pub version_1: u32,
     pub version_2: u32,
@@ -56,6 +56,45 @@ pub struct MapData {
     pub unknown_9: [BoxedArray<u8, 36>; 10],
 }
 
+impl Default for MapData {
+    fn default() -> Self {
+        return MapData {
+            version_1: 321,
+            version_2: 33,
+            manifest: ManifestData::default_map_manifest(),
+            sprite: Default::default(),
+            root_offset: Default::default(),
+            terrain: Default::default(),
+            tile_size: Default::default(),
+            random: Default::default(),
+            constant_1_0x00: Default::default(),
+            seed_1: 0,
+            seed_2: 0,
+            unknown_1: 0,
+            unknown_2: 0,
+            scenario_data: Default::default(),
+            meadow: Default::default(),
+            unknown_3: Default::default(),
+            world_map_elements: Default::default(),
+            trade_routes: Default::default(),
+            constant_2_0xff: BoxedArray::from_vec(vec![0xFF; 51984]),
+            constant_3: BoxedArray::from_vec(vec![180, 70, 100, 180, 70, 100, 0, 100, 0]),
+            prices: Default::default(),
+            scrub: Default::default(),
+            elevation: Default::default(),
+            elevation_rotation: Default::default(),
+            world_locations: Default::default(),
+            background_image: 0,
+            unknown_5: vec![vec![0; 52]; 14],
+            mythology: Default::default(),
+            unknown_6: Default::default(),
+            unknown_7: 0,
+            unknown_8: 0,
+            unknown_9: Default::default(),
+        };
+    }
+}
+
 impl MapData {
     pub fn read_from(reader: &mut impl Read) -> io::Result<Self> {
         return ReadFrom::read_from(reader);
@@ -84,10 +123,6 @@ impl MapData {
     }
 
     pub fn validate(&self) -> Result<(), String> {
-        if self.version_2 != 33 {
-            return Err(format!("version_2 is {}, expected 33", self.version_2));
-        }
-
         let is_old_format = (227..=247).contains(&self.version_1);
         let is_new_format = (318..=321).contains(&self.version_1);
         if !is_old_format && !is_new_format {
@@ -97,12 +132,21 @@ impl MapData {
             ));
         }
 
+        if self.version_2 != 33 {
+            return Err(format!("version_2 is {}, expected 33", self.version_2));
+        }
+
+        ManifestData::validate_map_manifest(&self.manifest, self.version_1).map_err(|e| format!("manifest: {e}"))?;
+
         if let Some(offset) = self.constant_1_0x00.as_ref().iter().position(|b| *b != 0) {
-            return Err(format!("constant_1_0x00[{offset}] is non-zero"));
+            return Err(format!("constant_1_0x00[{offset}] is {}, expected 0", self.constant_1_0x00[offset]));
         }
 
         if let Some(offset) = self.constant_2_0xff.as_ref().iter().position(|b| *b != 0xFF) {
-            return Err(format!("constant_2_0xff[{offset}] is not 0xFF"));
+            return Err(format!(
+                "constant_2_0xff[{offset}] is {}, expected 255",
+                self.constant_2_0xff[offset]
+            ));
         }
 
         const CONSTANT_3_EXPECTED: [u32; 9] = [180, 70, 100, 180, 70, 100, 0, 100, 0];
@@ -142,7 +186,7 @@ impl ReadFrom for MapData {
         let manifest: BoxedArray<ManifestData, 300> = ReadFrom::read_from(reader)?;
         let include_custom_names = manifest[17].size == 72;
         let include_world_locations_extras = manifest[25].size == 572;
-        let manifest_field_28 = manifest[27].clone();
+        let manifest_field_28 = manifest[27];
         let include_pyramids = manifest[28].size == 300;
 
         return Ok(MapData {

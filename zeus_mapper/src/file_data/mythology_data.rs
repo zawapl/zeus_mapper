@@ -10,7 +10,7 @@ use std::io::ErrorKind;
 use std::io::Read;
 use std::io::Write;
 
-#[derive(Debug, Clone, PartialEq, Default, LogDifferences)]
+#[derive(Debug, Clone, PartialEq, LogDifferences)]
 pub struct MythologyData {
     pub opponent_gods: [u32; 12],
     pub proponent_gods: [u32; 12],
@@ -21,6 +21,22 @@ pub struct MythologyData {
     pub max_sanctuaries: u32,
     pub max_pyramids: u32,
     pub pyramids: Vec<PyramidData>,
+}
+
+impl Default for MythologyData {
+    fn default() -> Self {
+        return MythologyData {
+            opponent_gods: [u32::MAX; 12],
+            proponent_gods: [u32::MAX; 12],
+            monster: u32::MAX,
+            constant_1_0xff: BoxedArray::from_vec(vec![0xFF; 96]),
+            constant_2_0x00: [0; 12],
+            sanctuaries_allowed: [0; 12],
+            max_sanctuaries: 0,
+            max_pyramids: 0,
+            pyramids: vec![PyramidData::default(); 6],
+        };
+    }
 }
 
 impl MythologyData {

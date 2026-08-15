@@ -24,7 +24,7 @@ use std::io::Write;
 /// tutorial saves alike) - see `docs/sav_investigation.md` for the full verification results and what
 /// to do next. Still treat any `field_N` not called out in that doc as an unconfirmed hypothesis, not
 /// a known fact.
-#[derive(Debug, Clone, PartialEq, Default, LogDifferences)]
+#[derive(Debug, Clone, PartialEq, LogDifferences)]
 pub struct SavData {
     /// Format version marker, the same role as every other format's leading `version_1`/`version_2`
     /// pair in this crate. Confirmed `238`/`235`/`241` (paired with `version_2 == 138`) on vanilla
@@ -228,6 +228,67 @@ pub struct SavData {
     pub poseidon_marker: u32,
 }
 
+impl Default for SavData {
+    fn default() -> Self {
+        return SavData {
+            version_1: 321,
+            version_2: 139,
+            manifest: ManifestData::default_sav_manifest(),
+            field_1: Default::default(),
+            field_2: Default::default(),
+            field_3: Default::default(),
+            field_4: Default::default(),
+            field_5: Default::default(),
+            map_size: Default::default(),
+            field_6: Default::default(),
+            poseidon_flag: Default::default(),
+            field_7: Default::default(),
+            field_8: Default::default(),
+            field_9: Default::default(),
+            root_offset: Default::default(),
+            field_11: Default::default(),
+            terrain: Default::default(),
+            field_13: Default::default(),
+            field_14: Default::default(),
+            tile_size: Default::default(),
+            field_16: Default::default(),
+            random: Default::default(),
+            field_18: Default::default(),
+            field_19: Default::default(),
+            field_20: Default::default(),
+            field_21: Default::default(),
+            field_22: Default::default(),
+            units: Default::default(),
+            field_23: Default::default(),
+            field_24: Default::default(),
+            field_25: Default::default(),
+            field_26: Default::default(),
+            field_26b: Default::default(),
+            player_name: Default::default(),
+            buildings: Default::default(),
+            field_27: Default::default(),
+            field_28: Default::default(),
+            field_29: Default::default(),
+            field_30: Default::default(),
+            field_31: Default::default(),
+            field_32: Default::default(),
+            field_33: Default::default(),
+            meadow: Default::default(),
+            field_35: Default::default(),
+            field_36: Default::default(),
+            field_37: Default::default(),
+            field_38: Default::default(),
+            field_39: Default::default(),
+            field_40: Default::default(),
+            field_41: Default::default(),
+            field_42: Default::default(),
+            scrub: Default::default(),
+            field_44: Default::default(),
+            poseidon_marker: Default::default(),
+        };
+    }
+}
+
 impl SavData {
     pub fn read_from(reader: &mut impl Read) -> io::Result<Self> {
         return ReadFrom::read_from(reader);
@@ -238,30 +299,22 @@ impl SavData {
     }
 
     pub fn validate(&self) -> Result<(), String> {
-        let is_vanilla = self.version_2 == 138;
-        let is_poseidon = self.version_2 == 139;
-        if !is_vanilla && !is_poseidon {
-            return Err(format!("version_2 is {}, expected 138 (vanilla) or 139 (Poseidon)", self.version_2));
+        if self.version_2 < 138 || self.version_2 > 139 {
+            return Err(format!("version_2 is {}, expected range [138, 139]", self.version_2));
         }
+
+        ManifestData::validate_sav_manifest(&self.manifest, self.version_1, self.version_2).map_err(|e| format!("manifest: {e}"))?;
 
         if self.map_size > MAX_MAP_SIZE {
             return Err(format!("map_size is {}, expected at most {MAX_MAP_SIZE}", self.map_size));
         }
 
         if self.poseidon_flag > 1 {
-            return Err(format!("poseidon_flag is {}, expected 0 or 1", self.poseidon_flag));
+            return Err(format!("poseidon_flag is {}, expected range [0, 1]", self.poseidon_flag));
         }
 
         if self.poseidon_marker > 1 {
-            return Err(format!("poseidon_marker is {}, expected 0 or 1", self.poseidon_marker));
-        }
-
-        let self_entry = &self.manifest[2];
-        if self_entry.size != 20 || self_entry.count != 300 {
-            return Err(format!(
-                "manifest[2] is size={}, count={} - expected the self-referential size=20, count=300 entry describing manifest itself",
-                self_entry.size, self_entry.count
-            ));
+            return Err(format!("poseidon_marker is {}, expected range [0, 1]", self.poseidon_marker));
         }
 
         return Ok(());

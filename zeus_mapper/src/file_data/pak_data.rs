@@ -9,10 +9,19 @@ use std::io::Read;
 use std::io::Seek;
 use std::io::Write;
 
-#[derive(Debug, Clone, PartialEq, Default, LogDifferences)]
+#[derive(Debug, Clone, PartialEq, LogDifferences)]
 pub struct PakData {
     pub settings_data: SettingsData,
     pub map_data: Vec<MapData>,
+}
+
+impl Default for PakData {
+    fn default() -> Self {
+        return PakData {
+            settings_data: Default::default(),
+            map_data: vec![Default::default()],
+        };
+    }
 }
 
 impl PakData {
@@ -84,6 +93,13 @@ mod tests {
     use std::io::SeekFrom;
     use std::path::Path;
     use std::path::PathBuf;
+
+    #[test]
+    fn default_is_valid() {
+        if let Err(e) = PakData::default().validate() {
+            panic!("{e}");
+        }
+    }
 
     #[test]
     fn validate_pak_files() -> Result<()> {

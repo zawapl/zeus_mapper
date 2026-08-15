@@ -13,7 +13,7 @@ use std::io::Cursor;
 use std::io::Read;
 use std::io::Write;
 
-#[derive(Debug, Clone, PartialEq, Default, LogDifferences)]
+#[derive(Debug, Clone, PartialEq, LogDifferences)]
 pub struct WorldLocationData {
     pub exists: u16,
     pub location_type: u8,
@@ -53,6 +53,46 @@ pub struct WorldLocationData {
     pub custom_name: String,
     pub custom_leader_name: String,
     pub tail: Vec<u8>,
+}
+
+impl Default for WorldLocationData {
+    fn default() -> Self {
+        return WorldLocationData {
+            exists: 0,
+            location_type: 0,
+            name: 0,
+            slot_index: 0,
+            unknown_1: Default::default(),
+            trade_quantities: Default::default(),
+            unknown_2: Default::default(),
+            buying: [0; 8],
+            selling: [0; 8],
+            civilization: 0,
+            leader_name: 0,
+            attitude: 0,
+            economical_strength: 0,
+            military_strength: 0,
+            tribute: 0,
+            tribute_rec_amount: 0,
+            tribute_pay_amount: 0,
+            tribute_pay_resource: 0,
+            tribute_rec_resource: 0,
+            unknown_3: Default::default(),
+            favour_old: 0,
+            constant_1_0x00: Default::default(),
+            active_old: 0,
+            favour_new: 0,
+            constant_3_0x00: Default::default(),
+            active_new: 0,
+            visible: 0,
+            unknown_4: Default::default(),
+            unknown_5: vec![0; 28],
+            trade_route_visible: 4,
+            custom_name: String::new(),
+            custom_leader_name: String::new(),
+            tail: vec![0; 3],
+        };
+    }
 }
 
 impl WorldLocationData {

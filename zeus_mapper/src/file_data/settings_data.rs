@@ -15,7 +15,7 @@ use std::io::ErrorKind;
 use std::io::Read;
 use std::io::Write;
 
-#[derive(Debug, Clone, PartialEq, Default, LogDifferences)]
+#[derive(Debug, Clone, PartialEq, LogDifferences)]
 pub struct SettingsData {
     pub version_1: u32,
     pub version_2: u32,
@@ -78,6 +78,57 @@ pub struct SettingsData {
     pub parent_episode_goals: [[EpisodeGoalData; 6]; 10],
 }
 
+impl Default for SettingsData {
+    fn default() -> Self {
+        return SettingsData {
+            version_1: 8871,
+            version_2: 26,
+            parent_episodes: 1,
+            colony_episodes_used: 0,
+            colony_episodes_available: 0,
+            basic_episode_data: Default::default(),
+            real_episode_data: Default::default(),
+            unknown_1: Default::default(),
+            colony_location_names: Default::default(),
+            unknown_2: Default::default(),
+            mythology: Default::default(),
+            events: Default::default(),
+            adventure_type: 0,
+            constant_1_0x00: Default::default(),
+            data_length: 0,
+            unknown_3: Default::default(),
+            map_data: Default::default(),
+            padding: Vec::new(),
+            parent_event_counts: Default::default(),
+            colony_event_counts: Default::default(),
+            unused_blocks: Default::default(),
+            parent_city_favor: Default::default(),
+            constant_2_0x00: Default::default(),
+            bitmap: 0,
+            tab_visibility: Default::default(),
+            constant_3_0x01: [1; 7],
+            unknown_4: 1,
+            constant_4_0x01: BoxedArray::from_vec(vec![1; 93]),
+            unknown_5: 1,
+            constant_5_0x01: [1; 3],
+            unknown_6: 1,
+            unknown_7: 1,
+            constant_6_0x01: [1; 2],
+            unknown_8: 1,
+            constant_7_0x01: BoxedArray::from_vec(vec![1; 33]),
+            constant_8_0x00: Default::default(),
+            world_map_enabled: 0,
+            constant_9_0x01: [1; 9],
+            unknown_9: 0,
+            unknown_10: 0,
+            colony_episode_goal_counts: Default::default(),
+            colony_episode_goals: Default::default(),
+            parent_episode_goal_counts: Default::default(),
+            parent_episode_goals: Default::default(),
+        };
+    }
+}
+
 impl SettingsData {
     pub fn read_from(reader: &mut impl Read) -> io::Result<Self> {
         return ReadFrom::read_from(reader);
@@ -90,6 +141,42 @@ impl SettingsData {
     pub fn validate(&self) -> Result<(), String> {
         if self.version_1 != 8871 {
             return Err(format!("version_1 is {}, expected 8871", self.version_1));
+        }
+
+        // Real adventures range 1..=5; allow up to 10 for headroom until a tighter bound is confirmed.
+        if !(1..=10).contains(&self.parent_episodes) {
+            return Err(format!("parent_episodes is {}, expected 1..=10", self.parent_episodes));
+        }
+
+        if self.colony_episodes_used > 4 {
+            return Err(format!("colony_episodes_used is {}, expected 0..=4", self.colony_episodes_used));
+        }
+
+        if self.colony_episodes_available > 4 {
+            return Err(format!(
+                "colony_episodes_available is {}, expected 0..=4",
+                self.colony_episodes_available
+            ));
+        }
+
+        if self.adventure_type > 4 {
+            return Err(format!("adventure_type is {}, expected 0..=4", self.adventure_type));
+        }
+
+        if let Some((i, count)) = self.parent_event_counts.iter().enumerate().find(|(_, c)| **c > 150) {
+            return Err(format!("parent_event_counts[{i}] is {count}, expected <=150"));
+        }
+
+        if let Some((i, count)) = self.colony_event_counts.iter().enumerate().find(|(_, c)| **c > 150) {
+            return Err(format!("colony_event_counts[{i}] is {count}, expected <=150"));
+        }
+
+        if let Some((i, count)) = self.colony_episode_goal_counts.iter().enumerate().find(|(_, c)| **c > 6) {
+            return Err(format!("colony_episode_goal_counts[{i}] is {count}, expected <=6"));
+        }
+
+        if let Some((i, count)) = self.parent_episode_goal_counts.iter().enumerate().find(|(_, c)| **c > 6) {
+            return Err(format!("parent_episode_goal_counts[{i}] is {count}, expected <=6"));
         }
 
         for mythology in &self.mythology {
