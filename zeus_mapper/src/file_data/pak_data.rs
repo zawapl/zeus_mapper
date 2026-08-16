@@ -182,6 +182,7 @@ mod tests {
 
         return Ok(());
     }
+
     #[test]
     fn write_read_round_trip() -> Result<()> {
         let mut test_generator = TestDataGenerator::default();
@@ -300,8 +301,8 @@ mod tests {
                 constant_1_0x00: self.generate_data(),
                 seed_1: self.generate_data(),
                 seed_2: self.generate_data(),
-                unknown_1: self.generate_data(),
-                unknown_2: self.generate_data(),
+                camera_x: self.generate_data(),
+                camera_y: self.generate_data(),
                 scenario_data: self.generate_data(),
                 meadow: self.generate_data(),
                 unknown_3: self.generate_data(),
@@ -522,7 +523,9 @@ mod tests {
                 starting_cash: self.generate_data(),
                 unknown_1: self.generate_data(),
                 map_size: self.generate_data(),
-                unknown_2: self.generate_data(),
+                map_size_duplicate: self.generate_data(),
+                first_tile_index: self.generate_data(),
+                map_size_margin: self.generate_data(),
                 text_buffer_1: self.generate_data(),
                 text_buffer_2: self.generate_data(),
                 civilization: self.generate_data(),

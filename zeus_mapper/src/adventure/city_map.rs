@@ -1,3 +1,5 @@
+use crate::prelude::MAX_MAP_SIZE;
+use crate::prelude::ManifestData;
 use crate::prelude::MapData;
 use crate::prelude::RealEpisodeData;
 use crate::utils::boxed_array::BoxedArray;
@@ -17,6 +19,7 @@ pub struct CityMap {
     pub elevation: Vec<u8>,
     pub entry_point: (u16, u16),
     pub exit_point: (u16, u16),
+    pub camera_position: (u16, u16),
     pub fishing_spots: Vec<Option<(u16, u16)>>,
     pub wolf_spawn: Vec<Option<(u16, u16)>>,
     pub urchin_spawn: Vec<Option<(u16, u16)>>,
@@ -47,6 +50,7 @@ impl CityMap {
             elevation: map_data.elevation.to_vec(),
             entry_point: (map_data.scenario_data.entry_x, map_data.scenario_data.entry_y),
             exit_point: (map_data.scenario_data.exit_x, map_data.scenario_data.exit_y),
+            camera_position: (map_data.camera_x as u16, map_data.camera_y as u16),
             fishing_spots: zip_positions(&map_data.scenario_data.fish_x, &map_data.scenario_data.fish_y),
             wolf_spawn: zip_positions(&map_data.scenario_data.wolf_x, &map_data.scenario_data.wolf_y),
             urchin_spawn: zip_positions(&map_data.scenario_data.urchin_x, &map_data.scenario_data.urchin_y),
@@ -86,7 +90,9 @@ impl CityMap {
             starting_cash: 1000,
             unknown_1: Default::default(),
             map_size: self.map_size,
-            unknown_2: Default::default(),
+            map_size_duplicate: self.map_size,
+            first_tile_index: (MAX_MAP_SIZE - self.map_size) * (MAX_MAP_SIZE + 1) / 2,
+            map_size_margin: MAX_MAP_SIZE - self.map_size,
             text_buffer_1: "Brief description".to_owned(),
             text_buffer_2: "Brief description of this episode, for players. History, aims and tips etc.".to_owned(),
             civilization: 0,
@@ -146,7 +152,7 @@ impl CityMap {
             // correctly.
             version_1: 321,
             version_2: 33,
-            manifest: Default::default(),
+            manifest: ManifestData::default_map_manifest(),
             sprite: BoxedArray::from_vec(self.sprite.clone()),
             root_offset: BoxedArray::from_vec(self.root_offset.clone()),
             terrain: BoxedArray::from_vec(self.terrain.clone()),
@@ -155,8 +161,8 @@ impl CityMap {
             constant_1_0x00: Default::default(),
             seed_1: 0,
             seed_2: 0,
-            unknown_1: 0,
-            unknown_2: 0,
+            camera_x: self.camera_position.0 as u32,
+            camera_y: self.camera_position.1 as u32,
             scenario_data,
             meadow: BoxedArray::from_vec(self.meadow.clone()),
             unknown_3: Default::default(),
@@ -170,7 +176,7 @@ impl CityMap {
             elevation_rotation: Default::default(),
             world_locations: Default::default(),
             background_image: 0,
-            unknown_5: Default::default(),
+            unknown_5: vec![vec![0; 52]; 14],
             mythology: Default::default(),
             unknown_6: Default::default(),
             unknown_7: 0,

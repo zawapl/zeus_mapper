@@ -1,4 +1,5 @@
 use crate::file_data::basic_episode_data::BasicEpisodeData;
+use crate::prelude::MAX_MAP_SIZE;
 use crate::prelude::ValidationError;
 use crate::utils::boxed_array::BoxedArray;
 use crate::utils::read_utils::ReadFrom;
@@ -20,7 +21,9 @@ pub struct RealEpisodeData {
     pub starting_cash: u32,
     pub unknown_1: [u8; 8],
     pub map_size: u32,
-    pub unknown_2: [u8; 12],
+    pub map_size_duplicate: u32,
+    pub first_tile_index: u32,
+    pub map_size_margin: u32,
     pub text_buffer_1: String,
     pub text_buffer_2: String,
     pub civilization: u32,
@@ -82,6 +85,34 @@ impl RealEpisodeData {
         validate_expected_constant("constant_6_0x00", &self.constant_6_0x00, 0)?;
         validate_expected_constant("constant_7_0x00", &self.constant_7_0x00, 0)?;
 
+        // records with no map (map_size == 0) leave all three at 0 rather than following the formula
+        let (expected_duplicate, expected_margin, expected_first_tile_index) = if self.map_size == 0 {
+            (0, 0, 0)
+        } else {
+            let margin = MAX_MAP_SIZE - self.map_size;
+            (self.map_size, margin, margin * (MAX_MAP_SIZE + 1) / 2)
+        };
+
+        if self.map_size_duplicate != expected_duplicate {
+            return Err(ValidationError::expected_exactly(
+                "map_size_duplicate",
+                self.map_size_duplicate,
+                expected_duplicate,
+            ));
+        }
+
+        if self.map_size_margin != expected_margin {
+            return Err(ValidationError::expected_exactly(
+                "map_size_margin",
+                self.map_size_margin,
+                expected_margin,
+            ));
+        }
+
+        if self.first_tile_index != expected_first_tile_index {
+            return Err(ValidationError::expected_exactly("first_tile_index", self.first_tile_index, expected_first_tile_index));
+        }
+
         return self
             .basic_episode_data
             .validate()
@@ -99,7 +130,9 @@ impl ReadFrom for RealEpisodeData {
             starting_cash: ReadFrom::read_from(reader)?,
             unknown_1: ReadFrom::read_from(reader)?,
             map_size: ReadFrom::read_from(reader)?,
-            unknown_2: ReadFrom::read_from(reader)?,
+            map_size_duplicate: ReadFrom::read_from(reader)?,
+            first_tile_index: ReadFrom::read_from(reader)?,
+            map_size_margin: ReadFrom::read_from(reader)?,
             text_buffer_1: read_string_from(reader, 64)?,
             text_buffer_2: read_string_from(reader, 524)?,
             civilization: ReadFrom::read_from(reader)?,
@@ -164,7 +197,9 @@ impl WriteTo for RealEpisodeData {
         bytes += WriteTo::write_to(&self.starting_cash, writer)?;
         bytes += WriteTo::write_to(&self.unknown_1, writer)?;
         bytes += WriteTo::write_to(&self.map_size, writer)?;
-        bytes += WriteTo::write_to(&self.unknown_2, writer)?;
+        bytes += WriteTo::write_to(&self.map_size_duplicate, writer)?;
+        bytes += WriteTo::write_to(&self.first_tile_index, writer)?;
+        bytes += WriteTo::write_to(&self.map_size_margin, writer)?;
         bytes += write_string_to(&self.text_buffer_1, writer, 64)?;
         bytes += write_string_to(&self.text_buffer_2, writer, 524)?;
         bytes += WriteTo::write_to(&self.civilization, writer)?;
@@ -236,7 +271,9 @@ mod tests {
             starting_cash: 5,
             unknown_1: seq_u8(6),
             map_size: 7,
-            unknown_2: seq_u8(8),
+            map_size_duplicate: 8,
+            first_tile_index: 800,
+            map_size_margin: 801,
             text_buffer_1: "Text buffer one".to_owned(),
             text_buffer_2: "Text buffer two".to_owned(),
             civilization: 9,

@@ -32,6 +32,16 @@ use std::io::BufReader;
 use std::io::ErrorKind;
 use std::path::Path;
 
+// `MapData.scenario_data.civilization` in every new-format (`version_2 == 26`) real adventure
+// surveyed is `1`, regardless of the adventure's actual civilization (confirmed against Greek and
+// Atlantean examples, including "The Odyssey" resaved into the new format by the real game) - this
+// field does not use the `Civilization` enum's values in the new format the way it does in the old
+// one (there, it matches `self.civilization.value()` exactly). Where the new format actually
+// stores the map's civilization, if not here, is not yet understood; this constant only reproduces
+// the observed real-file value so `to_pak()` (which always writes the new format) doesn't corrupt
+// it, not a real fix for civilization selection at the map level.
+const NEW_FORMAT_MAP_CIVILIZATION: u32 = 1;
+
 #[derive(LogDifferences, PartialEq, Debug)]
 pub struct Adventure {
     pub title: String,
@@ -223,7 +233,7 @@ impl Adventure {
         }
 
         for map in &mut map_data {
-            map.scenario_data.civilization = self.civilization.value();
+            map.scenario_data.civilization = NEW_FORMAT_MAP_CIVILIZATION;
             map.world_locations = world_locations.clone();
             map.world_map_elements = world_map_elements.clone();
             map.trade_routes = trade_routes.clone();
@@ -250,7 +260,7 @@ impl Adventure {
             }
             None => self.parent_city.to_map_data(),
         };
-        map_data_duplicate.scenario_data.civilization = self.civilization.value();
+        map_data_duplicate.scenario_data.civilization = NEW_FORMAT_MAP_CIVILIZATION;
         map_data_duplicate.world_locations = world_locations;
         map_data_duplicate.world_map_elements = world_map_elements;
         map_data_duplicate.trade_routes = trade_routes;
@@ -273,50 +283,26 @@ impl Adventure {
         }
 
         let settings_data = SettingsData {
-            version_1: 8871,
-            version_2: 26,
             parent_episodes: self.parent_episodes.len() as u32,
-            colony_episodes_used: 0,
             colony_episodes_available: self.colony_episodes.len() as u32,
             basic_episode_data,
             real_episode_data,
-            unknown_1: Default::default(),
             colony_location_names,
-            unknown_2: Default::default(),
             mythology,
             events: BoxedArray::from_vec(events.into()),
             adventure_type: self.adventure_type.value(),
-            constant_1_0x00: Default::default(),
-            data_length: 0,
-            unknown_3: Default::default(),
             map_data: map_data_duplicate,
-            padding: Default::default(),
             parent_event_counts,
             colony_event_counts,
-            unused_blocks: Default::default(),
             parent_city_favor,
-            constant_2_0x00: Default::default(),
             bitmap: self.bitmap as u32,
             tab_visibility: [1; 11],
-            constant_3_0x01: [1; 7],
-            unknown_4: 1,
-            constant_4_0x01: BoxedArray::from_vec(vec![1; 93]),
-            unknown_5: 1,
-            constant_5_0x01: [1; 3],
-            unknown_6: 1,
-            unknown_7: 1,
-            constant_6_0x01: [1; 2],
-            unknown_8: 1,
-            constant_7_0x01: BoxedArray::from_vec(vec![1; 33]),
-            constant_8_0x00: BoxedArray::from_vec(vec![0; 66]),
             world_map_enabled: 1,
-            constant_9_0x01: [1; 9],
-            unknown_9: 0,
-            unknown_10: Default::default(),
             colony_episode_goal_counts,
             colony_episode_goals,
             parent_episode_goal_counts,
             parent_episode_goals,
+            ..Default::default()
         };
 
         return PakData { settings_data, map_data };
@@ -375,9 +361,14 @@ fn folder_name(folder: &Path) -> io::Result<String> {
 #[cfg(test)]
 mod tests {
     use crate::adventure::adventure::Adventure;
+    use crate::prelude::AdventureText;
+    use crate::prelude::AdventureType;
     use crate::prelude::Civilization;
     use crate::prelude::DataConstant;
+    use crate::prelude::PakData;
     use crate::prelude::ResourceType;
+    use std::fs::File;
+    use std::io::BufReader;
     use std::io::Result;
 
     #[test]
@@ -388,6 +379,7 @@ mod tests {
             assert_eq!(adventure.title, "The Youngest Twins");
             assert_eq!(adventure.complete_text, "n/a");
             assert_eq!(adventure.civilization, Civilization::Atlantean);
+            assert_eq!(adventure.adventure_type, AdventureType::PoseidonCustom);
             assert_eq!(adventure.bitmap, 14);
             assert_eq!(adventure.world_bitmap, 11);
             assert_eq!(adventure.start_year, -2600);
@@ -426,6 +418,7 @@ mod tests {
 
             assert_eq!(adventure.title, "The Odyssey");
             assert_eq!(adventure.civilization, Civilization::Greek);
+            assert_eq!(adventure.adventure_type, AdventureType::ZeusCustom);
             assert_eq!(adventure.bitmap, 7);
             assert_eq!(adventure.world_bitmap, 9);
             assert_eq!(adventure.start_year, -1200);
@@ -448,6 +441,47 @@ mod tests {
             assert_price_eq(&adventure.prices, ResourceType::Fleece, 60);
             assert_price_eq(&adventure.prices, ResourceType::BlackMarble, 0);
             assert_price_eq(&adventure.prices, ResourceType::Orichalc, 0);
+            assert_price_eq(&adventure.prices, ResourceType::Armor, 200);
+            assert_price_eq(&adventure.prices, ResourceType::Sculpture, 640);
+            assert_price_eq(&adventure.prices, ResourceType::OliveOil, 145);
+            assert_price_eq(&adventure.prices, ResourceType::Wine, 160);
+        }
+
+        return Ok(());
+    }
+
+    #[test]
+    fn parse_two_worlds_collide() -> Result<()> {
+        if let Ok(game_root) = std::env::var("ZEUS_HOME") {
+            let path = format!("{game_root}/Adventures/^Two Worlds Collide.pak");
+            let mut reader = BufReader::new(File::open(path)?);
+            let pak_data = PakData::read_from(&mut reader)?;
+            let adventure = Adventure::from_pak(&pak_data, &AdventureText::default());
+
+            assert_eq!(adventure.civilization, Civilization::Greek);
+            assert_eq!(adventure.adventure_type, AdventureType::PoseidonCampaign);
+            assert_eq!(adventure.bitmap, 4);
+            assert_eq!(adventure.world_bitmap, 14);
+            assert_eq!(adventure.start_year, -1900);
+            assert_eq!(adventure.initial_funds, 4000);
+            assert_eq!(adventure.parent_episodes.len(), 6);
+            assert_eq!(adventure.colony_episodes.len(), 2);
+            assert_price_eq(&adventure.prices, ResourceType::Urchin, 36);
+            assert_price_eq(&adventure.prices, ResourceType::Fish, 36);
+            assert_price_eq(&adventure.prices, ResourceType::Meat, 45);
+            assert_price_eq(&adventure.prices, ResourceType::Cheese, 45);
+            assert_price_eq(&adventure.prices, ResourceType::Carrot, 40);
+            assert_price_eq(&adventure.prices, ResourceType::Onion, 40);
+            assert_price_eq(&adventure.prices, ResourceType::Wheat, 30);
+            assert_price_eq(&adventure.prices, ResourceType::Orange, 40);
+            assert_price_eq(&adventure.prices, ResourceType::Wood, 75);
+            assert_price_eq(&adventure.prices, ResourceType::Bronze, 110);
+            assert_price_eq(&adventure.prices, ResourceType::Marble, 84);
+            assert_price_eq(&adventure.prices, ResourceType::Grape, 42);
+            assert_price_eq(&adventure.prices, ResourceType::Olive, 38);
+            assert_price_eq(&adventure.prices, ResourceType::Fleece, 60);
+            assert_price_eq(&adventure.prices, ResourceType::BlackMarble, 88);
+            assert_price_eq(&adventure.prices, ResourceType::Orichalc, 140);
             assert_price_eq(&adventure.prices, ResourceType::Armor, 200);
             assert_price_eq(&adventure.prices, ResourceType::Sculpture, 640);
             assert_price_eq(&adventure.prices, ResourceType::OliveOil, 145);

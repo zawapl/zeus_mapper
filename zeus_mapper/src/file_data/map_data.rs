@@ -39,8 +39,8 @@ pub struct MapData {
     pub constant_1_0x00: BoxedArray<u8, 51984>,
     pub seed_1: u32,
     pub seed_2: u32,
-    pub unknown_1: u32,
-    pub unknown_2: u32,
+    pub camera_x: u32,
+    pub camera_y: u32,
     pub scenario_data: RealEpisodeData,
     pub meadow: BoxedArray<u8, 51984>,
     pub unknown_3: BoxedArray<u8, 18628>,
@@ -76,8 +76,8 @@ impl Default for MapData {
             constant_1_0x00: Default::default(),
             seed_1: 0,
             seed_2: 0,
-            unknown_1: 0,
-            unknown_2: 0,
+            camera_x: 0,
+            camera_y: 0,
             scenario_data: Default::default(),
             meadow: Default::default(),
             unknown_3: Default::default(),
@@ -203,8 +203,8 @@ impl ReadFrom for MapData {
             constant_1_0x00: read_compressed_boxed_array_from(reader)?,
             seed_1: ReadFrom::read_from(reader)?,
             seed_2: ReadFrom::read_from(reader)?,
-            unknown_1: ReadFrom::read_from(reader)?,
-            unknown_2: ReadFrom::read_from(reader)?,
+            camera_x: ReadFrom::read_from(reader)?,
+            camera_y: ReadFrom::read_from(reader)?,
             scenario_data: ReadFrom::read_from(reader)?,
             meadow: read_compressed_boxed_array_from(reader)?,
             unknown_3: ReadFrom::read_from(reader)?,
@@ -248,8 +248,8 @@ impl WriteTo for MapData {
         bytes += write_compressed(&self.constant_1_0x00, writer)?;
         bytes += WriteTo::write_to(&self.seed_1, writer)?;
         bytes += WriteTo::write_to(&self.seed_2, writer)?;
-        bytes += WriteTo::write_to(&self.unknown_1, writer)?;
-        bytes += WriteTo::write_to(&self.unknown_2, writer)?;
+        bytes += WriteTo::write_to(&self.camera_x, writer)?;
+        bytes += WriteTo::write_to(&self.camera_y, writer)?;
         bytes += WriteTo::write_to(&self.scenario_data, writer)?;
         bytes += write_compressed(&self.meadow, writer)?;
         bytes += WriteTo::write_to(&self.unknown_3, writer)?;

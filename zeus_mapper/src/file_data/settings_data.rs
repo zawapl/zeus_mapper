@@ -98,7 +98,7 @@ impl Default for SettingsData {
             events: Default::default(),
             adventure_type: 0,
             constant_1_0x00: Default::default(),
-            data_length: 0,
+            data_length: data_length(true),
             unknown_3: Default::default(),
             map_data: Default::default(),
             padding: Vec::new(),
@@ -245,13 +245,12 @@ impl ReadFrom for SettingsData {
 
         let new_file_ver = version_2 == 26;
 
-        let end_position = if new_file_ver { 842_931 } else { 841_863 }; // should match data_length field
-
-        let event_counts_offset = if new_file_ver { 800_361 } else { 799_297 };
+        let data_length = data_length(new_file_ver) as u64; // should match data_length field
+        let padded_map_data_end = padded_map_data_end(new_file_ver) as u64;
 
         // limited length readers for different sections, the -8 accounts for the versions which were already read
-        let mut limited_reader = reader.take(end_position - 8);
-        let mut map_data_reader = (&mut limited_reader).take(event_counts_offset - 8);
+        let mut limited_reader = reader.take(data_length - 8);
+        let mut map_data_reader = (&mut limited_reader).take(padded_map_data_end - 8);
 
         return Ok(SettingsData {
             version_1,
@@ -309,8 +308,6 @@ impl ReadFrom for SettingsData {
 impl WriteTo for SettingsData {
     fn write_to<W: Write>(&self, writer: &mut W) -> io::Result<usize> {
         let new_file_ver = self.version_2 == 26;
-        let event_counts_offset: usize = if new_file_ver { 800_361 } else { 799_297 };
-
         let mut bytes = 0;
 
         bytes += WriteTo::write_to(&self.version_1, writer)?;
@@ -331,7 +328,8 @@ impl WriteTo for SettingsData {
         bytes += WriteTo::write_to(&self.unknown_3, writer)?;
         bytes += WriteTo::write_to(&self.map_data, writer)?;
 
-        if bytes > event_counts_offset {
+        let padded_map_data_end = padded_map_data_end(new_file_ver) as usize;
+        if bytes > padded_map_data_end {
             return Err(Error::new(
                 ErrorKind::InvalidData,
                 "SettingsData: map_data overflowing to parent_event_counts",
@@ -339,8 +337,8 @@ impl WriteTo for SettingsData {
         }
 
         // Write the real `padding` content back  truncating/zero-extending it to fit the space actually available.
-        // In the future should be possible to just write 0s (we need the original for byte checking tests)
-        let padding_len = event_counts_offset - bytes;
+        // In the future should be possible to just write 0s (we want the original for now for byte checking tests)
+        let padding_len = padded_map_data_end - bytes;
         let mut padding_buf = vec![0u8; padding_len];
         let copy_len = usize::min(padding_len, self.padding.len());
         padding_buf[..copy_len].copy_from_slice(&self.padding[..copy_len]);
@@ -377,6 +375,14 @@ impl WriteTo for SettingsData {
 
         return Ok(bytes);
     }
+}
+
+fn padded_map_data_end(new_file_ver: bool) -> u32 {
+    return if new_file_ver { 800_361 } else { 799_297 };
+}
+
+fn data_length(new_file_ver: bool) -> u32 {
+    return if new_file_ver { 842_931 } else { 841_863 };
 }
 
 #[cfg(test)]
