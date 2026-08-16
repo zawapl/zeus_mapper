@@ -1,6 +1,8 @@
 use crate::utils::boxed_array::BoxedArray;
 use crate::utils::read_utils::ReadFrom;
 use crate::utils::read_utils::read_string_from;
+use crate::utils::validation::ValidationError;
+use crate::utils::validation::ValidationResult;
 use crate::utils::write_utils::WriteTo;
 use crate::utils::write_utils::write_string_to;
 use my_macros::LogDifferences;
@@ -27,13 +29,13 @@ pub struct BasicEpisodeData {
 }
 
 impl BasicEpisodeData {
-    pub fn validate(&self) -> Result<(), String> {
+    pub fn validate(&self) -> ValidationResult {
         if self.constant_1_0x00 != 0 {
-            return Err(format!("constant_1_0x00 is {}, expected 0", self.constant_1_0x00));
+            return Err(ValidationError::expected_exactly("constant_1_0x00", self.constant_1_0x00, 0));
         }
 
         if self.unknown_2 != 0 && self.unknown_2 != u32::MAX {
-            return Err(format!("unknown_2 is {}, expected 0 or u32::MAX", self.unknown_2));
+            return Err(ValidationError::expected_one_of("unknown_2", self.unknown_2, &[0, u32::MAX]));
         }
 
         return Ok(());

@@ -1,6 +1,8 @@
 use crate::utils::boxed_array::BoxedArray;
 use crate::utils::read_utils::ReadFrom;
 use crate::utils::read_utils::to_usize;
+use crate::utils::validation::ValidationError;
+use crate::utils::validation::ValidationResult;
 use crate::utils::write_utils::WriteTo;
 use my_macros::LogDifferences;
 use std::io;
@@ -25,12 +27,12 @@ impl ManifestData {
         return sav_manifest_template(241, 139);
     }
 
-    pub fn validate_map_manifest(manifest: &BoxedArray<ManifestData, 300>, version_1: u32) -> Result<(), String> {
+    pub fn validate_map_manifest(manifest: &BoxedArray<ManifestData, 300>, version_1: u32) -> ValidationResult {
         let expected = map_manifest_template(version_1);
         return validate_against_template(manifest, &expected);
     }
 
-    pub fn validate_sav_manifest(manifest: &BoxedArray<ManifestData, 300>, version_1: u32, version_2: u32) -> Result<(), String> {
+    pub fn validate_sav_manifest(manifest: &BoxedArray<ManifestData, 300>, version_1: u32, version_2: u32) -> ValidationResult {
         let expected = sav_manifest_template(version_1, version_2);
         return validate_against_template(manifest, &expected);
     }
@@ -270,15 +272,29 @@ fn sav_manifest_template(version_1: u32, version_2: u32) -> BoxedArray<ManifestD
     return BoxedArray(Box::new(manifest));
 }
 
-fn validate_against_template(manifest: &BoxedArray<ManifestData, 300>, expected: &BoxedArray<ManifestData, 300>) -> Result<(), String> {
+fn validate_against_template(manifest: &BoxedArray<ManifestData, 300>, expected: &BoxedArray<ManifestData, 300>) -> ValidationResult {
     for (i, (entry, expected_entry)) in manifest.iter().zip(expected.iter()).enumerate() {
-        if (entry.compressed > 0 && expected_entry.compressed == 0)
-            || (entry.size != expected_entry.size)
-            || (entry.count != expected_entry.count)
-        {
-            return Err(format!(
-                "manifest[{i}] is compressed={}, size={}, count={} - expected compressed={}, size={}, count={}",
-                entry.compressed, entry.size, entry.count, expected_entry.compressed, expected_entry.size, expected_entry.count
+        if entry.compressed != expected_entry.compressed {
+            return Err(ValidationError::expected_exactly(
+                format!("[{i}].compressed"),
+                entry.compressed,
+                expected_entry.compressed,
+            ));
+        }
+
+        if entry.size != expected_entry.size {
+            return Err(ValidationError::expected_exactly(
+                format!("[{i}].size"),
+                entry.size,
+                expected_entry.size,
+            ));
+        }
+
+        if entry.count != expected_entry.count {
+            return Err(ValidationError::expected_exactly(
+                format!("[{i}].count"),
+                entry.count,
+                expected_entry.count,
             ));
         }
     }

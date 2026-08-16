@@ -1,5 +1,6 @@
 pub(crate) mod boxed_array;
 pub(crate) mod read_utils;
+pub(crate) mod validation;
 pub(crate) mod write_utils;
 
 pub const MAX_MAP_SIZE: u32 = 228;

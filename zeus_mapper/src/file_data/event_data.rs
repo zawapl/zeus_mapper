@@ -1,4 +1,6 @@
 use crate::utils::read_utils::ReadFrom;
+use crate::utils::validation::ValidationError;
+use crate::utils::validation::ValidationResult;
 use crate::utils::write_utils::WriteTo;
 use my_macros::LogDifferences;
 use std::io;
@@ -67,18 +69,21 @@ pub struct EventData {
 }
 
 impl EventData {
-    pub fn validate(&self) -> Result<(), String> {
+    pub fn validate(&self) -> ValidationResult {
         if self.constant_1_0x00 != 0 {
-            return Err(format!("constant_1_0x00 is {}, expected 0", self.constant_1_0x00));
+            return Err(ValidationError::expected_exactly("constant_1_0x00", self.constant_1_0x00, 0));
         }
+
         if self.constant_2_0x00 != 0 {
-            return Err(format!("constant_2_0x00 is {}, expected 0", self.constant_2_0x00));
+            return Err(ValidationError::expected_exactly("constant_2_0x00", self.constant_2_0x00, 0));
         }
+
         if self.constant_3_0x00 != 0 {
-            return Err(format!("constant_3_0x00 is {}, expected 0", self.constant_3_0x00));
+            return Err(ValidationError::expected_exactly("constant_3_0x00", self.constant_3_0x00, 0));
         }
+
         if self.constant_4_0x00 != 0 {
-            return Err(format!("constant_4_0x00 is {}, expected 0", self.constant_4_0x00));
+            return Err(ValidationError::expected_exactly("constant_4_0x00", self.constant_4_0x00, 0));
         }
 
         return Ok(());

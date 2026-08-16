@@ -8,6 +8,9 @@ use crate::file_data::world_map_element_data::WorldMapElementData;
 use crate::utils::boxed_array::BoxedArray;
 use crate::utils::read_utils::ReadFrom;
 use crate::utils::read_utils::read_compressed_boxed_array_from;
+use crate::utils::validation::ValidationError;
+use crate::utils::validation::ValidationResult;
+use crate::utils::validation::validate_expected_constant;
 use crate::utils::write_utils::WriteTo;
 use crate::utils::write_utils::write_compressed;
 use crate::utils::write_utils::write_string_to;
@@ -19,6 +22,9 @@ use std::io::Read;
 use std::io::Seek;
 use std::io::SeekFrom;
 use std::io::Write;
+
+// Special value that seems to be constant for one of the fields
+const CONSTANT_3_EXPECTED: [u32; 9] = [180, 70, 100, 180, 70, 100, 0, 100, 0];
 
 #[derive(Debug, Clone, PartialEq, LogDifferences)]
 pub struct MapData {
@@ -78,7 +84,7 @@ impl Default for MapData {
             world_map_elements: Default::default(),
             trade_routes: Default::default(),
             constant_2_0xff: BoxedArray::from_vec(vec![0xFF; 51984]),
-            constant_3: BoxedArray::from_vec(vec![180, 70, 100, 180, 70, 100, 0, 100, 0]),
+            constant_3: BoxedArray(Box::new(CONSTANT_3_EXPECTED)),
             prices: Default::default(),
             scrub: Default::default(),
             elevation: Default::default(),
@@ -122,46 +128,42 @@ impl MapData {
         }
     }
 
-    pub fn validate(&self) -> Result<(), String> {
-        let is_old_format = (227..=247).contains(&self.version_1);
-        let is_new_format = (318..=321).contains(&self.version_1);
-        if !is_old_format && !is_new_format {
-            return Err(format!(
-                "version_1 is {}, expected the known old-format (227..=247) or new-format (318..=321) range",
-                self.version_1
-            ));
+    pub fn validate(&self) -> ValidationResult {
+        if self.version_1 < 227 || self.version_1 > 321 {
+            return Err(ValidationError::expected_range("version_1", self.version_1, 227, 321));
         }
 
         if self.version_2 != 33 {
-            return Err(format!("version_2 is {}, expected 33", self.version_2));
+            return Err(ValidationError::expected_exactly("version_2", self.version_2, 33));
         }
 
-        ManifestData::validate_map_manifest(&self.manifest, self.version_1).map_err(|e| format!("manifest: {e}"))?;
+        ManifestData::validate_map_manifest(&self.manifest, self.version_1).map_err(ValidationError::add_parent("manifest"))?;
 
-        if let Some(offset) = self.constant_1_0x00.as_ref().iter().position(|b| *b != 0) {
-            return Err(format!("constant_1_0x00[{offset}] is {}, expected 0", self.constant_1_0x00[offset]));
-        }
+        validate_expected_constant("constant_1_0x00", self.constant_1_0x00.as_ref(), 0)?;
+        validate_expected_constant("constant_2_0xff", self.constant_2_0xff.as_ref(), 0xFF)?;
 
-        if let Some(offset) = self.constant_2_0xff.as_ref().iter().position(|b| *b != 0xFF) {
-            return Err(format!(
-                "constant_2_0xff[{offset}] is {}, expected 255",
-                self.constant_2_0xff[offset]
+        if *self.constant_3 != CONSTANT_3_EXPECTED {
+            return Err(ValidationError::expected_exactly(
+                "constant_3",
+                *self.constant_3,
+                CONSTANT_3_EXPECTED,
             ));
         }
 
-        const CONSTANT_3_EXPECTED: [u32; 9] = [180, 70, 100, 180, 70, 100, 0, 100, 0];
-        if *self.constant_3 != CONSTANT_3_EXPECTED {
-            return Err(format!("constant_3 is {:?}, expected {:?}", *self.constant_3, CONSTANT_3_EXPECTED));
-        }
-
-        self.scenario_data.validate().map_err(|e| format!("scenario_data: {e}"))?;
+        self.scenario_data
+            .validate()
+            .map_err(ValidationError::add_parent("scenario_data"))?;
 
         for (i, trade_route) in self.trade_routes.iter().enumerate() {
-            trade_route.validate().map_err(|e| format!("trade_routes[{i}]: {e}"))?;
+            trade_route
+                .validate()
+                .map_err(ValidationError::add_parent(format!("trade_routes[{i}]")))?;
         }
 
         for (i, world_location) in self.world_locations.iter().enumerate() {
-            world_location.validate().map_err(|e| format!("world_locations[{i}]: {e}"))?;
+            world_location
+                .validate()
+                .map_err(ValidationError::add_parent(format!("world_locations[{i}]")))?;
         }
 
         return Ok(());

@@ -2,6 +2,8 @@ use crate::file_data::pyramid_data::PyramidData;
 use crate::utils::boxed_array::BoxedArray;
 use crate::utils::read_utils::ReadFrom;
 use crate::utils::read_utils::read_vec_from;
+use crate::utils::validation::ValidationResult;
+use crate::utils::validation::validate_expected_constant;
 use crate::utils::write_utils::WriteTo;
 use my_macros::LogDifferences;
 use std::io;
@@ -99,14 +101,9 @@ impl MythologyData {
         return Ok(bytes);
     }
 
-    pub fn validate(&self) -> Result<(), String> {
-        if let Some(offset) = self.constant_1_0xff.as_ref().iter().position(|b| *b != 0xFF) {
-            return Err(format!("constant_1_0xff[{offset}] is not 0xFF"));
-        }
-
-        if let Some(offset) = self.constant_2_0x00.iter().position(|b| *b != 0) {
-            return Err(format!("constant_2_0x00[{offset}] is non-zero"));
-        }
+    pub fn validate(&self) -> ValidationResult {
+        validate_expected_constant("constant_1_0xff", self.constant_1_0xff.as_ref(), 0xFF)?;
+        validate_expected_constant("constant_2_0x00", &self.constant_2_0x00, 0)?;
 
         return Ok(());
     }

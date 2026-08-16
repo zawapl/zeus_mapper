@@ -1,7 +1,10 @@
 use crate::file_data::basic_episode_data::BasicEpisodeData;
+use crate::prelude::ValidationError;
 use crate::utils::boxed_array::BoxedArray;
 use crate::utils::read_utils::ReadFrom;
 use crate::utils::read_utils::read_string_from;
+use crate::utils::validation::ValidationResult;
+use crate::utils::validation::validate_expected_constant;
 use crate::utils::write_utils::WriteTo;
 use crate::utils::write_utils::write_string_to;
 use my_macros::LogDifferences;
@@ -70,30 +73,19 @@ pub struct RealEpisodeData {
 }
 
 impl RealEpisodeData {
-    pub fn validate(&self) -> Result<(), String> {
-        if self.constant_1_0x00.iter().any(|b| *b != 0) {
-            return Err("constant_1_0x00 is non-zero".to_owned());
-        }
-        if self.constant_2_0x00.iter().any(|b| *b != 0) {
-            return Err("constant_2_0x00 is non-zero".to_owned());
-        }
-        if self.constant_3_0x00.iter().any(|b| *b != 0) {
-            return Err("constant_3_0x00 is non-zero".to_owned());
-        }
-        if self.constant_4_0x00.iter().any(|b| *b != 0) {
-            return Err("constant_4_0x00 is non-zero".to_owned());
-        }
-        if self.constant_5_0x00.as_ref().iter().any(|b| *b != 0) {
-            return Err("constant_5_0x00 is non-zero".to_owned());
-        }
-        if self.constant_6_0x00.iter().any(|b| *b != 0) {
-            return Err("constant_6_0x00 is non-zero".to_owned());
-        }
-        if self.constant_7_0x00.iter().any(|b| *b != 0) {
-            return Err("constant_7_0x00 is non-zero".to_owned());
-        }
+    pub fn validate(&self) -> ValidationResult {
+        validate_expected_constant("constant_1_0x00", &self.constant_1_0x00, 0)?;
+        validate_expected_constant("constant_2_0x00", &self.constant_2_0x00, 0)?;
+        validate_expected_constant("constant_3_0x00", &self.constant_3_0x00, 0)?;
+        validate_expected_constant("constant_4_0x00", &self.constant_4_0x00, 0)?;
+        validate_expected_constant("constant_5_0x00", self.constant_5_0x00.as_ref(), 0)?;
+        validate_expected_constant("constant_6_0x00", &self.constant_6_0x00, 0)?;
+        validate_expected_constant("constant_7_0x00", &self.constant_7_0x00, 0)?;
 
-        return self.basic_episode_data.validate();
+        return self
+            .basic_episode_data
+            .validate()
+            .map_err(ValidationError::add_parent("basic_episode_data"));
     }
 }
 

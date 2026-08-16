@@ -9,6 +9,8 @@ use crate::utils::read_utils::read_bytes_to_end;
 use crate::utils::read_utils::read_compressed_boxed_array_from;
 use crate::utils::read_utils::read_compressed_vec_from;
 use crate::utils::read_utils::read_string_from;
+use crate::utils::validation::ValidationError;
+use crate::utils::validation::ValidationResult;
 use crate::utils::write_utils::WriteTo;
 use crate::utils::write_utils::write_compressed;
 use crate::utils::write_utils::write_string_to;
@@ -298,23 +300,25 @@ impl SavData {
         return WriteTo::write_to(self, writer);
     }
 
-    pub fn validate(&self) -> Result<(), String> {
+    pub fn validate(&self) -> ValidationResult {
         if self.version_2 < 138 || self.version_2 > 139 {
-            return Err(format!("version_2 is {}, expected range [138, 139]", self.version_2));
+            return Err(ValidationError::expected_range("version_2", self.version_2, 138, 139));
         }
 
-        ManifestData::validate_sav_manifest(&self.manifest, self.version_1, self.version_2).map_err(|e| format!("manifest: {e}"))?;
+        ManifestData::validate_sav_manifest(&self.manifest, self.version_1, self.version_2)
+            .map_err(ValidationError::add_parent("manifest"))?;
 
         if self.map_size > MAX_MAP_SIZE {
-            return Err(format!("map_size is {}, expected at most {MAX_MAP_SIZE}", self.map_size));
+            // todo this probably also has a lower bound - check examples
+            return Err(ValidationError::expected_range("map_size", self.map_size, 0, MAX_MAP_SIZE));
         }
 
         if self.poseidon_flag > 1 {
-            return Err(format!("poseidon_flag is {}, expected range [0, 1]", self.poseidon_flag));
+            return Err(ValidationError::expected_range("poseidon_flag", self.poseidon_flag, 0, 1));
         }
 
         if self.poseidon_marker > 1 {
-            return Err(format!("poseidon_marker is {}, expected range [0, 1]", self.poseidon_marker));
+            return Err(ValidationError::expected_range("poseidon_marker", self.poseidon_marker, 0, 1));
         }
 
         return Ok(());

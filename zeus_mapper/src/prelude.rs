@@ -59,3 +59,5 @@ pub use crate::utils::TILE_MAP_IMAGE_INDEX_MASK;
 pub use crate::utils::TILE_MAP_IMAGE_INDEX_START;
 pub use crate::utils::TILE_MAP_MAP_DATA_IMAGE_OFFSET;
 pub use crate::utils::boxed_array::BoxedArray;
+pub use crate::utils::validation::ValidationError;
+pub use crate::utils::validation::ValidationResult;

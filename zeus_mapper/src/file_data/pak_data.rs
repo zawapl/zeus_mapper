@@ -2,6 +2,8 @@ use crate::adventure::Civilization;
 use crate::constants::data_constant::DataConstant;
 use crate::file_data::map_data::MapData;
 use crate::file_data::settings_data::SettingsData;
+use crate::prelude::ValidationError;
+use crate::utils::validation::ValidationResult;
 use crate::utils::write_utils::WriteTo;
 use my_macros::LogDifferences;
 use std::io;
@@ -45,11 +47,13 @@ impl PakData {
         return Civilization::try_resolve(&self.settings_data.real_episode_data[0].civilization).unwrap_or(Civilization::Greek);
     }
 
-    pub fn validate(&self) -> Result<(), String> {
-        self.settings_data.validate().map_err(|e| format!("settings_data: {e}"))?;
+    pub fn validate(&self) -> ValidationResult {
+        self.settings_data
+            .validate()
+            .map_err(ValidationError::add_parent("settings_data"))?;
 
         for (i, map_data) in self.map_data.iter().enumerate() {
-            map_data.validate().map_err(|e| format!("map_data[{i}]: {e}"))?;
+            map_data.validate().map_err(ValidationError::add_parent(format!("map_data[{i}]")))?;
         }
 
         return Ok(());

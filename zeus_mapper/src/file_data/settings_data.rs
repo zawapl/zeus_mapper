@@ -7,6 +7,9 @@ use crate::file_data::real_episode_data::RealEpisodeData;
 use crate::utils::boxed_array::BoxedArray;
 use crate::utils::read_utils::ReadFrom;
 use crate::utils::read_utils::read_bytes_to_end;
+use crate::utils::validation::ValidationError;
+use crate::utils::validation::ValidationResult;
+use crate::utils::validation::validate_expected_constant;
 use crate::utils::write_utils::WriteTo;
 use my_macros::LogDifferences;
 use std::io;
@@ -138,102 +141,98 @@ impl SettingsData {
         return WriteTo::write_to(self, writer);
     }
 
-    pub fn validate(&self) -> Result<(), String> {
+    pub fn validate(&self) -> ValidationResult {
         if self.version_1 != 8871 {
-            return Err(format!("version_1 is {}, expected 8871", self.version_1));
+            return Err(ValidationError::expected_exactly("version_1", self.version_1, 8871));
         }
 
-        // Real adventures range 1..=5; allow up to 10 for headroom until a tighter bound is confirmed.
         if !(1..=10).contains(&self.parent_episodes) {
-            return Err(format!("parent_episodes is {}, expected 1..=10", self.parent_episodes));
+            return Err(ValidationError::expected_range("parent_episodes", self.parent_episodes, 1, 10));
         }
 
         if self.colony_episodes_used > 4 {
-            return Err(format!("colony_episodes_used is {}, expected 0..=4", self.colony_episodes_used));
+            return Err(ValidationError::expected_range(
+                "colony_episodes_used",
+                self.colony_episodes_used,
+                0,
+                4,
+            ));
         }
 
         if self.colony_episodes_available > 4 {
-            return Err(format!(
-                "colony_episodes_available is {}, expected 0..=4",
-                self.colony_episodes_available
+            return Err(ValidationError::expected_range(
+                "colony_episodes_available",
+                self.colony_episodes_available,
+                0,
+                4,
             ));
         }
 
         if self.adventure_type > 4 {
-            return Err(format!("adventure_type is {}, expected 0..=4", self.adventure_type));
+            return Err(ValidationError::expected_range("adventure_type", self.adventure_type, 0, 4));
         }
 
         if let Some((i, count)) = self.parent_event_counts.iter().enumerate().find(|(_, c)| **c > 150) {
-            return Err(format!("parent_event_counts[{i}] is {count}, expected <=150"));
+            return Err(ValidationError::expected_range(format!("parent_event_counts[{i}]"), *count, 0, 150));
         }
 
         if let Some((i, count)) = self.colony_event_counts.iter().enumerate().find(|(_, c)| **c > 150) {
-            return Err(format!("colony_event_counts[{i}] is {count}, expected <=150"));
+            return Err(ValidationError::expected_range(format!("colony_event_counts[{i}]"), *count, 0, 150));
         }
 
         if let Some((i, count)) = self.colony_episode_goal_counts.iter().enumerate().find(|(_, c)| **c > 6) {
-            return Err(format!("colony_episode_goal_counts[{i}] is {count}, expected <=6"));
+            return Err(ValidationError::expected_range(
+                format!("colony_episode_goal_counts[{i}]"),
+                *count,
+                0,
+                6,
+            ));
         }
 
         if let Some((i, count)) = self.parent_episode_goal_counts.iter().enumerate().find(|(_, c)| **c > 6) {
-            return Err(format!("parent_episode_goal_counts[{i}] is {count}, expected <=6"));
+            return Err(ValidationError::expected_range(
+                format!("parent_episode_goal_counts[{i}]"),
+                *count,
+                0,
+                6,
+            ));
         }
 
-        for mythology in &self.mythology {
-            mythology.validate()?;
+        for (i, mythology) in self.mythology.iter().enumerate() {
+            mythology
+                .validate()
+                .map_err(ValidationError::add_parent(format!("mythology[{i}]")))?;
         }
 
-        if let Some(offset) = self.constant_3_0x01.iter().position(|b| *b != 1) {
-            return Err(format!("constant_3_0x01[{offset}] is not 1"));
-        }
-
-        if let Some(offset) = self.constant_4_0x01.iter().position(|b| *b != 1) {
-            return Err(format!("constant_4_0x01[{offset}] is not 1"));
-        }
-
-        if let Some(offset) = self.constant_5_0x01.iter().position(|b| *b != 1) {
-            return Err(format!("constant_5_0x01[{offset}] is not 1"));
-        }
-
-        if let Some(offset) = self.constant_6_0x01.iter().position(|b| *b != 1) {
-            return Err(format!("constant_6_0x01[{offset}] is not 1"));
-        }
-
-        if let Some(offset) = self.constant_7_0x01.iter().position(|b| *b != 1) {
-            return Err(format!("constant_7_0x01[{offset}] is not 1"));
-        }
-
-        if let Some(offset) = self.constant_8_0x00.iter().position(|b| *b != 0) {
-            return Err(format!("constant_8_0x00[{offset}] is non-zero"));
-        }
-
-        if let Some(offset) = self.constant_9_0x01.iter().position(|b| *b != 1) {
-            return Err(format!("constant_9_0x01[{offset}] is not 1"));
-        }
-
-        if self.constant_1_0x00.iter().any(|b| *b != 0) {
-            return Err("constant_1_0x00 is non-zero".to_owned());
-        }
-
-        if let Some(offset) = self.constant_2_0x00.as_ref().iter().position(|b| *b != 0) {
-            return Err(format!("constant_2_0x00[{offset}] is non-zero"));
-        }
+        validate_expected_constant("constant_3_0x01", &self.constant_3_0x01, 1)?;
+        validate_expected_constant("constant_4_0x01", self.constant_4_0x01.as_ref(), 1)?;
+        validate_expected_constant("constant_5_0x01", &self.constant_5_0x01, 1)?;
+        validate_expected_constant("constant_6_0x01", &self.constant_6_0x01, 1)?;
+        validate_expected_constant("constant_7_0x01", self.constant_7_0x01.as_ref(), 1)?;
+        validate_expected_constant("constant_8_0x00", self.constant_8_0x00.as_ref(), 0)?;
+        validate_expected_constant("constant_9_0x01", &self.constant_9_0x01, 1)?;
+        validate_expected_constant("constant_1_0x00", &self.constant_1_0x00, 0)?;
+        validate_expected_constant("constant_2_0x00", self.constant_2_0x00.as_ref(), 0)?;
 
         for (i, basic_episode_data) in self.basic_episode_data.iter().enumerate() {
-            basic_episode_data.validate().map_err(|e| format!("basic_episode_data[{i}]: {e}"))?;
+            basic_episode_data
+                .validate()
+                .map_err(ValidationError::add_parent(format!("basic_episode_data[{i}]")))?;
         }
 
         for (i, real_episode_data) in self.real_episode_data.iter().enumerate() {
-            real_episode_data.validate().map_err(|e| format!("real_episode_data[{i}]: {e}"))?;
+            real_episode_data
+                .validate()
+                .map_err(ValidationError::add_parent(format!("real_episode_data[{i}]")))?;
         }
 
         for (i, row) in self.events.iter().enumerate() {
             for (j, event) in row.iter().enumerate() {
-                event.validate().map_err(|e| format!("events[{i}][{j}]: {e}"))?;
+                event.validate().map_err(ValidationError::add_parent(format!("events[{i}][{j}]")))?;
             }
         }
 
-        self.map_data.validate().map_err(|e| format!("map_data: {e}"))?;
+        self.map_data.validate().map_err(ValidationError::add_parent("map_data"))?;
 
         return Ok(());
     }

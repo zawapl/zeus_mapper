@@ -4,6 +4,9 @@ use crate::utils::read_utils::ReadFrom;
 use crate::utils::read_utils::read_string_from;
 use crate::utils::read_utils::read_vec_from;
 use crate::utils::read_utils::to_usize;
+use crate::utils::validation::ValidationError;
+use crate::utils::validation::ValidationResult;
+use crate::utils::validation::validate_expected_constant;
 use crate::utils::write_utils::WriteTo;
 use crate::utils::write_utils::write_maybe_compressed;
 use crate::utils::write_utils::write_string_to;
@@ -96,19 +99,15 @@ impl Default for WorldLocationData {
 }
 
 impl WorldLocationData {
-    pub fn validate(&self) -> Result<(), String> {
-        if self.constant_1_0x00.as_ref().iter().any(|b| *b != 0) {
-            return Err("constant_1_0x00 is non-zero".to_owned());
-        }
+    pub fn validate(&self) -> ValidationResult {
+        validate_expected_constant("constant_1_0x00", self.constant_1_0x00.as_ref(), 0)?;
 
-        // todo check in game if value sin higher bytes actually affect how the game interprets this
+        // todo check in game if values in higher bytes actually affect how the game interprets this
         if self.active_old > 0xFF {
-            return Err(format!("active_old is {}, expected top 3 bytes to be 0", self.active_old));
+            return Err(ValidationError::expected_range("active_old", self.active_old, 0, 0xFF));
         }
 
-        if self.constant_3_0x00.iter().any(|b| *b != 0) {
-            return Err("constant_3_0x00 is non-zero".to_owned());
-        }
+        validate_expected_constant("constant_3_0x00", &self.constant_3_0x00, 0)?;
 
         return Ok(());
     }
