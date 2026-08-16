@@ -1,6 +1,7 @@
 use crate::adventure::God;
 use crate::adventure::MonetaryAmount;
 use crate::adventure::Monster;
+use crate::adventure::event::Event;
 use crate::adventure::mythology::Mythology;
 use crate::adventure::resource::ResourceType;
 use crate::constants::data_constant::DataConstant;
@@ -109,14 +110,18 @@ impl EpisodeGoal {
     ///
     /// Always writes the new file format - only reading needs to support the old format.
     ///
+    /// `events`/`mythology` are this same episode/colony's own - `Quest`/`Slay` goals encode as the
+    /// index of their linked event, so they need the sibling event list (and, for `Slay`, the
+    /// mythology that resolves a raw monster index back to a `Monster`) to find it again.
+    ///
     /// Returns the row alongside how many slots were actually populated - the source for
     /// `parent_episode_goal_counts[i]` on the parent side (the colony side has no equivalent count
     /// field, see `DATA_MAPPING.md`).
-    pub(crate) fn vec_to_episode_goal_data(goals: &[EpisodeGoal]) -> ([EpisodeGoalData; 6], u32) {
+    pub(crate) fn vec_to_episode_goal_data(goals: &[EpisodeGoal], events: &[Event], mythology: &Mythology) -> ([EpisodeGoalData; 6], u32) {
         let mut slots: [EpisodeGoalData; 6] = Default::default();
         let mut count = 0;
 
-        for goal_data in goals.iter().filter_map(|goal| goal.to_raw_fields()) {
+        for goal_data in goals.iter().filter_map(|goal| goal.to_raw_fields(events, mythology)) {
             if count >= slots.len() {
                 break;
             }
@@ -127,12 +132,14 @@ impl EpisodeGoal {
         return (slots, count as u32);
     }
 
-    fn to_raw_fields(&self) -> Option<EpisodeGoalData> {
+    fn to_raw_fields(&self, events: &[Event], mythology: &Mythology) -> Option<EpisodeGoalData> {
         let (goal_type, resource_id, amount, unknown_1) = match self {
             EpisodeGoal::Population(count) => (0, *count, 0, Default::default()),
             EpisodeGoal::Treasury(amount) => (1, *amount, 0, Default::default()),
             EpisodeGoal::Sanctuary(god) => (2, god.value(), 0, Default::default()),
             EpisodeGoal::Army(unit, count) => (3, unit.value(), *count, Default::default()),
+            EpisodeGoal::Quest(god, quest_type) => (4, find_quest_index(events, *god, quest_type)? as u32, 0, Default::default()),
+            EpisodeGoal::Slay(monster) => (5, find_slay_index(events, *monster, mythology)? as u32, 0, Default::default()),
             EpisodeGoal::YearlyProduction(resource, amount) => (6, resource.value() as u32, *amount, Default::default()),
             EpisodeGoal::Rule(location) => (7, *location as u32, 0, Default::default()),
             EpisodeGoal::YearlyProfit(amount) => (8, *amount, 0, Default::default()),
@@ -142,9 +149,9 @@ impl EpisodeGoal {
             EpisodeGoal::Pyramids(count) => (15, 1, 0, pyramids_field_4(*count)),
             EpisodeGoal::Pyramid(kind) => (15, 1, kind.value(), Default::default()),
             EpisodeGoal::Hippodrome(count) => (16, *count, 0, Default::default()),
-            EpisodeGoal::Sanctuaries(_) | EpisodeGoal::Quest(_, _) | EpisodeGoal::Slay(_) => {
-                return None;
-            }
+            // No confirmed new-format encoding exists for `Sanctuaries` (see `from_raw_fields`) -
+            // `Adventure::to_pak` always writes the new format, so there's nowhere to put it.
+            EpisodeGoal::Sanctuaries(_) => return None,
         };
 
         return Some(EpisodeGoalData {
@@ -156,8 +163,32 @@ impl EpisodeGoal {
     }
 }
 
-fn u32_at(bytes: &[u8], offset: usize) -> u32 {
-    return u32::from_le_bytes([bytes[offset], bytes[offset + 1], bytes[offset + 2], bytes[offset + 3]]);
+/// `Quest`'s payload, like old-format `Slay`'s, isn't in the goal record at all: `resource_id` is
+/// the index of a `Quest` event (`event_type == 4`) in this same episode/colony's own event list.
+/// The linked event's `subtype` is the offering god's id (the same numbering `God` resolves
+/// everywhere else); `quest` (`0`/non-`0`) selects `QuestType::Type0`/`Type1` - only `0` has been
+/// observed in real data so far, so `Type1` is unconfirmed.
+///
+/// Confirmed against `&Perseus and Medusa.pak` (two parent-episode quests, one colony quest) and
+/// `@Athens through the Ages.pak` (one parent-episode quest).
+fn resolve_quest(goal_index: u32, events: &BoxedArray<EventData, 150>) -> Option<EpisodeGoal> {
+    let event = events.get(goal_index as usize)?;
+    if event.event_type != 4 {
+        return None;
+    }
+
+    let god = God::try_resolve(&(event.subtype as u32))?;
+    let quest_type = if event.quest == 0 { QuestType::Type0 } else { QuestType::Type1 };
+
+    return Some(EpisodeGoal::Quest(god, quest_type));
+}
+
+/// Finds the index of the `Quest` event a `Quest(god, quest_type)` goal links to - the inverse of
+/// [`resolve_quest`]'s lookup, matched on the same god/quest-type pair rather than event identity.
+fn find_quest_index(events: &[Event], god: God, quest_type: &QuestType) -> Option<usize> {
+    return events
+        .iter()
+        .position(|event| matches!(event, Event::Quest(quest) if quest.god == god && quest.quest_type == *quest_type));
 }
 
 /// Old-format `Slay`'s payload isn't in the goal record at all: `goal_type` is the index of a
@@ -187,24 +218,33 @@ fn resolve_slay(goal_type: u32, events: &BoxedArray<EventData, 150>, mythology: 
     };
 }
 
-/// `Quest`'s payload, like old-format `Slay`'s, isn't in the goal record at all: `resource_id` is
-/// the index of a `Quest` event (`event_type == 4`) in this same episode/colony's own event list.
-/// The linked event's `subtype` is the offering god's id (the same numbering `God` resolves
-/// everywhere else); `quest` (`0`/non-`0`) selects `QuestType::Type0`/`Type1` - only `0` has been
-/// observed in real data so far, so `Type1` is unconfirmed.
-///
-/// Confirmed against `&Perseus and Medusa.pak` (two parent-episode quests, one colony quest) and
-/// `@Athens through the Ages.pak` (one parent-episode quest).
-fn resolve_quest(goal_index: u32, events: &BoxedArray<EventData, 150>) -> Option<EpisodeGoal> {
-    let event = events.get(goal_index as usize)?;
-    if event.event_type != 4 {
-        return None;
+/// Finds the index of the `MonsterInvasion` event a `Slay(monster)` goal links to - the inverse of
+/// [`resolve_slay`]'s lookup: resolves `monster` back to its raw `0`/`1`/`2` in-game index via
+/// `mythology` (the same scheme `resolve_slay` decodes), then finds an event whose `MonsterAttack`
+/// includes that index.
+fn find_slay_index(events: &[Event], monster: Monster, mythology: &Mythology) -> Option<usize> {
+    let raw_index = slay_raw_monster_index(monster, mythology)?;
+
+    return events
+        .iter()
+        .position(|event| matches!(event, Event::MonsterInvasion(invasion) if invasion.attack.monsters.contains(&raw_index)));
+}
+
+fn slay_raw_monster_index(monster: Monster, mythology: &Mythology) -> Option<u8> {
+    if mythology.opponent_gods.first().map(God::get_monster) == Some(monster) {
+        return Some(0);
     }
+    if mythology.opponent_gods.get(1).map(God::get_monster) == Some(monster) {
+        return Some(1);
+    }
+    if mythology.monster == monster {
+        return Some(2);
+    }
+    return None;
+}
 
-    let god = God::try_resolve(&(event.subtype as u32))?;
-    let quest_type = if event.quest == 0 { QuestType::Type0 } else { QuestType::Type1 };
-
-    return Some(EpisodeGoal::Quest(god, quest_type));
+fn u32_at(bytes: &[u8], offset: usize) -> u32 {
+    return u32::from_le_bytes([bytes[offset], bytes[offset + 1], bytes[offset + 2], bytes[offset + 3]]);
 }
 
 /// `Pyramids(count)`'s raw encoding: `resource_id`/`amount` are both otherwise-unused for this

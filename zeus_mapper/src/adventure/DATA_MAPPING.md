@@ -361,15 +361,20 @@ claim was evidently based on a stale or miscomputed count reading, not real coun
 
 `EpisodeGoal::to_raw_fields` only encodes the kinds in the table above, always in the new-format
 shape (e.g. `Sanctuary`'s god id goes straight into `resource_id`, not the old-format sentinel
-shape); `Sanctuaries`/`Quest`/`Slay` - not yet reverse-engineered on the write side at all - are
-silently dropped by `Adventure::to_pak` if present in the model. This is consistent with
-`Adventure::to_pak` itself, which currently always builds new-format-shaped (`version_2: 26`)
-settings data regardless of the source adventure's own format (a pre-existing gap - `Adventure`
-doesn't track `version_2` at all), so today a round trip through the model always upgrades an
-old-format adventure's goals to new-format encoding, dropping `Sanctuaries`/`Quest`/`Slay`.
-`parent_episode_goal_counts[i]`/`colony_episode_goal_counts[i]` on write are the number of goals
-from that episode/colony's list that actually got encoded (i.e. can be smaller than
-`episode_goals.len()` if some goals didn't encode).
+shape). `Quest`/`Slay` re-derive their linked event's index by searching the episode/colony's own
+(already-written-back) `events` for a `Event::Quest`/`Event::MonsterInvasion` matching the goal's
+god/quest-type or monster - this only finds the link if the linked event itself round-trips, which
+requires it to be a *real* event (within `parent_event_counts`/`colony_event_counts`); a
+`Quest`/`Slay` goal linked to a leftover past-count event (see above) still can't round-trip, since
+that event's own contents are never modeled at all. `Sanctuaries` has no confirmed new-format
+encoding (see above), so it's still silently dropped by `Adventure::to_pak` if present in the
+model - consistent with `Adventure::to_pak` itself, which currently always builds
+new-format-shaped (`version_2: 26`) settings data regardless of the source adventure's own format
+(a pre-existing gap - `Adventure` doesn't track `version_2` at all), so today a round trip through
+the model always upgrades an old-format adventure's goals to new-format encoding, dropping
+`Sanctuaries`. `parent_episode_goal_counts[i]`/`colony_episode_goal_counts[i]` on write are the
+number of goals from that episode/colony's list that actually got encoded (i.e. can be smaller
+than `episode_goals.len()` if some goals didn't encode).
 
 `Adventure::to_pak` writes `basic_episode_data[i]` and `real_episode_data[i].basic_episode_data` as
 byte-for-byte duplicates of each other, with `field_3`/`field_5`/`field_6` always `0xFFFFFFFF` (their
@@ -621,6 +626,7 @@ further by `subtype`:
 |-------------:|---------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 |            1 | goods/troops request            | `0`=`GoodsRequestSubtype::GeneralRequest`, `3`=`GoodsRequestSubtype::Festival`, `4`=`GoodsRequestSubtype::Construction`, `5`=`GoodsRequestSubtype::Famine`, `6`=`GoodsRequestSubtype::FinancialWoes`, `7`=`MilitaryRequestSubtype::GreekCityTerrorized`. `1`/`2` (`MilitaryRequestSubtype::CityUnderAttack`/`CityAttacksRival`) have no confirmed second-`CityId` source, not produced |
 |            2 | invasion                        | `Invasion`                                                                                                                                                                                                                                                                                                                                                                             |
+|            4 | quest                           | `Quest` - `subtype`/`quest` give the offering god/`QuestType`, the same fields `episode_goals::resolve_quest` reads off the linked event (see the `goal_type == 4` note above)                                                                                                                                                                                                        |
 |            3 | earthquake                      | `Disaster(Earthquake)`                                                                                                                                                                                                                                                                                                                                                                 |
 |            5 | landslide                       | `Disaster(Landslide)`                                                                                                                                                                                                                                                                                                                                                                  |
 |          8/9 | wage increase/decrease          | `WageIncrease`/`WageDecrease`                                                                                                                                                                                                                                                                                                                                                          |
@@ -680,10 +686,16 @@ Field notes:
   them (`first_item`, `fixed_target`, `source_min`/`source_max` show up with real, non-default values -
   e.g. recurring pairs like `(1, 8)` or `(0, 231)` - on events with no item/marker/source concept).
   Not yet modeled.
+- `CityStatusChangeSubtype::GodDisaster`'s `WarningMonths` payload is `event.warnings`, kept out of
+  `Occurrence`'s folded month like the other dedicated-`WarningMonths`-field types (`GoodsRequest`,
+  `MilitaryRequest`, `Invasion`) - it was previously folded into the month *and* separately recorded,
+  then dropped unwritten on `to_data`, which zeroed it on every round trip.
 
-Not modeled at all (no `from_data` dispatch, `to_data` only): `Quest` (only one low-confidence real
-sample; `MonumentReward`'s source for `Quest` specifically, and `QuestType`'s raw encoding, aren't
-confirmed), `RivalArmyChange` (its raw subtype wasn't observed in any real adventure surveyed).
+Not modeled at all (no `from_data` dispatch, `to_data` only): `RivalArmyChange` (its raw subtype
+wasn't observed in any real adventure surveyed). `Quest` is modeled both ways now, but
+`MonumentReward`'s source and `QuestType`'s raw encoding are still only weakly confirmed (one
+low-confidence real sample for the payload fields not covered by `resolve_quest`'s own, stronger
+confirmation).
 
 ## Duplicate/dead raw fields (confirmed, not modeled)
 

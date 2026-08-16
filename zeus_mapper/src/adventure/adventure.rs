@@ -163,7 +163,8 @@ impl Adventure {
                 *favour = episode.world_settings.favour as u32;
             }
 
-            let (goal_slots, goal_count) = EpisodeGoal::vec_to_episode_goal_data(&episode.episode_goals);
+            let (goal_slots, goal_count) =
+                EpisodeGoal::vec_to_episode_goal_data(&episode.episode_goals, &episode.events, &episode.mythology);
             parent_episode_goals[i] = goal_slots;
             parent_episode_goal_counts[i] = goal_count;
         }
@@ -203,7 +204,8 @@ impl Adventure {
                 *this_events = Event::vec_to_data(&colony_episode.events);
             }
             if let Some(this_goals) = colony_episode_goals.get_mut(i) {
-                let (goal_slots, goal_count) = EpisodeGoal::vec_to_episode_goal_data(&colony_episode.episode_goals);
+                let (goal_slots, goal_count) =
+                    EpisodeGoal::vec_to_episode_goal_data(&colony_episode.episode_goals, &colony_episode.events, &colony_episode.mythology);
                 *this_goals = goal_slots;
                 if let Some(this_count) = colony_episode_goal_counts.get_mut(i) {
                     *this_count = goal_count;
@@ -498,6 +500,22 @@ mod tests {
             let pak_data = adventure.to_pak();
             let adventure_text = adventure.to_text();
             assert_eq!(Adventure::from_pak(&pak_data, &adventure_text), adventure);
+        }
+
+        return Ok(());
+    }
+
+    #[test]
+    fn parse_two_worlds_collide_round_trip() -> Result<()> {
+        if let Ok(game_root) = std::env::var("ZEUS_HOME") {
+            let path = format!("{game_root}/Adventures/^Two Worlds Collide.pak");
+            let mut reader = BufReader::new(File::open(path)?);
+            let pak_data = PakData::read_from(&mut reader)?;
+            let adventure = Adventure::from_pak(&pak_data, &AdventureText::default());
+
+            let reconstructed_pak_data = adventure.to_pak();
+            let adventure_text = adventure.to_text();
+            assert_eq!(Adventure::from_pak(&reconstructed_pak_data, &adventure_text), adventure);
         }
 
         return Ok(());

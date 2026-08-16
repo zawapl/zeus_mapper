@@ -74,6 +74,7 @@ impl Event {
 
         return match event.event_type {
             2 => Event::Invasion(Invasion::from_data(event)),
+            4 => Event::Quest(Quest::from_data(event)),
             3 | 5 | 24 | 25 | 28 => Event::Disaster(Disaster::from_data(event)),
             8 => Event::WageIncrease(WageIncrease::from_data(event)),
             9 => Event::WageDecrease(WageDecrease::from_data(event)),
@@ -440,10 +441,6 @@ impl Gift {
     }
 }
 
-/// A quest offered to a city, rewarding a monument on success.
-///
-/// Not modeled by `from_data` (see DATA_MAPPING.md): only one low-confidence real sample was
-/// observed, so `Quest` is `to_data`-only.
 #[derive(PartialEq, Debug)]
 pub struct Quest {
     pub god: God,
@@ -455,14 +452,25 @@ pub struct Quest {
 }
 
 impl Quest {
+    fn from_data(event: &EventData) -> Quest {
+        return Quest {
+            god: God::try_resolve(&(event.subtype as u32)).unwrap_or(God::Zeus),
+            quest_type: if event.quest == 0 { QuestType::Type0 } else { QuestType::Type1 },
+            city: event.other_city as u16,
+            reward: MonumentReward::try_resolve(&event.loot_type).unwrap_or(MonumentReward::None),
+            trigger: EventToTrigger::from_data(event.on_success, event.trig_reason),
+            occurrence: Occurrence::from_data(event),
+        };
+    }
+
     fn to_data(&self) -> EventData {
         let (on_success, trig_reason) = self.trigger.to_data();
 
         return with_occurrence(
             EventData {
                 event_type: 4,
-                god_or_mon_or_warship_id: self.god.value() as u16,
-                subtype: if self.quest_type == QuestType::Type0 { 0 } else { 1 },
+                subtype: self.god.value() as u16,
+                quest: if self.quest_type == QuestType::Type0 { 0 } else { 1 },
                 other_city: self.city as u8,
                 loot_type: self.reward.value(),
                 on_success,
@@ -989,7 +997,6 @@ default_differ_impl!(CityStatusChange);
 impl CityStatusChange {
     fn from_data(event: &EventData) -> CityStatusChange {
         let amount = resolve_range(event.fixed_amount, event.min_amount);
-        let occurrence = Occurrence::from_data(event);
         let (city_min, city_max) = if event.fixed_target != u16::MAX {
             (event.fixed_target, event.fixed_target)
         } else {
@@ -1020,7 +1027,7 @@ impl CityStatusChange {
         return CityStatusChange {
             city_min,
             city_max,
-            occurrence,
+            occurrence: Occurrence::from_data(event),
             subtype,
         };
     }
@@ -1039,11 +1046,10 @@ impl CityStatusChange {
                 subtype: 11,
                 ..EventData::default()
             },
-            // The `u8` is folded into `occurrence`'s month on read (see `Occurrence::from_data`),
-            // not reproduced here, to avoid double-counting it on a subsequent read.
-            CityStatusChangeSubtype::GodDisaster(god, _) => EventData {
+            CityStatusChangeSubtype::GodDisaster(god, warning_months) => EventData {
                 subtype: 13,
                 god_or_mon_or_warship_id: god.value() as u16,
+                warnings: *warning_months as u16,
                 ..EventData::default()
             },
             CityStatusChangeSubtype::MilitaryBuildup(amount) => EventData {
@@ -1113,10 +1119,7 @@ pub enum CityStatusChangeSubtype {
     RivalBecomesAlly,
     CityBecomesRival,
     CityBecomesVassal,
-    // The `u8` is a raw copy of `event.warnings`; despite sharing that source with `WarningMonths`
-    // elsewhere, it isn't known to represent a warning period for this subtype, so it's left
-    // untyped. See `Occurrence::from_data` for where the same raw value is actually consumed.
-    GodDisaster(God, u8),
+    GodDisaster(God, WarningMonths),
     MilitaryBuildup(u8),
     MilitaryDecline(u8),
     EconomicProsperity(u8),
@@ -1126,8 +1129,6 @@ pub enum CityStatusChangeSubtype {
     CityAppears,
     CityDisappears,
     RebellionOver,
-    // The `CityId` is the conquering city; the conquered city is `CityStatusChange::city_min`/
-    // `city_max`.
     CityConqueredBy(CityId),
 }
 
