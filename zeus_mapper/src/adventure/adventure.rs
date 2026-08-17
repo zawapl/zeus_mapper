@@ -29,9 +29,11 @@ use std::fs;
 use std::fs::File;
 use std::io;
 use std::io::BufReader;
+use std::io::Error;
 use std::io::ErrorKind;
 use std::path::Path;
 
+// todo this doesn't look like a civilization related thing, but a file version thing
 // `MapData.scenario_data.civilization` in every new-format (`version_2 == 26`) real adventure
 // surveyed is `1`, regardless of the adventure's actual civilization (confirmed against Greek and
 // Atlantean examples, including "The Odyssey" resaved into the new format by the real game) - this
@@ -41,6 +43,10 @@ use std::path::Path;
 // the observed real-file value so `to_pak()` (which always writes the new format) doesn't corrupt
 // it, not a real fix for civilization selection at the map level.
 const NEW_FORMAT_MAP_CIVILIZATION: u32 = 1;
+
+// There are issues with adventures with long names, UI allows for ~21, longest observed is 23
+// Might need a proper investigation to find what a safe limit is
+const MAX_ADVENTURE_NAME_LENGTH: usize = 23;
 
 #[derive(LogDifferences, PartialEq, Debug)]
 pub struct Adventure {
@@ -321,6 +327,7 @@ impl Adventure {
     pub fn write_to(&self, folder: impl AsRef<Path>) -> io::Result<()> {
         let folder = folder.as_ref();
         let name = folder_name(folder)?;
+        validate_adventure_name(&name)?;
 
         if let Err(err) = fs::remove_dir_all(&folder)
             && err.kind() != ErrorKind::NotFound
@@ -355,12 +362,27 @@ fn folder_name(folder: &Path) -> io::Result<String> {
         .file_name()
         .and_then(|name| name.to_str())
         .map(|name| name.to_string())
-        .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, format!("folder path has no folder name: {folder:?}")));
+        .ok_or_else(|| Error::new(io::ErrorKind::InvalidInput, format!("folder path has no folder name: {folder:?}")));
+}
+
+fn validate_adventure_name(name: &str) -> io::Result<()> {
+    if name.chars().count() > MAX_ADVENTURE_NAME_LENGTH {
+        return Err(Error::new(
+            ErrorKind::InvalidInput,
+            format!(
+                "adventure name {name:?} is {} characters long, longer than the {MAX_ADVENTURE_NAME_LENGTH} limit",
+                name.chars().count()
+            ),
+        ));
+    }
+
+    return Ok(());
 }
 
 #[cfg(test)]
 mod tests {
     use crate::adventure::adventure::Adventure;
+    use crate::adventure::adventure::validate_adventure_name;
     use crate::prelude::AdventureText;
     use crate::prelude::AdventureType;
     use crate::prelude::Civilization;
@@ -370,6 +392,13 @@ mod tests {
     use std::fs::File;
     use std::io::BufReader;
     use std::io::Result;
+
+    #[test]
+    fn validate_adventure_name_accepts_the_longest_known_real_name() -> Result<()> {
+        validate_adventure_name("The Sinking of Atlantis")?;
+
+        return Ok(());
+    }
 
     #[test]
     fn parse_the_youngest_twins() -> Result<()> {

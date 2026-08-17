@@ -10,6 +10,7 @@ use std::io;
 use std::io::Read;
 use std::io::Seek;
 use std::io::Write;
+use std::panic::Location;
 
 #[derive(Debug, Clone, PartialEq, LogDifferences)]
 pub struct PakData {
@@ -54,6 +55,49 @@ impl PakData {
 
         for (i, map_data) in self.map_data.iter().enumerate() {
             map_data.validate().map_err(ValidationError::add_parent(format!("map_data[{i}]")))?;
+        }
+
+        self.validate_attacking_cities()?;
+
+        return Ok(());
+    }
+
+    // Check attacking cities for invasion events are not parent or colony
+    fn validate_attacking_cities(&self) -> ValidationResult {
+        let valid_attackers = self.map_data[0]
+            .world_locations
+            .iter()
+            .enumerate()
+            .filter(|(_, location)| location.location_type != 0 && location.location_type != 1)
+            .map(|(i, _)| i as u16)
+            .collect::<Vec<_>>();
+
+        for (i, row) in self.settings_data.events.iter().enumerate() {
+            let real_count = if i < self.settings_data.parent_event_counts.len() {
+                self.settings_data.parent_event_counts.get(i).copied().unwrap_or(0) as usize
+            } else {
+                self.settings_data
+                    .colony_event_counts
+                    .get(i - self.settings_data.parent_event_counts.len())
+                    .copied()
+                    .unwrap_or(0) as usize
+            };
+
+            for (j, event) in row.iter().take(real_count).enumerate() {
+                if event.event_type != 1 || !matches!(event.subtype, 1 | 2) {
+                    continue;
+                }
+
+                let attacking_city = event.other_city as u16;
+
+                if !valid_attackers.contains(&attacking_city) {
+                    return Err(ValidationError::expected_one_of(
+                        format!("settings_data.events[{i}][{j}].other_city"),
+                        attacking_city,
+                        valid_attackers.as_ref(),
+                    ));
+                }
+            }
         }
 
         return Ok(());

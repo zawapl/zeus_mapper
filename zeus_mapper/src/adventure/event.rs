@@ -1167,6 +1167,77 @@ mod tests {
     use std::io::Result;
 
     #[test]
+    fn parse_the_founding_of_troy() -> Result<()> {
+        if let Ok(game_root) = std::env::var("ZEUS_HOME") {
+            let adventure = Adventure::read_from(format!("{game_root}/Adventures/The Founding of Troy"))?;
+
+            let episode_3 = adventure.parent_episodes.get(2).expect("Episode 3");
+            assert_eq!(
+                episode_3.events,
+                vec![
+                    Event::TradeChange(TradeChange {
+                        occurrence: Occurrence::OneTime(5, BetweenYears(0, 0)),
+                        subtype: TradeChangeSubtype::SupplyDecrease(0, ResourceType::Sculpture, 5),
+                    }),
+                    Event::GoodsRequest(GoodsRequest {
+                        subtype: GoodsRequestSubtype::GeneralRequest(ResourceType::Orichalc),
+                        city: 0,
+                        amount: 6,
+                        warning_months: 8,
+                        occurrence: Occurrence::Repeating(2, BetweenYears(1, 2)),
+                    }),
+                    Event::GoodsRequest(GoodsRequest {
+                        subtype: GoodsRequestSubtype::GeneralRequest(ResourceType::BlackMarble),
+                        city: 0,
+                        amount: 6,
+                        warning_months: 8,
+                        occurrence: Occurrence::Repeating(11, BetweenYears(2, 3)),
+                    }),
+                    Event::GoodsRequest(GoodsRequest {
+                        subtype: GoodsRequestSubtype::GeneralRequest(ResourceType::Fleece),
+                        city: 0,
+                        amount: 8,
+                        warning_months: 6,
+                        occurrence: Occurrence::Repeating(5, BetweenYears(4, 5)),
+                    }),
+                    Event::CityStatusChange(CityStatusChange {
+                        city_min: 4,
+                        city_max: 4,
+                        occurrence: Occurrence::Repeating(9, BetweenYears(5, 5)),
+                        subtype: CityStatusChangeSubtype::GodDisaster(God::Hera, 6),
+                    }),
+                    Event::TradeChange(TradeChange {
+                        occurrence: Occurrence::Repeating(3, BetweenYears(8, 8)),
+                        subtype: TradeChangeSubtype::TradeShutsDown(0),
+                    }),
+                    Event::TradeChange(TradeChange {
+                        occurrence: Occurrence::Repeating(13, BetweenYears(8, 8)),
+                        subtype: TradeChangeSubtype::TradeOpensUp(0),
+                    }),
+                    Event::TradeChange(TradeChange {
+                        occurrence: Occurrence::Repeating(5, BetweenYears(12, 12)),
+                        subtype: TradeChangeSubtype::PriceIncrease(ResourceType::Wood, 20),
+                    }),
+                    Event::WageIncrease(WageIncrease {
+                        amount: 15,
+                        occurrence: Occurrence::OneTime(7, BetweenYears(22, 22)),
+                    }),
+                    Event::TradeChange(TradeChange {
+                        occurrence: Occurrence::Repeating(8, BetweenYears(26, 26)),
+                        subtype: TradeChangeSubtype::PriceDecrease(ResourceType::Wood, 15),
+                    }),
+                    Event::GodInvasion(GodInvasion {
+                        gods: [11, u16::MAX, u16::MAX],
+                        occurrence: Occurrence::Repeating(12, BetweenYears(3, 4)),
+                    }),
+                ]
+            );
+        }
+
+        return Ok(());
+    }
+
+    #[test]
     fn parse_the_youngest_twins() -> Result<()> {
         if let Ok(game_root) = std::env::var("ZEUS_HOME") {
             let adventure = Adventure::read_from(format!("{game_root}/Adventures/The Youngest Twins"))?;
@@ -1551,37 +1622,37 @@ mod tests {
                 episode_1.events,
                 vec![
                     Event::CityStatusChange(CityStatusChange {
-                        city_min: 10,
+                        city_min: 10, // Troy
                         city_max: 10,
-                        occurrence: Occurrence::OneTime(4, BetweenYears(0, 0)),
-                        subtype: CityStatusChangeSubtype::CityConqueredBy(5),
+                        occurrence: Occurrence::OneTime(2 + 2, BetweenYears(0, 0)),
+                        subtype: CityStatusChangeSubtype::CityConqueredBy(5), // Tenedos
                     }),
                     Event::CityStatusChange(CityStatusChange {
                         city_min: 10,
                         city_max: 10,
-                        occurrence: Occurrence::Repeating(5, BetweenYears(0, 0)),
+                        occurrence: Occurrence::Repeating(3 + 2, BetweenYears(0, 0)), // Confirmed happens in May
                         subtype: CityStatusChangeSubtype::CityBecomesInactive,
                     }),
                     Event::CityStatusChange(CityStatusChange {
                         city_min: 10,
                         city_max: 10,
-                        occurrence: Occurrence::OneTime(6, BetweenYears(0, 0)),
+                        occurrence: Occurrence::OneTime(4 + 2, BetweenYears(0, 0)), // Confirmed happens in June
                         subtype: CityStatusChangeSubtype::CityDisappears,
                     }),
                     Event::CityStatusChange(CityStatusChange {
-                        city_min: 9,
+                        city_min: 9, // Ismarus
                         city_max: 9,
-                        occurrence: Occurrence::OneTime(8, BetweenYears(0, 0)),
+                        occurrence: Occurrence::OneTime(6 + 2, BetweenYears(0, 0)), // Confirmed happens in August
                         subtype: CityStatusChangeSubtype::MilitaryDecline(5),
                     }),
                     Event::CityStatusChange(CityStatusChange {
                         city_min: 9,
                         city_max: 9,
-                        occurrence: Occurrence::OneTime(9, BetweenYears(0, 0)),
+                        occurrence: Occurrence::OneTime(7 + 2, BetweenYears(0, 0)), // Confirmed happens in September
                         subtype: CityStatusChangeSubtype::EconomicDecline(3),
                     }),
                     Event::CityStatusChange(CityStatusChange {
-                        city_min: 4,
+                        city_min: 4, // Sparta
                         city_max: 4,
                         occurrence: Occurrence::EpisodeComplete,
                         subtype: CityStatusChangeSubtype::CityBecomesInactive,

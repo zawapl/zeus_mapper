@@ -69,7 +69,7 @@ pub struct EventData {
 }
 
 impl EventData {
-    pub fn validate(&self) -> ValidationResult {
+    pub fn validate(&self, new_file_ver: bool) -> ValidationResult {
         if self.constant_1_0x00 != 0 {
             return Err(ValidationError::expected_exactly("constant_1_0x00", self.constant_1_0x00, 0));
         }
@@ -84,6 +84,451 @@ impl EventData {
 
         if self.constant_4_0x00 != 0 {
             return Err(ValidationError::expected_exactly("constant_4_0x00", self.constant_4_0x00, 0));
+        }
+
+        return match self.event_type {
+            1 => self.validate_request(new_file_ver),
+            2 => self.validate_invasion(),
+            3 => self.validate_earthquake(),
+            4 => self.validate_quest(new_file_ver),
+            5 => self.validate_landslide(),
+            8 => self.validate_wage_increase(),
+            9 => self.validate_wage_decrease(),
+            13 => self.validate_demand_increase(new_file_ver),
+            14 => self.validate_demand_decrease(new_file_ver),
+            15 => self.validate_price_increase(new_file_ver),
+            16 => self.validate_price_decrease(new_file_ver),
+            19 => self.validate_city_status_change(),
+            20 => self.validate_rival_army_change(),
+            21 => self.validate_supply_increase(new_file_ver),
+            22 => self.validate_supply_decrease(new_file_ver),
+            23 => self.validate_gift(new_file_ver),
+            24 => self.validate_lava_flow(),
+            25 => self.validate_tidal_wave(),
+            26 => self.validate_monster_invasion(),
+            27 => self.validate_god_invasion(),
+            28 => self.validate_sink_land(),
+            _ => Err(ValidationError::expected_one_of(
+                "event_type",
+                self.event_type,
+                &[1, 2, 3, 4, 5, 8, 9, 13, 14, 15, 16, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28],
+            )),
+        };
+    }
+
+    fn validate_request(&self, new_file_ver: bool) -> ValidationResult {
+        self.validate_target_range()?;
+
+        return match self.subtype {
+            0 => self.validate_general_goods_request(new_file_ver),
+            1 => self.validate_city_under_attack(new_file_ver),
+            2 => self.validate_city_attacks_rival(new_file_ver),
+            3 => self.validate_festival_request(new_file_ver),
+            7 => self.validate_city_terrorized(new_file_ver),
+            4 => self.validate_construction_request(new_file_ver),
+            5 => self.validate_famine_request(new_file_ver),
+            6 => self.validate_financial_request(new_file_ver),
+            _ => Err(ValidationError::expected_one_of("subtype", self.subtype, &[0, 1, 2, 3, 4, 5, 6, 7])),
+        };
+    }
+
+    fn validate_general_goods_request(&self, new_file_ver: bool) -> ValidationResult {
+        // todo replace with explicit list that includes only wood/bronze/marble/grapse/olives/fleece/black marble/orichalc/armor/sculpture/olive oil/wine/drachmas/food
+        self.validate_items_in_range(1, 25, new_file_ver)?;
+
+        return self.validate_amount_range();
+    }
+
+    fn validate_city_under_attack(&self, new_file_ver: bool) -> ValidationResult {
+        if !matches!(self.eff_on_city, 0 | 1 | 2) {
+            return Err(ValidationError::expected_one_of("eff_on_city", self.eff_on_city, &[0, 1, 2]));
+        }
+
+        return self.validate_item_exact(24, new_file_ver);
+    }
+
+    fn validate_city_attacks_rival(&self, new_file_ver: bool) -> ValidationResult {
+        if !matches!(self.eff_on_city, 0 | 2) {
+            return Err(ValidationError::expected_one_of("eff_on_city", self.eff_on_city, &[0, 2]));
+        }
+        return self.validate_item_exact(24, new_file_ver);
+    }
+
+    fn validate_festival_request(&self, new_file_ver: bool) -> ValidationResult {
+        // todo replace with explicit list that includes only wood/bronze/marble/grapse/olives/fleece/armor/sculpture/olive oil/wine/drachmas/food
+        self.validate_items_in_range(1, 25, new_file_ver)?;
+
+        if self.god_or_mon_or_warship_id > 13 {
+            return Err(ValidationError::expected_range(
+                "god_or_mon_or_warship_id",
+                self.god_or_mon_or_warship_id,
+                0,
+                13,
+            ));
+        }
+
+        return self.validate_amount_range();
+    }
+
+    fn validate_city_terrorized(&self, new_file_ver: bool) -> ValidationResult {
+        if !matches!(self.eff_on_city, 0 | 1) {
+            return Err(ValidationError::expected_one_of("eff_on_city", self.eff_on_city, &[0, 1]));
+        }
+
+        if !matches!(self.god_or_mon_or_warship_id, 0 | 1 | 2) {
+            return Err(ValidationError::expected_one_of(
+                "god_or_mon_or_warship_id",
+                self.god_or_mon_or_warship_id,
+                &[0, 1, 2],
+            ));
+        }
+
+        return self.validate_item_exact(24, new_file_ver);
+    }
+
+    fn validate_construction_request(&self, new_file_ver: bool) -> ValidationResult {
+        self.validate_items_one_of(&[9, 11, 19, 23], new_file_ver)?;
+        return self.validate_amount_range();
+    }
+
+    fn validate_famine_request(&self, new_file_ver: bool) -> ValidationResult {
+        self.validate_item_exact(25, new_file_ver)?;
+
+        return self.validate_amount_range();
+    }
+
+    fn validate_financial_request(&self, new_file_ver: bool) -> ValidationResult {
+        self.validate_item_exact(23, new_file_ver)?;
+
+        return self.validate_amount_range();
+    }
+
+    fn validate_invasion(&self) -> ValidationResult {
+        // todo check warships
+
+        self.validate_source_range()?;
+        self.validate_amount_range()?;
+
+        return self.validate_target_range();
+    }
+
+    fn validate_earthquake(&self) -> ValidationResult {
+        return self.validate_target_range();
+    }
+
+    fn validate_quest(&self, new_file_ver: bool) -> ValidationResult {
+        if self.subtype > 13 {
+            return Err(ValidationError::expected_range("subtype", self.subtype, 0, 13));
+        }
+
+        self.validate_item_exact(26, new_file_ver)?;
+
+        return self.validate_target_range();
+    }
+
+    fn validate_landslide(&self) -> ValidationResult {
+        return self.validate_target_range();
+    }
+
+    fn validate_wage_increase(&self) -> ValidationResult {
+        return self.validate_target_range();
+    }
+
+    fn validate_wage_decrease(&self) -> ValidationResult {
+        return self.validate_target_range();
+    }
+
+    fn validate_demand_increase(&self, new_file_ver: bool) -> ValidationResult {
+        self.validate_items_in_range(1, 22, new_file_ver)?;
+        return self.validate_target_range();
+    }
+
+    fn validate_demand_decrease(&self, new_file_ver: bool) -> ValidationResult {
+        self.validate_items_in_range(1, 22, new_file_ver)?;
+        return self.validate_target_range();
+    }
+
+    fn validate_price_increase(&self, new_file_ver: bool) -> ValidationResult {
+        self.validate_items_in_range(1, 22, new_file_ver)?;
+        return self.validate_amount_range();
+    }
+
+    fn validate_price_decrease(&self, new_file_ver: bool) -> ValidationResult {
+        self.validate_items_in_range(1, 22, new_file_ver)?;
+        return self.validate_amount_range();
+    }
+
+    fn validate_city_status_change(&self) -> ValidationResult {
+        self.validate_target_range()?;
+
+        return match self.subtype {
+            2 => self.validate_trade_shuts_down(),
+            3 => self.validate_trade_opens_up(),
+            9 => self.validate_rival_becomes_ally(),
+            10 => self.validate_city_becomes_rival(),
+            11 => self.validate_city_becomes_vassal(),
+            13 => self.validate_god_disaster(),
+            14 => self.validate_military_buildup(),
+            15 => self.validate_military_decline(),
+            16 => self.validate_economic_prosperity(),
+            17 => self.validate_economic_decline(),
+            18 => self.validate_city_becomes_active(),
+            19 => self.validate_city_becomes_inactive(),
+            20 => self.validate_city_appears(),
+            21 => self.validate_city_disappears(),
+            23 => self.validate_rebellion_over(),
+            24 => self.validate_city_conquered_by(),
+            _ => Err(ValidationError::expected_one_of(
+                "subtype",
+                self.subtype,
+                &[2, 3, 9, 10, 11, 13, 14, 15, 16, 17, 18, 19, 20, 21, 23, 24],
+            )),
+        };
+    }
+
+    fn validate_trade_shuts_down(&self) -> ValidationResult {
+        return Ok(());
+    }
+
+    fn validate_trade_opens_up(&self) -> ValidationResult {
+        return Ok(());
+    }
+
+    fn validate_rival_becomes_ally(&self) -> ValidationResult {
+        return Ok(());
+    }
+
+    fn validate_city_becomes_rival(&self) -> ValidationResult {
+        return Ok(());
+    }
+
+    fn validate_city_becomes_vassal(&self) -> ValidationResult {
+        return Ok(());
+    }
+
+    fn validate_god_disaster(&self) -> ValidationResult {
+        if self.god_or_mon_or_warship_id > 13 {
+            return Err(ValidationError::expected_range(
+                "god_or_mon_or_warship_id",
+                self.god_or_mon_or_warship_id,
+                0,
+                13,
+            ));
+        }
+
+        return Ok(());
+    }
+
+    fn validate_military_buildup(&self) -> ValidationResult {
+        return self.validate_amount_range();
+    }
+
+    fn validate_military_decline(&self) -> ValidationResult {
+        return self.validate_amount_range();
+    }
+
+    fn validate_economic_prosperity(&self) -> ValidationResult {
+        return self.validate_amount_range();
+    }
+
+    fn validate_economic_decline(&self) -> ValidationResult {
+        return self.validate_amount_range();
+    }
+
+    fn validate_city_becomes_active(&self) -> ValidationResult {
+        return Ok(());
+    }
+
+    fn validate_city_becomes_inactive(&self) -> ValidationResult {
+        return Ok(());
+    }
+
+    fn validate_city_appears(&self) -> ValidationResult {
+        return Ok(());
+    }
+
+    fn validate_city_disappears(&self) -> ValidationResult {
+        return Ok(());
+    }
+
+    fn validate_rebellion_over(&self) -> ValidationResult {
+        return Ok(());
+    }
+
+    fn validate_city_conquered_by(&self) -> ValidationResult {
+        return Ok(());
+    }
+
+    fn validate_rival_army_change(&self) -> ValidationResult {
+        return self.validate_target_range();
+    }
+
+    fn validate_supply_increase(&self, new_file_ver: bool) -> ValidationResult {
+        self.validate_items_in_range(1, 22, new_file_ver)?;
+        return self.validate_target_range();
+    }
+
+    fn validate_supply_decrease(&self, new_file_ver: bool) -> ValidationResult {
+        self.validate_items_in_range(1, 22, new_file_ver)?;
+        return self.validate_target_range();
+    }
+
+    fn validate_gift(&self, new_file_ver: bool) -> ValidationResult {
+        // todo narrow down allowed values to a list
+        self.validate_items_in_range(1, 23, new_file_ver)?;
+        self.validate_target_range()?;
+        return self.validate_amount_range();
+    }
+
+    fn validate_lava_flow(&self) -> ValidationResult {
+        return self.validate_target_range();
+    }
+
+    fn validate_tidal_wave(&self) -> ValidationResult {
+        // todo check permanent flag
+        return self.validate_target_range();
+    }
+
+    fn validate_monster_invasion(&self) -> ValidationResult {
+        return match self.subtype {
+            0 => self.validate_monster_in_city(),
+            1 => self.validate_monster_unleashed(),
+            2 => self.validate_monster_invades(),
+            _ => Err(ValidationError::expected_one_of("subtype", self.subtype, &[0, 1, 2])),
+        };
+    }
+
+    fn validate_monster_in_city(&self) -> ValidationResult {
+        return self.validate_items_one_of(&[0, 1, 2], true);
+    }
+
+    fn validate_monster_unleashed(&self) -> ValidationResult {
+        return self.validate_items_one_of(&[0, 1], true);
+    }
+
+    fn validate_monster_invades(&self) -> ValidationResult {
+        // todo first value should be independent monster ? check examples where this doesn't hold
+        return self.validate_items_one_of(&[0, 1, 2], true);
+    }
+
+    fn validate_god_invasion(&self) -> ValidationResult {
+        return self.validate_items_in_range(0, 13, true);
+    }
+
+    fn validate_sink_land(&self) -> ValidationResult {
+        // todo check amount
+        return self.validate_target_range();
+    }
+
+    fn validate_target_range(&self) -> ValidationResult {
+        if self.fixed_target == u16::MAX && (self.min_target == u16::MAX || self.max_target == u16::MAX) {
+            return Err(ValidationError::expected_range("fixed_target", self.fixed_target, 0, u16::MAX - 1));
+        }
+
+        if self.fixed_target == u16::MAX && self.max_target < self.min_target {
+            return Err(ValidationError::expected_range(
+                "max_target",
+                self.max_target,
+                self.min_target,
+                u16::MAX - 1,
+            ));
+        }
+
+        return Ok(());
+    }
+
+    fn validate_source_range(&self) -> ValidationResult {
+        if self.source_fixed == u16::MAX && (self.source_min == u16::MAX || self.source_max == u16::MAX) {
+            return Err(ValidationError::expected_range("source_fixed", self.source_fixed, 0, u16::MAX - 1));
+        }
+
+        if self.source_fixed == u16::MAX && self.source_max < self.source_min {
+            return Err(ValidationError::expected_range(
+                "source_max",
+                self.source_max,
+                self.source_min,
+                u16::MAX - 1,
+            ));
+        }
+
+        return Ok(());
+    }
+
+    // Check that first item is populated with expected value, others are unpopulated
+    fn validate_item_exact(&self, expected: u16, new_file_ver: bool) -> ValidationResult {
+        let expected = map_resource_id(expected, new_file_ver);
+        if self.first_item != expected {
+            return Err(ValidationError::expected_exactly("first_item", self.first_item, expected));
+        }
+
+        if self.second_item != u16::MAX {
+            return Err(ValidationError::expected_exactly("second_item", self.second_item, u16::MAX));
+        }
+
+        if self.third_item != u16::MAX {
+            return Err(ValidationError::expected_exactly("third_item", self.third_item, u16::MAX));
+        }
+
+        return Ok(());
+    }
+
+    // Validate first item is populated with expected value, validate other times are expected or empty
+    fn validate_items_in_range(&self, min: u16, max: u16, new_file_ver: bool) -> ValidationResult {
+        let min = map_resource_id(min, new_file_ver);
+        let max = map_resource_id(max, new_file_ver);
+        if !(min..=max).contains(&self.first_item) {
+            return Err(ValidationError::expected_range("first_item", self.first_item, min, max));
+        }
+
+        if self.second_item != u16::MAX && !(min..=max).contains(&self.second_item) {
+            return Err(ValidationError::expected_range("second_item", self.second_item, min, max));
+        }
+
+        if self.third_item != u16::MAX && !(min..=max).contains(&self.third_item) {
+            return Err(ValidationError::expected_range("third_item", self.third_item, min, max));
+        }
+
+        return Ok(());
+    }
+
+    // Validate first item is populated with expected value, validate other times are expected or empty
+    fn validate_items_one_of(&self, expected: &[u16], new_file_ver: bool) -> ValidationResult {
+        let expected = expected.iter().map(|&i| map_resource_id(i, new_file_ver)).collect::<Vec<_>>();
+        if !expected.contains(&self.first_item) {
+            return Err(ValidationError::expected_one_of("first_item", self.first_item, expected.as_ref()));
+        }
+
+        if self.second_item != u16::MAX && !expected.contains(&self.second_item) {
+            return Err(ValidationError::expected_one_of("second_item", self.second_item, expected.as_ref()));
+        }
+
+        if self.third_item != u16::MAX && !expected.contains(&self.third_item) {
+            return Err(ValidationError::expected_one_of("third_item", self.third_item, expected.as_ref()));
+        }
+
+        return Ok(());
+    }
+
+    fn validate_amount_range(&self) -> ValidationResult {
+        if self.fixed_amount == u16::MAX && (self.min_amount == u16::MAX || self.max_amount == u16::MAX) {
+            return Err(ValidationError::expected_range("fixed_amount", self.fixed_amount, 1, u16::MAX - 1));
+        }
+
+        if self.fixed_amount == u16::MAX && self.max_amount < self.min_amount {
+            return Err(ValidationError::expected_range(
+                "max_amount",
+                self.max_amount,
+                self.min_amount,
+                u16::MAX - 1,
+            ));
+        }
+
+        if self.fixed_amount != u16::MAX && self.fixed_amount == 0 {
+            return Err(ValidationError::expected_range("fixed_amount", self.fixed_amount, 1, u16::MAX - 1));
+        }
+
+        if self.fixed_amount == u16::MAX && self.min_amount == 0 {
+            return Err(ValidationError::expected_range("min_amount", self.min_amount, 1, u16::MAX - 1));
         }
 
         return Ok(());
@@ -363,4 +808,19 @@ mod tests {
 
         return Ok(());
     }
+}
+
+// Map new resource id to one in the desired version
+fn map_resource_id(new_format_id: u16, new_file_ver: bool) -> u16 {
+    if new_file_ver || new_format_id == u16::MAX {
+        return new_format_id;
+    }
+
+    return match new_format_id {
+        0..8 => new_format_id,
+        8..16 => new_format_id - 1,
+        16..17 => new_format_id - 2,
+        17..22 => new_format_id - 3,
+        22.. => new_format_id - 4,
+    };
 }

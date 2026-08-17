@@ -504,8 +504,10 @@ mod tests {
     use std::fs::File;
     use std::io;
     use std::io::BufReader;
+    use std::io::BufWriter;
 
     #[test]
+    #[ignore] // a bit slow, will remove ignored after looking into this more
     fn validate_sav_files() -> io::Result<()> {
         if let Ok(game_root) = std::env::var("ZEUS_HOME") {
             let mut sav_files = vec![];

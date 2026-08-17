@@ -226,9 +226,22 @@ impl SettingsData {
                 .map_err(ValidationError::add_parent(format!("real_episode_data[{i}]")))?;
         }
 
+        let new_file_ver = self.version_2 == 26;
+
         for (i, row) in self.events.iter().enumerate() {
-            for (j, event) in row.iter().enumerate() {
-                event.validate().map_err(ValidationError::add_parent(format!("events[{i}][{j}]")))?;
+            let real_count = if i < self.parent_event_counts.len() {
+                self.parent_event_counts.get(i).copied().unwrap_or(0) as usize
+            } else {
+                self.colony_event_counts
+                    .get(i - self.parent_event_counts.len())
+                    .copied()
+                    .unwrap_or(0) as usize
+            };
+
+            for (j, event) in row.iter().take(real_count).enumerate() {
+                event
+                    .validate(new_file_ver)
+                    .map_err(ValidationError::add_parent(format!("events[{i}][{j}]")))?;
             }
         }
 

@@ -46,7 +46,7 @@ impl TradeRouteData {
         if self.constant_1_0x05 != 5 {
             return Err(ValidationError::expected_exactly("constant_1_0x05", self.constant_1_0x05, 5));
         }
-        
+
         if self.constant_2_0x00 != 0 {
             return Err(ValidationError::expected_exactly("constant_2_0x00", self.constant_2_0x00, 0));
         }

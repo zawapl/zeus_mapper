@@ -110,7 +110,11 @@ impl RealEpisodeData {
         }
 
         if self.first_tile_index != expected_first_tile_index {
-            return Err(ValidationError::expected_exactly("first_tile_index", self.first_tile_index, expected_first_tile_index));
+            return Err(ValidationError::expected_exactly(
+                "first_tile_index",
+                self.first_tile_index,
+                expected_first_tile_index,
+            ));
         }
 
         return self
