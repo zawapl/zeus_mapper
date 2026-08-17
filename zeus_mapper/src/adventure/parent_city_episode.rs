@@ -97,12 +97,7 @@ impl ParentEpisode {
                     .unwrap_or(NextEpisode::Victory),
                 panhellenic_games: pak_data.settings_data.real_episode_data[i].panhellenic_games == 0,
                 building_allowed: BuildingType::vec_from_data(building_flags),
-                episode_goals: EpisodeGoal::vec_from_episode_goal_data(
-                    real_goal_slots,
-                    new_file_ver,
-                    &pak_data.settings_data.events[i],
-                    &mythology,
-                ),
+                episode_goals: EpisodeGoal::vec_from_episode_goal_data(real_goal_slots, new_file_ver, &pak_data.settings_data.events[i]),
                 events: Event::vec_from_data(&pak_data.settings_data.events[i], event_count, new_file_ver),
                 city_resources: ResourceType::vec_from_data(&pak_data.settings_data.real_episode_data[i].city_resources, new_file_ver),
                 world_settings: ParentCityWorldSettings {

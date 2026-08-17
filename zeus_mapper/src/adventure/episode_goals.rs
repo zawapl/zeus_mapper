@@ -1,8 +1,5 @@
 use crate::adventure::God;
 use crate::adventure::MonetaryAmount;
-use crate::adventure::Monster;
-use crate::adventure::event::Event;
-use crate::adventure::mythology::Mythology;
 use crate::adventure::resource::ResourceType;
 use crate::constants::data_constant::DataConstant;
 use crate::constants::data_constant::data_constants;
@@ -18,8 +15,8 @@ pub enum EpisodeGoal {
     Sanctuary(God),
     Sanctuaries(u8),
     Army(UnitType, u32),
-    Quest(God, QuestType),
-    Slay(Monster),
+    Quest(u16),
+    Slay(u16),
     YearlyProduction(ResourceType, u32),
     Rule(u8),
     YearlyProfit(MonetaryAmount),
@@ -47,19 +44,16 @@ impl EpisodeGoal {
     /// `goal_type == 14`, `SetAsideGoods`), and by inspecting a single adventure with one goal of
     /// each other kind set via the in-game editor (weaker evidence than a diff round, but
     /// `resource_id`/`amount` matched the expected value exactly for every kind below). `Quest`'s
-    /// god comes from a linked event rather than the goal record itself - see
+    /// payload comes from a linked event rather than the goal record itself - see
     /// [`resolve_quest`]'s doc comment.
     pub(crate) fn vec_from_episode_goal_data(
         slots: &[EpisodeGoalData],
         new_file_ver: bool,
         events: &BoxedArray<EventData, 150>,
-        mythology: &Mythology,
     ) -> Vec<EpisodeGoal> {
         return slots
             .iter()
-            .filter_map(|slot| {
-                EpisodeGoal::from_raw_fields(slot.goal_type, slot.resource_id, slot.amount, slot, new_file_ver, events, mythology)
-            })
+            .filter_map(|slot| EpisodeGoal::from_raw_fields(slot.goal_type, slot.resource_id, slot.amount, slot, new_file_ver, events))
             .collect();
     }
 
@@ -75,7 +69,6 @@ impl EpisodeGoal {
         slot: &EpisodeGoalData,
         new_file_ver: bool,
         events: &BoxedArray<EventData, 150>,
-        mythology: &Mythology,
     ) -> Option<EpisodeGoal> {
         return match marker {
             0 if resource_id > 0 => Some(EpisodeGoal::Population(resource_id)),
@@ -87,8 +80,8 @@ impl EpisodeGoal {
             2 if !new_file_ver && resource_id == u32::MAX => Some(EpisodeGoal::Sanctuaries(u32_at(slot.unknown_1.as_slice(), 0) as u8)),
             2 => God::try_resolve(&resource_id).map(EpisodeGoal::Sanctuary),
             3 => UnitType::try_resolve(&resource_id).map(|unit| EpisodeGoal::Army(unit, amount)),
-            4 => resolve_quest(resource_id, events),
-            5 => resolve_slay(resource_id, events, mythology).map(EpisodeGoal::Slay),
+            4 => resolve_quest(resource_id, events), // todo this implies resource_id should be called something else
+            5 => resolve_slay(resource_id, events),  // todo this implies resource_id should be called something else
             6 => ResourceType::try_resolve_for_format(&(resource_id as u8), new_file_ver)
                 .map(|resource| EpisodeGoal::YearlyProduction(resource, amount)),
             7 if resource_id <= u8::MAX as u32 => Some(EpisodeGoal::Rule(resource_id as u8)),
@@ -110,18 +103,14 @@ impl EpisodeGoal {
     ///
     /// Always writes the new file format - only reading needs to support the old format.
     ///
-    /// `events`/`mythology` are this same episode/colony's own - `Quest`/`Slay` goals encode as the
-    /// index of their linked event, so they need the sibling event list (and, for `Slay`, the
-    /// mythology that resolves a raw monster index back to a `Monster`) to find it again.
-    ///
     /// Returns the row alongside how many slots were actually populated - the source for
     /// `parent_episode_goal_counts[i]` on the parent side (the colony side has no equivalent count
     /// field, see `DATA_MAPPING.md`).
-    pub(crate) fn vec_to_episode_goal_data(goals: &[EpisodeGoal], events: &[Event], mythology: &Mythology) -> ([EpisodeGoalData; 6], u32) {
+    pub(crate) fn vec_to_episode_goal_data(goals: &[EpisodeGoal]) -> ([EpisodeGoalData; 6], u32) {
         let mut slots: [EpisodeGoalData; 6] = Default::default();
         let mut count = 0;
 
-        for goal_data in goals.iter().filter_map(|goal| goal.to_raw_fields(events, mythology)) {
+        for goal_data in goals.iter().filter_map(|goal| goal.to_raw_fields()) {
             if count >= slots.len() {
                 break;
             }
@@ -132,14 +121,14 @@ impl EpisodeGoal {
         return (slots, count as u32);
     }
 
-    fn to_raw_fields(&self, events: &[Event], mythology: &Mythology) -> Option<EpisodeGoalData> {
+    fn to_raw_fields(&self) -> Option<EpisodeGoalData> {
         let (goal_type, resource_id, amount, unknown_1) = match self {
             EpisodeGoal::Population(count) => (0, *count, 0, Default::default()),
             EpisodeGoal::Treasury(amount) => (1, *amount, 0, Default::default()),
             EpisodeGoal::Sanctuary(god) => (2, god.value(), 0, Default::default()),
             EpisodeGoal::Army(unit, count) => (3, unit.value(), *count, Default::default()),
-            EpisodeGoal::Quest(god, quest_type) => (4, find_quest_index(events, *god, quest_type)? as u32, 0, Default::default()),
-            EpisodeGoal::Slay(monster) => (5, find_slay_index(events, *monster, mythology)? as u32, 0, Default::default()),
+            EpisodeGoal::Quest(event_id) => (4, *event_id as u32, 0, Default::default()),
+            EpisodeGoal::Slay(event_id) => (5, *event_id as u32, 0, Default::default()),
             EpisodeGoal::YearlyProduction(resource, amount) => (6, resource.value() as u32, *amount, Default::default()),
             EpisodeGoal::Rule(location) => (7, *location as u32, 0, Default::default()),
             EpisodeGoal::YearlyProfit(amount) => (8, *amount, 0, Default::default()),
@@ -164,10 +153,9 @@ impl EpisodeGoal {
 }
 
 /// `Quest`'s payload, like old-format `Slay`'s, isn't in the goal record at all: `resource_id` is
-/// the index of a `Quest` event (`event_type == 4`) in this same episode/colony's own event list.
-/// The linked event's `subtype` is the offering god's id (the same numbering `God` resolves
-/// everywhere else); `quest` (`0`/non-`0`) selects `QuestType::Type0`/`Type1` - only `0` has been
-/// observed in real data so far, so `Type1` is unconfirmed.
+/// the index of a `Quest` event (`event_type == 4`) in this same episode/colony's own event list,
+/// which `EpisodeGoal::Quest` carries as-is rather than resolving eagerly - the linked `Event::Quest`
+/// already carries the resolved god/quest-type.
 ///
 /// Confirmed against `&Perseus and Medusa.pak` (two parent-episode quests, one colony quest) and
 /// `@Athens through the Ages.pak` (one parent-episode quest).
@@ -177,72 +165,27 @@ fn resolve_quest(goal_index: u32, events: &BoxedArray<EventData, 150>) -> Option
         return None;
     }
 
-    let god = God::try_resolve(&(event.subtype as u32))?;
-    let quest_type = if event.quest == 0 { QuestType::Type0 } else { QuestType::Type1 };
-
-    return Some(EpisodeGoal::Quest(god, quest_type));
-}
-
-/// Finds the index of the `Quest` event a `Quest(god, quest_type)` goal links to - the inverse of
-/// [`resolve_quest`]'s lookup, matched on the same god/quest-type pair rather than event identity.
-fn find_quest_index(events: &[Event], god: God, quest_type: &QuestType) -> Option<usize> {
-    return events
-        .iter()
-        .position(|event| matches!(event, Event::Quest(quest) if quest.god == god && quest.quest_type == *quest_type));
+    return Some(EpisodeGoal::Quest(goal_index as u16));
 }
 
 /// Old-format `Slay`'s payload isn't in the goal record at all: `goal_type` is the index of a
 /// `MonsterInvasion` event (`event_type == 26`) in this same episode/colony's own event list -
 /// looked up directly, bypassing `parent_event_counts`/`colony_event_counts` (real `Slay`-linked
-/// events have been observed sitting past what that count considers "real"). The linked event's
-/// own monster index (see `MonsterAttack.monsters`) is then resolved the same way: `0`/`1` for the
-/// first/second opponent god's signature monster, `2` for the episode's own custom monster.
+/// events have been observed sitting past what that count considers "real") - which
+/// `EpisodeGoal::Slay` carries as-is rather than resolving the linked event's monster eagerly.
 ///
 /// Confirmed against `The Odyssey`: every parent episode and colony with a real `Slay` goal has
 /// `goal_type` landing exactly on its own `MonsterInvasion` event.
-fn resolve_slay(goal_type: u32, events: &BoxedArray<EventData, 150>, mythology: &Mythology) -> Option<Monster> {
+fn resolve_slay(goal_type: u32, events: &BoxedArray<EventData, 150>) -> Option<EpisodeGoal> {
     let event = events.get(goal_type as usize)?;
     if event.event_type != 26 {
         return None;
     }
 
-    let monster_index = [event.first_item, event.second_item, event.third_item]
-        .into_iter()
-        .find(|&id| id != u16::MAX)?;
-
-    return match monster_index {
-        0 => mythology.opponent_gods.first().map(God::get_monster),
-        1 => mythology.opponent_gods.get(1).map(God::get_monster),
-        2 => Some(mythology.monster),
-        _ => None,
-    };
+    return Some(EpisodeGoal::Slay(goal_type as u16));
 }
 
-/// Finds the index of the `MonsterInvasion` event a `Slay(monster)` goal links to - the inverse of
-/// [`resolve_slay`]'s lookup: resolves `monster` back to its raw `0`/`1`/`2` in-game index via
-/// `mythology` (the same scheme `resolve_slay` decodes), then finds an event whose `MonsterAttack`
-/// includes that index.
-fn find_slay_index(events: &[Event], monster: Monster, mythology: &Mythology) -> Option<usize> {
-    let raw_index = slay_raw_monster_index(monster, mythology)?;
-
-    return events
-        .iter()
-        .position(|event| matches!(event, Event::MonsterInvasion(invasion) if invasion.attack.monsters.contains(&raw_index)));
-}
-
-fn slay_raw_monster_index(monster: Monster, mythology: &Mythology) -> Option<u8> {
-    if mythology.opponent_gods.first().map(God::get_monster) == Some(monster) {
-        return Some(0);
-    }
-    if mythology.opponent_gods.get(1).map(God::get_monster) == Some(monster) {
-        return Some(1);
-    }
-    if mythology.monster == monster {
-        return Some(2);
-    }
-    return None;
-}
-
+// fixme this is a code smell - we should be using named fields, if we're using an unnamed field it means it should be promoted to named
 fn u32_at(bytes: &[u8], offset: usize) -> u32 {
     return u32::from_le_bytes([bytes[offset], bytes[offset + 1], bytes[offset + 2], bytes[offset + 3]]);
 }
@@ -375,7 +318,7 @@ mod tests {
                 episode_4.episode_goals,
                 vec![
                     EpisodeGoal::Sanctuary(God::Athena),
-                    EpisodeGoal::Slay(Monster::Kraken),
+                    EpisodeGoal::Slay(9),
                     EpisodeGoal::Army(UnitType::Warship, 4)
                 ],
             );
@@ -384,7 +327,7 @@ mod tests {
             assert_eq!(
                 episode_5.episode_goals,
                 vec![
-                    EpisodeGoal::Slay(Monster::Cyclops),
+                    EpisodeGoal::Slay(7),
                     EpisodeGoal::Rule(6), // Same
                     EpisodeGoal::Rule(7), // Olenus
                     EpisodeGoal::Sanctuary(God::Zeus)
@@ -396,7 +339,7 @@ mod tests {
                 colony_episode_1.episode_goals,
                 vec![
                     EpisodeGoal::Sanctuary(God::Hephaestus),
-                    EpisodeGoal::Slay(Monster::Cyclops),
+                    EpisodeGoal::Slay(2),
                     EpisodeGoal::YearlyProduction(ResourceType::Fleece, 24),
                     EpisodeGoal::YearlyProduction(ResourceType::Bronze, 10),
                     EpisodeGoal::Housing(HouseLevel::Townhouse, 1000)
@@ -407,7 +350,7 @@ mod tests {
             assert_eq!(
                 colony_episode_2.episode_goals,
                 vec![
-                    EpisodeGoal::Slay(Monster::Scylla),
+                    EpisodeGoal::Slay(6),
                     EpisodeGoal::Housing(HouseLevel::Tenement, 1000),
                     EpisodeGoal::Army(UnitType::Warship, 2)
                 ]
@@ -512,10 +455,7 @@ mod tests {
             );
 
             let episode_4 = adventure.parent_episodes.get(3).expect("Episode 4");
-            assert_eq!(
-                episode_4.episode_goals,
-                vec![EpisodeGoal::Slay(Monster::Talos), EpisodeGoal::Sanctuaries(2),]
-            );
+            assert_eq!(episode_4.episode_goals, vec![EpisodeGoal::Slay(0), EpisodeGoal::Sanctuaries(2),]);
 
             let episode_5 = adventure.parent_episodes.get(4).expect("Episode 5");
             assert_eq!(
@@ -531,7 +471,7 @@ mod tests {
                 episode_6.episode_goals,
                 vec![
                     EpisodeGoal::TradingPartners(11),
-                    EpisodeGoal::Slay(Monster::Maenad),
+                    EpisodeGoal::Slay(17),
                     EpisodeGoal::YearlyProfit(2000),
                     EpisodeGoal::Population(4000)
                 ]
@@ -589,8 +529,8 @@ mod tests {
             assert_eq!(
                 episode_3.episode_goals,
                 vec![
-                    EpisodeGoal::Quest(God::Hades, QuestType::Type0),
-                    EpisodeGoal::Quest(God::Athena, QuestType::Type0),
+                    EpisodeGoal::Quest(0),
+                    EpisodeGoal::Quest(1),
                     EpisodeGoal::SetAsideGoods(ResourceType::Marble, 48),
                     EpisodeGoal::SetAsideGoods(ResourceType::OliveOil, 24),
                 ]
@@ -605,7 +545,7 @@ mod tests {
                     EpisodeGoal::Treasury(10_000),
                     EpisodeGoal::Army(UnitType::Cavalary, 16),
                     EpisodeGoal::YearlyProduction(ResourceType::OliveOil, 32),
-                    EpisodeGoal::Slay(Monster::Medusa)
+                    EpisodeGoal::Slay(0)
                 ]
             );
 
@@ -613,7 +553,7 @@ mod tests {
             assert_eq!(
                 colony_episode_1.episode_goals,
                 vec![
-                    EpisodeGoal::Slay(Monster::CalydonianBoar),
+                    EpisodeGoal::Slay(0),
                     EpisodeGoal::Sanctuary(God::Hermes),
                     EpisodeGoal::YearlyProfit(500),
                     EpisodeGoal::SetAsideGoods(ResourceType::Sculpture, 8),
@@ -624,8 +564,8 @@ mod tests {
             assert_eq!(
                 colony_episode_2.episode_goals,
                 vec![
-                    EpisodeGoal::Slay(Monster::Kraken),
-                    EpisodeGoal::Quest(God::Hermes, QuestType::Type0),
+                    EpisodeGoal::Slay(0),
+                    EpisodeGoal::Quest(1),
                     EpisodeGoal::Rule(7), // Ethiopia
                     EpisodeGoal::SetAsideGoods(ResourceType::Wheat, 16),
                     EpisodeGoal::SetAsideGoods(ResourceType::Wood, 24),
@@ -690,7 +630,7 @@ mod tests {
                     EpisodeGoal::Rule(14), // Sparta
                     EpisodeGoal::Rule(10), // Eretria
                     EpisodeGoal::Rule(18), // Corinth
-                    EpisodeGoal::Slay(Monster::Dragon),
+                    EpisodeGoal::Slay(0),
                     EpisodeGoal::Sanctuary(God::Apollo),
                     EpisodeGoal::Housing(HouseLevel::Tenement, 960),
                 ]
@@ -705,7 +645,7 @@ mod tests {
                     EpisodeGoal::Housing(HouseLevel::Estate, 200),
                     EpisodeGoal::Housing(HouseLevel::Apartment, 2400),
                     EpisodeGoal::YearlyProfit(2500),
-                    EpisodeGoal::Quest(God::Demeter, QuestType::Type0)
+                    EpisodeGoal::Quest(0)
                 ]
             );
 
@@ -749,7 +689,7 @@ mod tests {
             assert_eq!(
                 episode_2.episode_goals,
                 vec![
-                    EpisodeGoal::Slay(Monster::Minotaur),
+                    EpisodeGoal::Slay(0),
                     EpisodeGoal::Population(1500),
                     EpisodeGoal::Housing(HouseLevel::Apartment, 1000),
                     EpisodeGoal::Pyramid(PyramidType::ModestPyramid),
@@ -761,7 +701,7 @@ mod tests {
                 episode_3.episode_goals,
                 vec![
                     EpisodeGoal::Sanctuary(God::Artemis),
-                    EpisodeGoal::Quest(God::Artemis, QuestType::Type1),
+                    EpisodeGoal::Quest(0),
                     EpisodeGoal::Population(2000),
                     EpisodeGoal::Housing(HouseLevel::Townhouse, 1500)
                 ]
@@ -781,8 +721,8 @@ mod tests {
             assert_eq!(
                 episode_5.episode_goals,
                 vec![
-                    EpisodeGoal::Quest(God::Poseidon, QuestType::Type1),
-                    EpisodeGoal::Quest(God::Apollo, QuestType::Type1),
+                    EpisodeGoal::Quest(0),
+                    EpisodeGoal::Quest(1),
                     EpisodeGoal::Population(3000),
                     EpisodeGoal::Housing(HouseLevel::Mansion, 100)
                 ]
@@ -795,7 +735,7 @@ mod tests {
             assert_eq!(
                 episode_7.episode_goals,
                 vec![
-                    EpisodeGoal::Quest(God::Hades, QuestType::Type1),
+                    EpisodeGoal::Quest(0),
                     EpisodeGoal::Population(5000),
                     EpisodeGoal::Pyramid(PyramidType::PyramidOfThePantheon),
                     EpisodeGoal::Hippodrome(40),
@@ -812,7 +752,7 @@ mod tests {
             assert_eq!(
                 colony_episode_2.episode_goals,
                 vec![
-                    EpisodeGoal::Slay(Monster::Sphinx),
+                    EpisodeGoal::Slay(0),
                     EpisodeGoal::SetAsideGoods(ResourceType::Orichalc, 32),
                     EpisodeGoal::SetAsideGoods(ResourceType::Bronze, 32)
                 ]
@@ -851,7 +791,7 @@ mod tests {
             assert_eq!(
                 episode_3.episode_goals,
                 vec![
-                    EpisodeGoal::Quest(God::Demeter, QuestType::Type1),
+                    EpisodeGoal::Quest(0),
                     EpisodeGoal::Pyramid(PyramidType::MuseumAtlantika),
                     EpisodeGoal::YearlyProfit(6000),
                     EpisodeGoal::SetAsideGoods(ResourceType::Marble, 48),
@@ -876,17 +816,14 @@ mod tests {
                 vec![
                     EpisodeGoal::Sanctuary(God::Aphrodite),
                     EpisodeGoal::Population(2000),
-                    EpisodeGoal::Quest(God::Aphrodite, QuestType::Type1)
+                    EpisodeGoal::Quest(0)
                 ]
             );
 
             let colony_episode_2 = adventure.colony_episodes.get(1).expect("Colony episode 2");
             assert_eq!(
                 colony_episode_2.episode_goals,
-                vec![
-                    EpisodeGoal::Slay(Monster::Echidna),
-                    EpisodeGoal::YearlyProduction(ResourceType::Orichalc, 64)
-                ]
+                vec![EpisodeGoal::Slay(0), EpisodeGoal::YearlyProduction(ResourceType::Orichalc, 64)]
             );
 
             let colony_episode_3 = adventure.colony_episodes.get(2).expect("Colony episode 3");

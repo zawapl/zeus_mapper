@@ -1027,7 +1027,12 @@ impl CityStatusChange {
         return CityStatusChange {
             city_min,
             city_max,
-            occurrence: Occurrence::from_data(event),
+            occurrence: if event.subtype == 13 {
+                // todo review if this split is correct
+                Occurrence::unfolded_from_data(event)
+            } else {
+                Occurrence::from_data(event)
+            },
             subtype,
         };
     }

@@ -163,8 +163,7 @@ impl Adventure {
                 *favour = episode.world_settings.favour as u32;
             }
 
-            let (goal_slots, goal_count) =
-                EpisodeGoal::vec_to_episode_goal_data(&episode.episode_goals, &episode.events, &episode.mythology);
+            let (goal_slots, goal_count) = EpisodeGoal::vec_to_episode_goal_data(&episode.episode_goals);
             parent_episode_goals[i] = goal_slots;
             parent_episode_goal_counts[i] = goal_count;
         }
@@ -204,8 +203,7 @@ impl Adventure {
                 *this_events = Event::vec_to_data(&colony_episode.events);
             }
             if let Some(this_goals) = colony_episode_goals.get_mut(i) {
-                let (goal_slots, goal_count) =
-                    EpisodeGoal::vec_to_episode_goal_data(&colony_episode.episode_goals, &colony_episode.events, &colony_episode.mythology);
+                let (goal_slots, goal_count) = EpisodeGoal::vec_to_episode_goal_data(&colony_episode.episode_goals);
                 *this_goals = goal_slots;
                 if let Some(this_count) = colony_episode_goal_counts.get_mut(i) {
                     *this_count = goal_count;

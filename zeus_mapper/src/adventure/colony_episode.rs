@@ -101,7 +101,7 @@ impl ColonyEpisode {
                     .map(|row| {
                         let goal_count = pak_data.settings_data.colony_episode_goal_counts.get(i).copied().unwrap_or(0) as usize;
                         let real_goal_slots = row.get(..goal_count.min(row.len())).unwrap_or(&[]);
-                        EpisodeGoal::vec_from_episode_goal_data(real_goal_slots, new_file_ver, events, &mythology)
+                        EpisodeGoal::vec_from_episode_goal_data(real_goal_slots, new_file_ver, events)
                     })
                     .unwrap_or_default(),
                 events: Event::vec_from_data(events, event_count, new_file_ver),
