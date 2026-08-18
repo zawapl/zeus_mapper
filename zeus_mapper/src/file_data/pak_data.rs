@@ -58,11 +58,11 @@ impl PakData {
         }
 
         self.validate_attacking_cities()?;
+        self.validate_on_success_targets()?;
 
         return Ok(());
     }
 
-    // Check attacking cities for invasion events are not parent or colony
     fn validate_attacking_cities(&self) -> ValidationResult {
         let valid_attackers = self.map_data[0]
             .world_locations
@@ -73,18 +73,12 @@ impl PakData {
             .collect::<Vec<_>>();
 
         for (i, row) in self.settings_data.events.iter().enumerate() {
-            let real_count = if i < self.settings_data.parent_event_counts.len() {
-                self.settings_data.parent_event_counts.get(i).copied().unwrap_or(0) as usize
-            } else {
-                self.settings_data
-                    .colony_event_counts
-                    .get(i - self.settings_data.parent_event_counts.len())
-                    .copied()
-                    .unwrap_or(0) as usize
-            };
+            let real_count = self.real_event_count(i);
 
             for (j, event) in row.iter().take(real_count).enumerate() {
-                if event.event_type != 1 || !matches!(event.subtype, 1 | 2) {
+                let is_attacker_field =
+                    (event.event_type == 1 && matches!(event.subtype, 1 | 2)) || (event.event_type == 19 && event.subtype == 24);
+                if !is_attacker_field {
                     continue;
                 }
 
@@ -101,6 +95,43 @@ impl PakData {
         }
 
         return Ok(());
+    }
+
+    fn validate_on_success_targets(&self) -> ValidationResult {
+        for (i, row) in self.settings_data.events.iter().enumerate() {
+            let real_count = self.real_event_count(i);
+            let row_events = &row[..real_count];
+
+            for (j, event) in row_events.iter().enumerate() {
+                if !matches!(event.event_type, 4 | 26) || event.on_success == u16::MAX {
+                    continue;
+                }
+
+                if row_events.get(event.on_success as usize).is_none() {
+                    return Err(ValidationError::expected_range(
+                        format!("settings_data.events[{i}][{j}].on_success"),
+                        event.on_success,
+                        0,
+                        real_count.saturating_sub(1) as u16,
+                    ));
+                }
+            }
+        }
+
+        return Ok(());
+    }
+
+    fn real_event_count(&self, row_index: usize) -> usize {
+        if row_index < self.settings_data.parent_event_counts.len() {
+            return self.settings_data.parent_event_counts.get(row_index).copied().unwrap_or(0) as usize;
+        }
+
+        return self
+            .settings_data
+            .colony_event_counts
+            .get(row_index - self.settings_data.parent_event_counts.len())
+            .copied()
+            .unwrap_or(0) as usize;
     }
 }
 

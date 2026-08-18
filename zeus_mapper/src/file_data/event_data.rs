@@ -88,6 +88,8 @@ impl EventData {
             return Err(ValidationError::expected_exactly("constant_4_0x00", self.constant_4_0x00, 0));
         }
 
+        self.validate_month()?;
+
         return match self.event_type {
             1 => self.validate_request(new_file_ver),
             2 => self.validate_invasion(),
@@ -107,7 +109,7 @@ impl EventData {
             23 => self.validate_gift(new_file_ver),
             24 => self.validate_lava_flow(),
             25 => self.validate_tidal_wave(),
-            26 => self.validate_monster_invasion(),
+            26 => self.validate_monster_invasion(new_file_ver),
             27 => self.validate_god_invasion(),
             28 => self.validate_sink_land(),
             _ => Err(ValidationError::expected_one_of(
@@ -119,7 +121,12 @@ impl EventData {
     }
 
     fn validate_request(&self, new_file_ver: bool) -> ValidationResult {
+        self.validate_time_range()?;
         self.validate_target_range()?;
+
+        if self.warnings < 1 {
+            return Err(ValidationError::expected_range("warnings", self.warnings, 1, u16::MAX));
+        }
 
         return match self.subtype {
             0 => self.validate_general_goods_request(new_file_ver),
@@ -249,6 +256,7 @@ impl EventData {
     fn validate_invasion(&self) -> ValidationResult {
         // todo check warships
 
+        self.validate_time_range()?;
         self.validate_source_range()?;
         self.validate_amount_range()?;
 
@@ -256,7 +264,9 @@ impl EventData {
     }
 
     fn validate_earthquake(&self) -> ValidationResult {
-        return self.validate_target_range();
+        self.validate_time_range()?;
+        self.validate_target_range()?;
+        return self.validate_disaster_marker();
     }
 
     fn validate_quest(&self, new_file_ver: bool) -> ValidationResult {
@@ -264,44 +274,56 @@ impl EventData {
             return Err(ValidationError::expected_range("subtype", self.subtype, 0, 13));
         }
 
+        self.validate_time_range()?;
         self.validate_item_exact(ResourceId::Hero.value(), new_file_ver)?;
 
         return self.validate_target_range();
     }
 
     fn validate_landslide(&self) -> ValidationResult {
-        return self.validate_target_range();
+        self.validate_time_range()?;
+        self.validate_target_range()?;
+        return self.validate_disaster_marker();
     }
 
     fn validate_wage_increase(&self) -> ValidationResult {
-        return self.validate_target_range();
+        self.validate_time_range()?;
+        self.validate_target_range()?;
+        return self.validate_amount_range();
     }
 
     fn validate_wage_decrease(&self) -> ValidationResult {
-        return self.validate_target_range();
+        self.validate_time_range()?;
+        self.validate_target_range()?;
+        return self.validate_amount_range();
     }
 
     fn validate_demand_increase(&self, new_file_ver: bool) -> ValidationResult {
+        self.validate_time_range()?;
         self.validate_items_one_of(&ResourceId::tradeable_resource_ids(), new_file_ver)?;
         return self.validate_target_range();
     }
 
     fn validate_demand_decrease(&self, new_file_ver: bool) -> ValidationResult {
+        self.validate_time_range()?;
         self.validate_items_one_of(&ResourceId::tradeable_resource_ids(), new_file_ver)?;
         return self.validate_target_range();
     }
 
     fn validate_price_increase(&self, new_file_ver: bool) -> ValidationResult {
+        self.validate_time_range()?;
         self.validate_items_one_of(&ResourceId::tradeable_resource_ids(), new_file_ver)?;
         return self.validate_amount_range();
     }
 
     fn validate_price_decrease(&self, new_file_ver: bool) -> ValidationResult {
+        self.validate_time_range()?;
         self.validate_items_one_of(&ResourceId::tradeable_resource_ids(), new_file_ver)?;
         return self.validate_amount_range();
     }
 
     fn validate_city_status_change(&self) -> ValidationResult {
+        self.validate_time_range()?;
         self.validate_target_range()?;
 
         return match self.subtype {
@@ -359,6 +381,12 @@ impl EventData {
             ));
         }
 
+        // `warnings` doubles as the disaster's duration here - confirmed against every real
+        // adventure, none of which leaves it at `0`, same as `validate_request`'s requirement.
+        if self.warnings == 0 {
+            return Err(ValidationError::expected_range("warnings", self.warnings, 1, u16::MAX));
+        }
+
         return Ok(());
     }
 
@@ -403,20 +431,24 @@ impl EventData {
     }
 
     fn validate_rival_army_change(&self) -> ValidationResult {
+        self.validate_time_range()?;
         return self.validate_target_range();
     }
 
     fn validate_supply_increase(&self, new_file_ver: bool) -> ValidationResult {
+        self.validate_time_range()?;
         self.validate_items_one_of(&ResourceId::tradeable_resource_ids(), new_file_ver)?;
         return self.validate_target_range();
     }
 
     fn validate_supply_decrease(&self, new_file_ver: bool) -> ValidationResult {
+        self.validate_time_range()?;
         self.validate_items_one_of(&ResourceId::tradeable_resource_ids(), new_file_ver)?;
         return self.validate_target_range();
     }
 
     fn validate_gift(&self, new_file_ver: bool) -> ValidationResult {
+        self.validate_time_range()?;
         self.validate_items_one_of(
             &[
                 ResourceId::Fish.value(),
@@ -443,50 +475,91 @@ impl EventData {
     }
 
     fn validate_lava_flow(&self) -> ValidationResult {
-        return self.validate_target_range();
+        self.validate_time_range()?;
+        self.validate_target_range()?;
+        return self.validate_disaster_marker();
     }
 
     fn validate_tidal_wave(&self) -> ValidationResult {
-        // todo check permanent flag
-        return self.validate_target_range();
+        self.validate_time_range()?;
+        self.validate_target_range()?;
+        return self.validate_disaster_marker();
     }
 
-    fn validate_monster_invasion(&self) -> ValidationResult {
+    fn validate_monster_invasion(&self, new_file_ver: bool) -> ValidationResult {
         return match self.subtype {
             0 => self.validate_monster_in_city(),
             1 => self.validate_monster_unleashed(),
-            2 => self.validate_monster_invades(),
+            2 => self.validate_monster_invades(new_file_ver),
             _ => Err(ValidationError::expected_one_of("subtype", self.subtype, &[0, 1, 2])),
         };
     }
 
     fn validate_monster_in_city(&self) -> ValidationResult {
+        // The only subtype with no `Occurrence` of its own (see `event.rs`), so
+        // `fixed_time`/`min_time`/`max_time` are meaningless leftovers here.
         return self.validate_items_in_range(0, 2);
     }
 
     fn validate_monster_unleashed(&self) -> ValidationResult {
+        self.validate_time_range()?;
         return self.validate_items_in_range(0, 1);
     }
 
-    fn validate_monster_invades(&self) -> ValidationResult {
-        return self.validate_items_in_range(0, 2);
+    fn validate_monster_invades(&self, new_file_ver: bool) -> ValidationResult {
+        self.validate_time_range()?;
+
+        if new_file_ver {
+            if self.first_item != 2 {
+                return Err(ValidationError::expected_exactly("first_item", self.first_item, 2));
+            }
+        } else {
+            if !(0..=2).contains(&self.first_item) {
+                return Err(ValidationError::expected_range("first_item", self.first_item, 0, 2));
+            }
+        }
+
+        if self.second_item >= 0 {
+            return Err(ValidationError::expected_exactly("second_item", self.second_item, -1));
+        }
+
+        if self.third_item >= 0 {
+            return Err(ValidationError::expected_exactly("third_item", self.third_item, -1));
+        }
+
+        return Ok(());
     }
 
     fn validate_god_invasion(&self) -> ValidationResult {
+        self.validate_time_range()?;
         return self.validate_items_in_range(0, 13);
     }
 
     fn validate_sink_land(&self) -> ValidationResult {
-        // todo check amount
-        return self.validate_target_range();
+        self.validate_time_range()?;
+        self.validate_target_range()?;
+        self.validate_disaster_marker()?;
+        return self.validate_amount_range_bounded(1, 5); // todo check why the editor enforces this limit
     }
 
     fn validate_target_range(&self) -> ValidationResult {
-        if self.fixed_target == u16::MAX && (self.min_target == u16::MAX || self.max_target == u16::MAX) {
+        if self.fixed_target != u16::MAX {
+            if self.min_target != u16::MAX {
+                return Err(ValidationError::expected_exactly("min_target", self.min_target, u16::MAX));
+            }
+
+            if self.max_target != u16::MAX {
+                return Err(ValidationError::expected_exactly("max_target", self.max_target, u16::MAX));
+            }
+
+            return Ok(());
+        }
+
+        if self.min_target == u16::MAX || self.max_target == u16::MAX {
             return Err(ValidationError::expected_range("fixed_target", self.fixed_target, 0, u16::MAX - 1));
         }
 
-        if self.fixed_target == u16::MAX && self.max_target < self.min_target {
+        if self.max_target < self.min_target {
             return Err(ValidationError::expected_range(
                 "max_target",
                 self.max_target,
@@ -499,17 +572,81 @@ impl EventData {
     }
 
     fn validate_source_range(&self) -> ValidationResult {
-        if self.source_fixed == u16::MAX && (self.source_min == u16::MAX || self.source_max == u16::MAX) {
+        if self.source_fixed != u16::MAX {
+            if self.source_min != u16::MAX {
+                return Err(ValidationError::expected_exactly("source_min", self.source_min, u16::MAX));
+            }
+
+            if self.source_max != u16::MAX {
+                return Err(ValidationError::expected_exactly("source_max", self.source_max, u16::MAX));
+            }
+
+            return Ok(());
+        }
+
+        if self.source_min == u16::MAX || self.source_max == u16::MAX {
             return Err(ValidationError::expected_range("source_fixed", self.source_fixed, 0, u16::MAX - 1));
         }
 
-        if self.source_fixed == u16::MAX && self.source_max < self.source_min {
+        if self.source_max < self.source_min {
             return Err(ValidationError::expected_range(
                 "source_max",
                 self.source_max,
                 self.source_min,
                 u16::MAX - 1,
             ));
+        }
+
+        return Ok(());
+    }
+
+    fn validate_time_range(&self) -> ValidationResult {
+        if self.fixed_time != u16::MAX {
+            if self.min_time != u16::MAX {
+                return Err(ValidationError::expected_exactly("min_time", self.min_time, u16::MAX));
+            }
+
+            if self.max_time != u16::MAX {
+                return Err(ValidationError::expected_exactly("max_time", self.max_time, u16::MAX));
+            }
+
+            return Ok(());
+        }
+
+        if self.min_time == u16::MAX || self.max_time == u16::MAX {
+            return Err(ValidationError::expected_range("fixed_time", self.fixed_time, 0, u16::MAX - 1));
+        }
+
+        if self.max_time < self.min_time {
+            return Err(ValidationError::expected_range(
+                "max_time",
+                self.max_time,
+                self.min_time,
+                u16::MAX - 1,
+            ));
+        }
+
+        return Ok(());
+    }
+
+    fn validate_month(&self) -> ValidationResult {
+        if self.month < 0 || self.month > 11 {
+            // still unsure if that field should be u8 or i8
+            return Err(ValidationError::expected_range("month", self.month, 0, 11));
+        }
+
+        return Ok(());
+    }
+
+    fn validate_disaster_marker(&self) -> ValidationResult {
+        let marker = if self.fixed_target != u16::MAX {
+            self.fixed_target
+        } else {
+            self.min_target
+        };
+
+        if marker < 1 || marker > 9 {
+            return Err(ValidationError::expected_range("fixed_target", marker, 1, 9));
         }
 
         return Ok(());
@@ -574,25 +711,36 @@ impl EventData {
     }
 
     fn validate_amount_range(&self) -> ValidationResult {
-        if self.fixed_amount == u16::MAX && (self.min_amount == u16::MAX || self.max_amount == u16::MAX) {
-            return Err(ValidationError::expected_range("fixed_amount", self.fixed_amount, 1, u16::MAX - 1));
+        return self.validate_amount_range_bounded(1, u16::MAX - 1);
+    }
+
+    fn validate_amount_range_bounded(&self, min: u16, max: u16) -> ValidationResult {
+        if self.fixed_amount != u16::MAX {
+            if !(min..=max).contains(&self.fixed_amount) {
+                return Err(ValidationError::expected_range("fixed_amount", self.fixed_amount, min, max));
+            }
+
+            if self.min_amount != u16::MAX {
+                return Err(ValidationError::expected_exactly("min_amount", self.min_amount, u16::MAX));
+            }
+
+            if self.max_amount != u16::MAX {
+                return Err(ValidationError::expected_exactly("max_amount", self.max_amount, u16::MAX));
+            }
+
+            return Ok(());
         }
 
-        if self.fixed_amount == u16::MAX && self.max_amount < self.min_amount {
-            return Err(ValidationError::expected_range(
-                "max_amount",
-                self.max_amount,
-                self.min_amount,
-                u16::MAX - 1,
-            ));
+        if self.min_amount == u16::MAX || self.max_amount == u16::MAX {
+            return Err(ValidationError::expected_range("fixed_amount", self.fixed_amount, min, max));
         }
 
-        if self.fixed_amount != u16::MAX && self.fixed_amount == 0 {
-            return Err(ValidationError::expected_range("fixed_amount", self.fixed_amount, 1, u16::MAX - 1));
+        if self.max_amount < self.min_amount {
+            return Err(ValidationError::expected_range("max_amount", self.max_amount, self.min_amount, max));
         }
 
-        if self.fixed_amount == u16::MAX && self.min_amount == 0 {
-            return Err(ValidationError::expected_range("min_amount", self.min_amount, 1, u16::MAX - 1));
+        if !(min..=max).contains(&self.min_amount) {
+            return Err(ValidationError::expected_range("min_amount", self.min_amount, min, max));
         }
 
         return Ok(());
@@ -641,8 +789,8 @@ impl Default for EventData {
             eff_on_city: 0,
             source: 0,
             source_fixed: u16::MAX,
-            source_min: 0,
-            source_max: 0,
+            source_min: u16::MAX,
+            source_max: u16::MAX,
             subtype: 0,
             prev_amount: 0,
             related_to_triggered_evt: 0,
