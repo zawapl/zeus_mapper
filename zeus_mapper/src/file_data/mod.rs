@@ -8,6 +8,7 @@ pub(crate) mod mythology_data;
 pub(crate) mod pak_data;
 pub(crate) mod pyramid_data;
 pub(crate) mod real_episode_data;
+pub(crate) mod resource_id;
 pub(crate) mod sav_data;
 pub(crate) mod settings_data;
 pub(crate) mod trade_route_data;

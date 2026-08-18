@@ -19,6 +19,14 @@ impl WriteTo for u8 {
     }
 }
 
+impl WriteTo for i8 {
+    fn write_to<W: Write>(&self, writer: &mut W) -> io::Result<usize> {
+        let bytes = [*self as u8];
+        writer.write_all(&bytes)?;
+        return Ok(bytes.len());
+    }
+}
+
 impl WriteTo for u16 {
     fn write_to<W: Write>(&self, writer: &mut W) -> io::Result<usize> {
         let bytes = u16::to_le_bytes(*self);

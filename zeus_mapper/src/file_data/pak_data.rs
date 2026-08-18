@@ -686,6 +686,12 @@ mod tests {
         }
     }
 
+    impl GenerateData<i8> for TestDataGenerator {
+        fn generate_data(&mut self) -> i8 {
+            return self.next() as i8;
+        }
+    }
+
     impl GenerateData<u16> for TestDataGenerator {
         fn generate_data(&mut self) -> u16 {
             return self.next() as u16;
@@ -701,6 +707,12 @@ mod tests {
     impl GenerateData<u32> for TestDataGenerator {
         fn generate_data(&mut self) -> u32 {
             return self.next() as u32;
+        }
+    }
+
+    impl GenerateData<i32> for TestDataGenerator {
+        fn generate_data(&mut self) -> i32 {
+            return self.next() as i32;
         }
     }
 

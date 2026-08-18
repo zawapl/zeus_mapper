@@ -14,7 +14,7 @@ use std::io::Write;
 #[derive(Debug, Clone, PartialEq, Default, LogDifferences)]
 pub struct EpisodeGoalData {
     pub goal_type: u32,
-    pub resource_id: u32,
+    pub resource_id: i32,
     pub amount: u32,
     pub unknown_1: BoxedArray<u8, 64>,
 }

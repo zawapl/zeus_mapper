@@ -185,9 +185,9 @@ impl WorldLocationType {
             WorldLocationType::Colony(colony) => {
                 data.active_new = if colony.active { 1 } else { 0 };
                 data.tribute = if colony.paying_tribute { 1 } else { 0 };
-                data.tribute_rec_resource = colony.received_tribute.0.value() as u16;
+                data.tribute_rec_resource = colony.received_tribute.0.value() as i16;
                 data.tribute_rec_amount = colony.received_tribute.1;
-                data.tribute_pay_resource = colony.paid_tribute.0.value() as u16;
+                data.tribute_pay_resource = colony.paid_tribute.0.value() as i16;
                 data.tribute_pay_amount = colony.paid_tribute.1;
                 data.military_strength = colony.military_strength;
                 data.economical_strength = colony.economy_strength;
@@ -204,9 +204,9 @@ impl WorldLocationType {
                 data.visible = if foreign.visible { 0 } else { 4 };
                 data.attitude = foreign.relation.value();
                 data.tribute = if foreign.paying_tribute { 1 } else { 0 };
-                data.tribute_rec_resource = foreign.received_tribute.0.value() as u16;
+                data.tribute_rec_resource = foreign.received_tribute.0.value() as i16;
                 data.tribute_rec_amount = foreign.received_tribute.1;
-                data.tribute_pay_resource = foreign.paid_tribute.0.value() as u16;
+                data.tribute_pay_resource = foreign.paid_tribute.0.value() as i16;
                 data.tribute_pay_amount = foreign.paid_tribute.1;
                 data.military_strength = foreign.military_strength;
                 data.economical_strength = foreign.economy_strength;
@@ -499,8 +499,8 @@ impl WorldLocation {
     }
 }
 
-fn resolve_pay_resource(resource_id: u16, new_file_ver: bool) -> ResourceType {
-    return ResourceType::try_resolve_for_format(&(resource_id as u8), new_file_ver).unwrap_or(ResourceType::Drachmas);
+fn resolve_pay_resource(resource_id: i16, new_file_ver: bool) -> ResourceType {
+    return ResourceType::try_resolve_for_format(&(resource_id as i8), new_file_ver).unwrap_or(ResourceType::Drachmas);
 }
 
 #[derive(PartialEq, Debug)]

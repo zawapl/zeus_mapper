@@ -229,7 +229,7 @@ default_differ_impl!(GoodsRequest);
 
 impl GoodsRequest {
     fn from_data(event: &EventData) -> GoodsRequest {
-        let resource = ResourceType::try_resolve(&(event.first_item as u8)).unwrap_or(ResourceType::Urchin);
+        let resource = ResourceType::try_resolve(&(event.first_item as i8)).unwrap_or(ResourceType::Urchin);
 
         let subtype = match event.subtype {
             3 => {
@@ -256,18 +256,18 @@ impl GoodsRequest {
         let mut data = match &self.subtype {
             GoodsRequestSubtype::GeneralRequest(resource) => EventData {
                 subtype: 0,
-                first_item: resource.value() as u16,
+                first_item: resource.value() as i16,
                 ..EventData::default()
             },
             GoodsRequestSubtype::Festival(resource, god) => EventData {
                 subtype: 3,
-                first_item: resource.value() as u16,
+                first_item: resource.value() as i16,
                 god_or_mon_or_warship_id: god.value() as u16,
                 ..EventData::default()
             },
             GoodsRequestSubtype::Construction(resource) => EventData {
                 subtype: 4,
-                first_item: resource.value() as u16,
+                first_item: resource.value() as i16,
                 ..EventData::default()
             },
             GoodsRequestSubtype::Famine => EventData {
@@ -407,7 +407,7 @@ impl Gift {
         return Gift {
             city_min,
             city_max,
-            resource: ResourceType::try_resolve_for_format(&(event.first_item as u8), new_file_ver).unwrap_or(ResourceType::Urchin),
+            resource: ResourceType::try_resolve_for_format(&(event.first_item as i8), new_file_ver).unwrap_or(ResourceType::Urchin),
             amount_min,
             amount_max,
             occurrence: Occurrence::from_data(event),
@@ -417,7 +417,7 @@ impl Gift {
     fn to_data(&self) -> EventData {
         let mut data = EventData {
             event_type: 23,
-            first_item: self.resource.value() as u16,
+            first_item: self.resource.value() as i16,
             ..EventData::default()
         };
 
@@ -683,7 +683,7 @@ impl MonsterAttack {
     fn from_data(event: &EventData) -> MonsterAttack {
         let monsters = [event.first_item, event.second_item, event.third_item]
             .into_iter()
-            .filter(|&id| id != u16::MAX)
+            .filter(|&id| id >= 0)
             .map(|id| id as u8)
             .collect();
 
@@ -705,9 +705,9 @@ impl MonsterAttack {
 
     fn to_data(&self, event_type: u8, subtype: u16) -> EventData {
         let mut monsters = self.monsters.iter();
-        let first_item = monsters.next().map(|&id| id as u16).unwrap_or(u16::MAX);
-        let second_item = monsters.next().map(|&id| id as u16).unwrap_or(u16::MAX);
-        let third_item = monsters.next().map(|&id| id as u16).unwrap_or(u16::MAX);
+        let first_item = monsters.next().map(|&id| id as i16).unwrap_or(-1);
+        let second_item = monsters.next().map(|&id| id as i16).unwrap_or(-1);
+        let third_item = monsters.next().map(|&id| id as i16).unwrap_or(-1);
 
         let mut targets = self.target.iter();
         let mtar1_target = targets.next().map(MonsterTarget::value).unwrap_or(0);
@@ -760,7 +760,7 @@ pub struct GodInvasion {
 
 impl GodInvasion {
     fn from_data(event: &EventData) -> GodInvasion {
-        let gods = [event.first_item, event.second_item, event.third_item];
+        let gods = [event.first_item as u16, event.second_item as u16, event.third_item as u16];
         let occurrence = Occurrence::from_data(event);
 
         return GodInvasion { gods, occurrence };
@@ -770,9 +770,9 @@ impl GodInvasion {
         return with_occurrence(
             EventData {
                 event_type: 27,
-                first_item: self.gods[0],
-                second_item: self.gods[1],
-                third_item: self.gods[2],
+                first_item: self.gods[0] as i16,
+                second_item: self.gods[1] as i16,
+                third_item: self.gods[2] as i16,
                 ..EventData::default()
             },
             &self.occurrence,
@@ -889,7 +889,7 @@ impl TradeChange {
     fn from_data(event: &EventData) -> TradeChange {
         let city = event.other_city as u16;
         let amount = resolve_range(event.fixed_amount, event.min_amount);
-        let resource = ResourceType::try_resolve(&(event.first_item as u8)).unwrap_or(ResourceType::Urchin);
+        let resource = ResourceType::try_resolve(&(event.first_item as i8)).unwrap_or(ResourceType::Urchin);
         let occurrence = Occurrence::from_data(event);
 
         let subtype = match (event.event_type, event.subtype) {
@@ -912,40 +912,40 @@ impl TradeChange {
             TradeChangeSubtype::DemandIncrease(city, resource, amount) => EventData {
                 event_type: 13,
                 other_city: *city as u8,
-                first_item: resource.value() as u16,
+                first_item: resource.value() as i16,
                 fixed_amount: *amount as u16,
                 ..EventData::default()
             },
             TradeChangeSubtype::DemandDecrease(city, resource, amount) => EventData {
                 event_type: 14,
                 other_city: *city as u8,
-                first_item: resource.value() as u16,
+                first_item: resource.value() as i16,
                 fixed_amount: *amount as u16,
                 ..EventData::default()
             },
             TradeChangeSubtype::SupplyIncrease(city, resource, amount) => EventData {
                 event_type: 21,
                 other_city: *city as u8,
-                first_item: resource.value() as u16,
+                first_item: resource.value() as i16,
                 fixed_amount: *amount as u16,
                 ..EventData::default()
             },
             TradeChangeSubtype::SupplyDecrease(city, resource, amount) => EventData {
                 event_type: 22,
                 other_city: *city as u8,
-                first_item: resource.value() as u16,
+                first_item: resource.value() as i16,
                 fixed_amount: *amount as u16,
                 ..EventData::default()
             },
             TradeChangeSubtype::PriceIncrease(resource, amount) => EventData {
                 event_type: 15,
-                first_item: resource.value() as u16,
+                first_item: resource.value() as i16,
                 fixed_amount: *amount as u16,
                 ..EventData::default()
             },
             TradeChangeSubtype::PriceDecrease(resource, amount) => EventData {
                 event_type: 16,
-                first_item: resource.value() as u16,
+                first_item: resource.value() as i16,
                 fixed_amount: *amount as u16,
                 ..EventData::default()
             },

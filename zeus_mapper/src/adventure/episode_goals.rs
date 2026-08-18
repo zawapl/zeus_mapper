@@ -1,5 +1,4 @@
 use crate::adventure::God;
-use crate::adventure::MonetaryAmount;
 use crate::adventure::resource::ResourceType;
 use crate::constants::data_constant::DataConstant;
 use crate::constants::data_constant::data_constants;
@@ -10,8 +9,8 @@ use crate::prelude::EventData;
 
 #[derive(PartialEq, Debug)]
 pub enum EpisodeGoal {
-    Population(u32),
-    Treasury(MonetaryAmount),
+    Population(u16),
+    Treasury(u16),
     Sanctuary(God),
     Sanctuaries(u8),
     Army(UnitType, u32),
@@ -19,13 +18,13 @@ pub enum EpisodeGoal {
     Slay(u16),
     YearlyProduction(ResourceType, u32),
     Rule(u8),
-    YearlyProfit(MonetaryAmount),
+    YearlyProfit(u16),
     Housing(HouseLevel, u32),
-    TradingPartners(u32),
+    TradingPartners(u16),
     SetAsideGoods(ResourceType, u32),
     Pyramid(PyramidType),
     Pyramids(u8),
-    Hippodrome(u32),
+    Hippodrome(u16),
 }
 
 default_differ_impl!(EpisodeGoal);
@@ -64,35 +63,35 @@ impl EpisodeGoal {
     /// examples at all, so they're only attempted for new-format data.
     fn from_raw_fields(
         marker: u32,
-        resource_id: u32,
+        resource_id: i32,
         amount: u32,
         slot: &EpisodeGoalData,
         new_file_ver: bool,
         events: &BoxedArray<EventData, 150>,
     ) -> Option<EpisodeGoal> {
         return match marker {
-            0 if resource_id > 0 => Some(EpisodeGoal::Population(resource_id)),
-            1 if resource_id > 0 => Some(EpisodeGoal::Treasury(resource_id)),
+            0 if resource_id > 0 => Some(EpisodeGoal::Population(resource_id as u16)),
+            1 if resource_id > 0 => Some(EpisodeGoal::Treasury(resource_id as u16)),
             // Old-format only: an unspecified count of *any* god's sanctuary, with the count in
             // `unknown_1[0]` rather than `amount` - confirmed against `#Zeus and Europa.pak`, where
             // `unknown_1[0] == 2` matches a real, user-confirmed `Sanctuaries(2)`. No confirmed
             // new-format example exists, so this shape is only attempted for old-format data.
-            2 if !new_file_ver && resource_id == u32::MAX => Some(EpisodeGoal::Sanctuaries(u32_at(slot.unknown_1.as_slice(), 0) as u8)),
-            2 => God::try_resolve(&resource_id).map(EpisodeGoal::Sanctuary),
-            3 => UnitType::try_resolve(&resource_id).map(|unit| EpisodeGoal::Army(unit, amount)),
+            2 if !new_file_ver && resource_id < 0 => Some(EpisodeGoal::Sanctuaries(u32_at(slot.unknown_1.as_slice(), 0) as u8)),
+            2 => God::try_resolve(&(resource_id as u32)).map(EpisodeGoal::Sanctuary),
+            3 => UnitType::try_resolve(&(resource_id as u32)).map(|unit| EpisodeGoal::Army(unit, amount)),
             4 => resolve_quest(resource_id, events), // todo this implies resource_id should be called something else
             5 => resolve_slay(resource_id, events),  // todo this implies resource_id should be called something else
-            6 => ResourceType::try_resolve_for_format(&(resource_id as u8), new_file_ver)
+            6 => ResourceType::try_resolve_for_format(&(resource_id as i8), new_file_ver)
                 .map(|resource| EpisodeGoal::YearlyProduction(resource, amount)),
-            7 if resource_id <= u8::MAX as u32 => Some(EpisodeGoal::Rule(resource_id as u8)),
-            8 if resource_id > 0 => Some(EpisodeGoal::YearlyProfit(resource_id)),
-            9 => HouseLevel::try_resolve(&resource_id).map(|level| EpisodeGoal::Housing(level, amount)),
-            10 if resource_id > 0 => Some(EpisodeGoal::TradingPartners(resource_id)),
-            14 if amount > 0 && amount < 256 => ResourceType::try_resolve_for_format(&(resource_id as u8), new_file_ver)
+            7 if (0..=u8::MAX as i32).contains(&resource_id) => Some(EpisodeGoal::Rule(resource_id as u8)),
+            8 if resource_id > 0 => Some(EpisodeGoal::YearlyProfit(resource_id as u16)),
+            9 => HouseLevel::try_resolve(&(resource_id as u32)).map(|level| EpisodeGoal::Housing(level, amount)),
+            10 if resource_id > 0 => Some(EpisodeGoal::TradingPartners(resource_id as u16)),
+            14 if amount > 0 && amount < 256 => ResourceType::try_resolve_for_format(&(resource_id as i8), new_file_ver)
                 .map(|resource| EpisodeGoal::SetAsideGoods(resource, amount)),
             15 if new_file_ver && amount == 0 => Some(EpisodeGoal::Pyramids(u32_at(slot.unknown_1.as_slice(), 4) as u8)),
             15 if new_file_ver => PyramidType::try_resolve(&amount).map(EpisodeGoal::Pyramid),
-            16 if new_file_ver && resource_id > 0 => Some(EpisodeGoal::Hippodrome(resource_id)),
+            16 if new_file_ver && resource_id > 0 => Some(EpisodeGoal::Hippodrome(resource_id as u16)),
             _ => None,
         };
     }
@@ -123,21 +122,21 @@ impl EpisodeGoal {
 
     fn to_raw_fields(&self) -> Option<EpisodeGoalData> {
         let (goal_type, resource_id, amount, unknown_1) = match self {
-            EpisodeGoal::Population(count) => (0, *count, 0, Default::default()),
-            EpisodeGoal::Treasury(amount) => (1, *amount, 0, Default::default()),
-            EpisodeGoal::Sanctuary(god) => (2, god.value(), 0, Default::default()),
-            EpisodeGoal::Army(unit, count) => (3, unit.value(), *count, Default::default()),
-            EpisodeGoal::Quest(event_id) => (4, *event_id as u32, 0, Default::default()),
-            EpisodeGoal::Slay(event_id) => (5, *event_id as u32, 0, Default::default()),
-            EpisodeGoal::YearlyProduction(resource, amount) => (6, resource.value() as u32, *amount, Default::default()),
-            EpisodeGoal::Rule(location) => (7, *location as u32, 0, Default::default()),
-            EpisodeGoal::YearlyProfit(amount) => (8, *amount, 0, Default::default()),
-            EpisodeGoal::Housing(level, count) => (9, level.value(), *count, Default::default()),
-            EpisodeGoal::TradingPartners(count) => (10, *count, 0, Default::default()),
-            EpisodeGoal::SetAsideGoods(resource, amount) => (14, resource.value() as u32, *amount, Default::default()),
+            EpisodeGoal::Population(count) => (0, *count as i32, 0, Default::default()),
+            EpisodeGoal::Treasury(amount) => (1, *amount as i32, 0, Default::default()),
+            EpisodeGoal::Sanctuary(god) => (2, god.value() as i32, 0, Default::default()),
+            EpisodeGoal::Army(unit, count) => (3, unit.value() as i32, *count, Default::default()),
+            EpisodeGoal::Quest(event_id) => (4, *event_id as i32, 0, Default::default()),
+            EpisodeGoal::Slay(event_id) => (5, *event_id as i32, 0, Default::default()),
+            EpisodeGoal::YearlyProduction(resource, amount) => (6, resource.value() as i32, *amount, Default::default()),
+            EpisodeGoal::Rule(location) => (7, *location as i32, 0, Default::default()),
+            EpisodeGoal::YearlyProfit(amount) => (8, *amount as i32, 0, Default::default()),
+            EpisodeGoal::Housing(level, count) => (9, level.value() as i32, *count, Default::default()),
+            EpisodeGoal::TradingPartners(count) => (10, *count as i32, 0, Default::default()),
+            EpisodeGoal::SetAsideGoods(resource, amount) => (14, resource.value() as i32, *amount, Default::default()),
             EpisodeGoal::Pyramids(count) => (15, 1, 0, pyramids_field_4(*count)),
             EpisodeGoal::Pyramid(kind) => (15, 1, kind.value(), Default::default()),
-            EpisodeGoal::Hippodrome(count) => (16, *count, 0, Default::default()),
+            EpisodeGoal::Hippodrome(count) => (16, *count as i32, 0, Default::default()),
             // No confirmed new-format encoding exists for `Sanctuaries` (see `from_raw_fields`) -
             // `Adventure::to_pak` always writes the new format, so there's nowhere to put it.
             EpisodeGoal::Sanctuaries(_) => return None,
@@ -159,7 +158,7 @@ impl EpisodeGoal {
 ///
 /// Confirmed against `&Perseus and Medusa.pak` (two parent-episode quests, one colony quest) and
 /// `@Athens through the Ages.pak` (one parent-episode quest).
-fn resolve_quest(goal_index: u32, events: &BoxedArray<EventData, 150>) -> Option<EpisodeGoal> {
+fn resolve_quest(goal_index: i32, events: &BoxedArray<EventData, 150>) -> Option<EpisodeGoal> {
     let event = events.get(goal_index as usize)?;
     if event.event_type != 4 {
         return None;
@@ -176,7 +175,7 @@ fn resolve_quest(goal_index: u32, events: &BoxedArray<EventData, 150>) -> Option
 ///
 /// Confirmed against `The Odyssey`: every parent episode and colony with a real `Slay` goal has
 /// `goal_type` landing exactly on its own `MonsterInvasion` event.
-fn resolve_slay(goal_type: u32, events: &BoxedArray<EventData, 150>) -> Option<EpisodeGoal> {
+fn resolve_slay(goal_type: i32, events: &BoxedArray<EventData, 150>) -> Option<EpisodeGoal> {
     let event = events.get(goal_type as usize)?;
     if event.event_type != 26 {
         return None;

@@ -21,6 +21,14 @@ impl ReadFrom for u8 {
     }
 }
 
+impl ReadFrom for i8 {
+    fn read_from(reader: &mut impl Read) -> io::Result<Self> {
+        let mut tmp = [0; 1];
+        reader.read_exact(&mut tmp)?;
+        return Ok(tmp[0] as i8);
+    }
+}
+
 impl ReadFrom for u16 {
     fn read_from(reader: &mut impl Read) -> io::Result<Self> {
         let mut tmp = [0; 2];

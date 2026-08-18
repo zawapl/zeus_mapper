@@ -67,10 +67,10 @@ pub struct RealEpisodeData {
     pub landslide_y: [u16; 6],
     pub constant_6_0x00: [u8; 8],
     pub basic_episode_data: BasicEpisodeData,
-    pub city_resources: [u8; 20],
-    pub city_resources_bought: [u8; 4],
+    pub city_resources: [i8; 20],
+    pub city_resources_bought: [i8; 4],
     pub constant_7_0x00: [u8; 2],
-    pub city_resources_sold: [u8; 4],
+    pub city_resources_sold: [i8; 4],
     pub unknown_5: [u8; 2],
     pub city_resources_quantity: BoxedArray<u8, 40>,
 }
@@ -333,10 +333,10 @@ mod tests {
                 name_padding: 58,
                 name: "Basic episode".to_owned(),
             },
-            city_resources: seq_u8(59),
-            city_resources_bought: seq_u8(60),
+            city_resources: seq_i8(59),
+            city_resources_bought: seq_i8(60),
             constant_7_0x00: seq_u8(61),
-            city_resources_sold: seq_u8(62),
+            city_resources_sold: seq_i8(62),
             unknown_5: seq_u8(63),
             city_resources_quantity: BoxedArray::from_vec(seq_u8::<40>(64).to_vec()),
         };
@@ -356,6 +356,14 @@ mod tests {
         let mut result = [0u8; N];
         for (i, value) in result.iter_mut().enumerate() {
             *value = start.wrapping_add(i as u8);
+        }
+        return result;
+    }
+
+    fn seq_i8<const N: usize>(start: i8) -> [i8; N] {
+        let mut result = [0i8; N];
+        for (i, value) in result.iter_mut().enumerate() {
+            *value = start.wrapping_add(i as i8);
         }
         return result;
     }

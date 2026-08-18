@@ -82,9 +82,11 @@ pub(crate) use default_differ_impl;
 
 default_differ_impl!(bool);
 default_differ_impl!(u8);
+default_differ_impl!(i8);
 default_differ_impl!(u16);
 default_differ_impl!(i16);
 default_differ_impl!(u32);
+default_differ_impl!(i32);
 default_differ_impl!(u64);
 default_differ_impl!(usize);
 default_differ_impl!(String);

@@ -1,3 +1,5 @@
+use crate::constants::data_constant::DataConstant;
+use crate::file_data::resource_id::ResourceId;
 use crate::utils::read_utils::ReadFrom;
 use crate::utils::validation::ValidationError;
 use crate::utils::validation::ValidationResult;
@@ -12,10 +14,10 @@ pub struct EventData {
     pub id: u16,
     pub event_type: u8,
     pub month: u8,
-    pub item_chosen: u16,
-    pub first_item: u16,
-    pub second_item: u16,
-    pub third_item: u16,
+    pub item_chosen: i16,
+    pub first_item: i16,
+    pub second_item: i16,
+    pub third_item: i16,
     pub amount: u16,
     pub fixed_amount: u16,
     pub min_amount: u16,
@@ -133,8 +135,26 @@ impl EventData {
     }
 
     fn validate_general_goods_request(&self, new_file_ver: bool) -> ValidationResult {
-        // todo replace with explicit list that includes only wood/bronze/marble/grapse/olives/fleece/black marble/orichalc/armor/sculpture/olive oil/wine/drachmas/food
-        self.validate_items_in_range(1, 25, new_file_ver)?;
+        self.validate_items_one_of(
+            &[
+                ResourceId::Urchin.value(),
+                ResourceId::Wood.value(),
+                ResourceId::Bronze.value(),
+                ResourceId::Marble.value(),
+                ResourceId::Grape.value(),
+                ResourceId::Olive.value(),
+                ResourceId::Fleece.value(),
+                ResourceId::BlackMarble.value(),
+                ResourceId::Orichalc.value(),
+                ResourceId::Armor.value(),
+                ResourceId::Sculpture.value(),
+                ResourceId::OliveOil.value(),
+                ResourceId::Wine.value(),
+                ResourceId::Drachmas.value(),
+                ResourceId::Food.value(),
+            ],
+            new_file_ver,
+        )?;
 
         return self.validate_amount_range();
     }
@@ -144,19 +164,34 @@ impl EventData {
             return Err(ValidationError::expected_one_of("eff_on_city", self.eff_on_city, &[0, 1, 2]));
         }
 
-        return self.validate_item_exact(24, new_file_ver);
+        return self.validate_item_exact(ResourceId::Troops.value(), new_file_ver);
     }
 
     fn validate_city_attacks_rival(&self, new_file_ver: bool) -> ValidationResult {
         if !matches!(self.eff_on_city, 0 | 2) {
             return Err(ValidationError::expected_one_of("eff_on_city", self.eff_on_city, &[0, 2]));
         }
-        return self.validate_item_exact(24, new_file_ver);
+        return self.validate_item_exact(ResourceId::Troops.value(), new_file_ver);
     }
 
     fn validate_festival_request(&self, new_file_ver: bool) -> ValidationResult {
-        // todo replace with explicit list that includes only wood/bronze/marble/grapse/olives/fleece/armor/sculpture/olive oil/wine/drachmas/food
-        self.validate_items_in_range(1, 25, new_file_ver)?;
+        self.validate_items_one_of(
+            &[
+                ResourceId::Wood.value(),
+                ResourceId::Bronze.value(),
+                ResourceId::Marble.value(),
+                ResourceId::Grape.value(),
+                ResourceId::Olive.value(),
+                ResourceId::Fleece.value(),
+                ResourceId::Armor.value(),
+                ResourceId::Sculpture.value(),
+                ResourceId::OliveOil.value(),
+                ResourceId::Wine.value(),
+                ResourceId::Drachmas.value(),
+                ResourceId::Food.value(),
+            ],
+            new_file_ver,
+        )?;
 
         if self.god_or_mon_or_warship_id > 13 {
             return Err(ValidationError::expected_range(
@@ -183,22 +218,30 @@ impl EventData {
             ));
         }
 
-        return self.validate_item_exact(24, new_file_ver);
+        return self.validate_item_exact(ResourceId::Troops.value(), new_file_ver);
     }
 
     fn validate_construction_request(&self, new_file_ver: bool) -> ValidationResult {
-        self.validate_items_one_of(&[9, 11, 19, 23], new_file_ver)?;
+        self.validate_items_one_of(
+            &[
+                ResourceId::Wood.value(),
+                ResourceId::Marble.value(),
+                ResourceId::Sculpture.value(),
+                ResourceId::Drachmas.value(),
+            ],
+            new_file_ver,
+        )?;
         return self.validate_amount_range();
     }
 
     fn validate_famine_request(&self, new_file_ver: bool) -> ValidationResult {
-        self.validate_item_exact(25, new_file_ver)?;
+        self.validate_item_exact(ResourceId::Food.value(), new_file_ver)?;
 
         return self.validate_amount_range();
     }
 
     fn validate_financial_request(&self, new_file_ver: bool) -> ValidationResult {
-        self.validate_item_exact(23, new_file_ver)?;
+        self.validate_item_exact(ResourceId::Drachmas.value(), new_file_ver)?;
 
         return self.validate_amount_range();
     }
@@ -221,7 +264,7 @@ impl EventData {
             return Err(ValidationError::expected_range("subtype", self.subtype, 0, 13));
         }
 
-        self.validate_item_exact(26, new_file_ver)?;
+        self.validate_item_exact(ResourceId::Hero.value(), new_file_ver)?;
 
         return self.validate_target_range();
     }
@@ -239,22 +282,22 @@ impl EventData {
     }
 
     fn validate_demand_increase(&self, new_file_ver: bool) -> ValidationResult {
-        self.validate_items_in_range(1, 22, new_file_ver)?;
+        self.validate_items_one_of(&ResourceId::tradeable_resource_ids(), new_file_ver)?;
         return self.validate_target_range();
     }
 
     fn validate_demand_decrease(&self, new_file_ver: bool) -> ValidationResult {
-        self.validate_items_in_range(1, 22, new_file_ver)?;
+        self.validate_items_one_of(&ResourceId::tradeable_resource_ids(), new_file_ver)?;
         return self.validate_target_range();
     }
 
     fn validate_price_increase(&self, new_file_ver: bool) -> ValidationResult {
-        self.validate_items_in_range(1, 22, new_file_ver)?;
+        self.validate_items_one_of(&ResourceId::tradeable_resource_ids(), new_file_ver)?;
         return self.validate_amount_range();
     }
 
     fn validate_price_decrease(&self, new_file_ver: bool) -> ValidationResult {
-        self.validate_items_in_range(1, 22, new_file_ver)?;
+        self.validate_items_one_of(&ResourceId::tradeable_resource_ids(), new_file_ver)?;
         return self.validate_amount_range();
     }
 
@@ -364,18 +407,37 @@ impl EventData {
     }
 
     fn validate_supply_increase(&self, new_file_ver: bool) -> ValidationResult {
-        self.validate_items_in_range(1, 22, new_file_ver)?;
+        self.validate_items_one_of(&ResourceId::tradeable_resource_ids(), new_file_ver)?;
         return self.validate_target_range();
     }
 
     fn validate_supply_decrease(&self, new_file_ver: bool) -> ValidationResult {
-        self.validate_items_in_range(1, 22, new_file_ver)?;
+        self.validate_items_one_of(&ResourceId::tradeable_resource_ids(), new_file_ver)?;
         return self.validate_target_range();
     }
 
     fn validate_gift(&self, new_file_ver: bool) -> ValidationResult {
-        // todo narrow down allowed values to a list
-        self.validate_items_in_range(1, 23, new_file_ver)?;
+        self.validate_items_one_of(
+            &[
+                ResourceId::Fish.value(),
+                ResourceId::Meat.value(),
+                ResourceId::Cheese.value(),
+                ResourceId::Wheat.value(),
+                ResourceId::Wood.value(),
+                ResourceId::Bronze.value(),
+                ResourceId::Marble.value(),
+                ResourceId::Grape.value(),
+                ResourceId::Fleece.value(),
+                ResourceId::BlackMarble.value(),
+                ResourceId::Orichalc.value(),
+                ResourceId::Armor.value(),
+                ResourceId::Sculpture.value(),
+                ResourceId::OliveOil.value(),
+                ResourceId::Wine.value(),
+                ResourceId::Drachmas.value(),
+            ],
+            new_file_ver,
+        )?;
         self.validate_target_range()?;
         return self.validate_amount_range();
     }
@@ -399,20 +461,19 @@ impl EventData {
     }
 
     fn validate_monster_in_city(&self) -> ValidationResult {
-        return self.validate_items_one_of(&[0, 1, 2], true);
+        return self.validate_items_in_range(0, 2);
     }
 
     fn validate_monster_unleashed(&self) -> ValidationResult {
-        return self.validate_items_one_of(&[0, 1], true);
+        return self.validate_items_in_range(0, 1);
     }
 
     fn validate_monster_invades(&self) -> ValidationResult {
-        // todo first value should be independent monster ? check examples where this doesn't hold
-        return self.validate_items_one_of(&[0, 1, 2], true);
+        return self.validate_items_in_range(0, 2);
     }
 
     fn validate_god_invasion(&self) -> ValidationResult {
-        return self.validate_items_in_range(0, 13, true);
+        return self.validate_items_in_range(0, 13);
     }
 
     fn validate_sink_land(&self) -> ValidationResult {
@@ -455,36 +516,34 @@ impl EventData {
     }
 
     // Check that first item is populated with expected value, others are unpopulated
-    fn validate_item_exact(&self, expected: u16, new_file_ver: bool) -> ValidationResult {
-        let expected = map_resource_id(expected, new_file_ver);
+    fn validate_item_exact(&self, expected: i8, new_file_ver: bool) -> ValidationResult {
+        let expected = ResourceId::map_id_to_version(expected, new_file_ver) as i16;
         if self.first_item != expected {
             return Err(ValidationError::expected_exactly("first_item", self.first_item, expected));
         }
 
-        if self.second_item != u16::MAX {
-            return Err(ValidationError::expected_exactly("second_item", self.second_item, u16::MAX));
+        if self.second_item >= 0 {
+            return Err(ValidationError::expected_exactly("second_item", self.second_item, -1));
         }
 
-        if self.third_item != u16::MAX {
-            return Err(ValidationError::expected_exactly("third_item", self.third_item, u16::MAX));
+        if self.third_item >= 0 {
+            return Err(ValidationError::expected_exactly("third_item", self.third_item, -1));
         }
 
         return Ok(());
     }
 
     // Validate first item is populated with expected value, validate other times are expected or empty
-    fn validate_items_in_range(&self, min: u16, max: u16, new_file_ver: bool) -> ValidationResult {
-        let min = map_resource_id(min, new_file_ver);
-        let max = map_resource_id(max, new_file_ver);
+    fn validate_items_in_range(&self, min: i16, max: i16) -> ValidationResult {
         if !(min..=max).contains(&self.first_item) {
             return Err(ValidationError::expected_range("first_item", self.first_item, min, max));
         }
 
-        if self.second_item != u16::MAX && !(min..=max).contains(&self.second_item) {
+        if self.second_item >= 0 && !(min..=max).contains(&self.second_item) {
             return Err(ValidationError::expected_range("second_item", self.second_item, min, max));
         }
 
-        if self.third_item != u16::MAX && !(min..=max).contains(&self.third_item) {
+        if self.third_item >= 0 && !(min..=max).contains(&self.third_item) {
             return Err(ValidationError::expected_range("third_item", self.third_item, min, max));
         }
 
@@ -492,17 +551,22 @@ impl EventData {
     }
 
     // Validate first item is populated with expected value, validate other times are expected or empty
-    fn validate_items_one_of(&self, expected: &[u16], new_file_ver: bool) -> ValidationResult {
-        let expected = expected.iter().map(|&i| map_resource_id(i, new_file_ver)).collect::<Vec<_>>();
+    fn validate_items_one_of(&self, expected: &[i8], new_file_ver: bool) -> ValidationResult {
+        let expected = expected
+            .iter()
+            .map(|&i| ResourceId::map_id_to_version(i, new_file_ver) as i16)
+            .filter(|&i| i >= 0)
+            .collect::<Vec<_>>();
+
         if !expected.contains(&self.first_item) {
             return Err(ValidationError::expected_one_of("first_item", self.first_item, expected.as_ref()));
         }
 
-        if self.second_item != u16::MAX && !expected.contains(&self.second_item) {
+        if self.second_item >= 0 && !expected.contains(&self.second_item) {
             return Err(ValidationError::expected_one_of("second_item", self.second_item, expected.as_ref()));
         }
 
-        if self.third_item != u16::MAX && !expected.contains(&self.third_item) {
+        if self.third_item >= 0 && !expected.contains(&self.third_item) {
             return Err(ValidationError::expected_one_of("third_item", self.third_item, expected.as_ref()));
         }
 
@@ -543,9 +607,9 @@ impl Default for EventData {
             event_type: 0,
             month: 0,
             item_chosen: 0,
-            first_item: u16::MAX,
-            second_item: u16::MAX,
-            third_item: u16::MAX,
+            first_item: -1,
+            second_item: -1,
+            third_item: -1,
             amount: 0,
             fixed_amount: u16::MAX,
             min_amount: u16::MAX,
@@ -808,19 +872,4 @@ mod tests {
 
         return Ok(());
     }
-}
-
-// Map new resource id to one in the desired version
-fn map_resource_id(new_format_id: u16, new_file_ver: bool) -> u16 {
-    if new_file_ver || new_format_id == u16::MAX {
-        return new_format_id;
-    }
-
-    return match new_format_id {
-        0..8 => new_format_id,
-        8..16 => new_format_id - 1,
-        16..17 => new_format_id - 2,
-        17..22 => new_format_id - 3,
-        22.. => new_format_id - 4,
-    };
 }
