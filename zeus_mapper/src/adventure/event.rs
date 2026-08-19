@@ -8,6 +8,7 @@ use crate::prelude::BoxedArray;
 use crate::prelude::DataConstant;
 use crate::prelude::EventData;
 use crate::prelude::UnconfirmedSign;
+use std::ops::RangeInclusive;
 
 pub type WarningMonths = u8;
 
@@ -125,6 +126,25 @@ fn resolve_items(event: &EventData, new_file_ver: bool) -> Vec<ResourceType> {
         .collect();
 }
 
+// Inverse of `resolve_items`: writes up to 3 resources back into `(first_item, second_item,
+// third_item)`, `-1` in any slot beyond `resources.len()`.
+fn write_items(resources: &[ResourceType]) -> (i16, i16, i16) {
+    let mut ids = resources.iter().map(|resource| resource.value() as i16);
+
+    return (ids.next().unwrap_or(-1), ids.next().unwrap_or(-1), ids.next().unwrap_or(-1));
+}
+
+// Encodes a min/max pair as `EventData`'s fixed-or-range triple: equal bounds collapse to one
+// `fixed` value with the range fields unset (`-1`), otherwise `fixed` is unset and both bounds are
+// written - the inverse of the `if event.fixed_x != -1 { .. } else { .. }` pattern `from_data` uses
+// to read this same triple back.
+fn to_fixed_or_range(min: u16, max: u16) -> (i16, i16, i16) {
+    if min == max {
+        return (min as i16, -1, -1);
+    }
+    return (-1, min as i16, max as i16);
+}
+
 // Stamps `occurrence`'s month/flags/time range onto `event`; used by the various `to_data`
 // methods for every event variant that carries an `Occurrence` (i.e. all but
 // `MonsterInvasionSubtype::MonsterInCity`).
@@ -208,8 +228,10 @@ impl BetweenYears {
 #[derive(PartialEq, Debug)]
 pub struct GoodsRequest {
     pub subtype: GoodsRequestSubtype,
-    pub city: CityId,
-    pub amount: u16,
+    pub city_min: CityId,
+    pub city_max: CityId,
+    pub amount_min: u16,
+    pub amount_max: u16,
     pub warning_months: WarningMonths,
     pub occurrence: Occurrence,
 }
@@ -232,10 +254,23 @@ impl GoodsRequest {
             _ => GoodsRequestSubtype::GeneralRequest(resolve_items(event, new_file_ver)),
         };
 
+        let (city_min, city_max) = if event.fixed_target != -1 {
+            (event.fixed_target as u16, event.fixed_target as u16)
+        } else {
+            (event.min_target as u16, event.max_target as u16)
+        };
+        let (amount_min, amount_max) = if event.fixed_amount != -1 {
+            (event.fixed_amount as u16, event.fixed_amount as u16)
+        } else {
+            (event.min_amount as u16, event.max_amount as u16)
+        };
+
         return GoodsRequest {
             subtype,
-            city: event.other_city as u16,
-            amount: resolve_range(event.fixed_amount, event.min_amount),
+            city_min,
+            city_max,
+            amount_min,
+            amount_max,
             warning_months: event.warnings as u8,
             occurrence: Occurrence::from_data(event),
         };
@@ -244,12 +279,12 @@ impl GoodsRequest {
     fn to_data(&self) -> EventData {
         let mut data = match &self.subtype {
             GoodsRequestSubtype::GeneralRequest(resources) => {
-                let mut ids = resources.iter().map(|resource| resource.value() as i16);
+                let (first_item, second_item, third_item) = write_items(resources);
                 EventData {
                     subtype: 0,
-                    first_item: ids.next().unwrap_or(-1),
-                    second_item: ids.next().unwrap_or(-1),
-                    third_item: ids.next().unwrap_or(-1),
+                    first_item,
+                    second_item,
+                    third_item,
                     ..EventData::default()
                 }
             }
@@ -274,8 +309,8 @@ impl GoodsRequest {
             },
         };
         data.event_type = 1;
-        data.other_city = self.city as u8;
-        data.fixed_amount = self.amount as i16;
+        (data.fixed_target, data.min_target, data.max_target) = to_fixed_or_range(self.city_min, self.city_max);
+        (data.fixed_amount, data.min_amount, data.max_amount) = to_fixed_or_range(self.amount_min, self.amount_max);
         data.warnings = self.warning_months as i16;
 
         return with_occurrence(data, &self.occurrence);
@@ -300,7 +335,8 @@ pub enum GoodsRequestSubtype {
 #[derive(PartialEq, Debug)]
 pub struct MilitaryRequest {
     pub subtype: MilitaryRequestSubtype,
-    pub city: CityId,
+    pub city_min: CityId,
+    pub city_max: CityId,
     pub outcome: CityAttackOutcome,
     pub warning_months: WarningMonths,
     pub occurrence: Occurrence,
@@ -321,7 +357,8 @@ impl MilitaryRequest {
 
         return MilitaryRequest {
             subtype,
-            city: resolve_range(event.fixed_target, event.min_target),
+            city_min: resolve_range(event.fixed_target, event.min_target),
+            city_max: resolve_range(event.fixed_target, event.max_target),
             outcome,
             warning_months: event.warnings as u8,
             occurrence: Occurrence::from_data(event),
@@ -347,7 +384,7 @@ impl MilitaryRequest {
             },
         };
         data.event_type = 1;
-        data.fixed_target = self.city as i16;
+        (data.fixed_target, data.min_target, data.max_target) = to_fixed_or_range(self.city_min, self.city_max);
         data.eff_on_city = UnconfirmedSign(self.outcome.value());
         data.warnings = self.warning_months as i16;
 
@@ -615,8 +652,8 @@ impl Invasion {
 /// `MonsterInvasionSubtype::MonsterInCity` has no occurrence of its own.
 #[derive(PartialEq, Debug)]
 pub struct MonsterInvasion {
-    pub attack: MonsterAttack,
     pub subtype: MonsterInvasionSubtype,
+    pub attack: MonsterAttack,
 }
 
 default_differ_impl!(MonsterInvasion);
@@ -677,7 +714,7 @@ pub struct MonsterAttack {
     /// `Monster`.
     pub monsters: Vec<u8>,
     pub monument: bool,
-    pub target: Vec<MonsterTarget>,
+    pub target: [MonsterTarget; 3],
     pub aggression: u8,
     pub event_on_success: EventToTrigger,
 }
@@ -691,9 +728,7 @@ impl MonsterAttack {
             .collect();
 
         let target = [*event.mtar1 & 0xFF, *event.mtar2, *event.mtar3]
-            .into_iter()
-            .filter_map(|value| MonsterTarget::try_resolve(&value))
-            .collect();
+            .map(|value| MonsterTarget::try_resolve(&value).unwrap_or(MonsterTarget::Random));
 
         let event_on_success = EventToTrigger::from_data(event.on_success, *event.trig_reason);
 
@@ -752,6 +787,7 @@ data_constants!(MonsterTarget<u16> {
 
 #[derive(PartialEq, Debug)]
 pub struct GodInvasion {
+    // todo replace with Vec<God>
     /// Raw god ids for up to 3 slots (`u16::MAX` in an unused slot), the same
     /// `first_item`/`second_item`/`third_item` fields `MonsterAttack.monsters` uses - confirmed
     /// against `The Odyssey`, where the raw ids matched `1`/`3` (`Poseidon`/`Apollo`) for a
@@ -786,7 +822,8 @@ impl GodInvasion {
 #[derive(PartialEq, Debug)]
 pub struct Disaster {
     pub disaster_type: DisasterSubtype,
-    pub marker: u8,
+    pub marker_min: u8,
+    pub marker_max: u8,
     pub occurrence: Occurrence,
 }
 
@@ -802,7 +839,8 @@ impl Disaster {
 
         return Disaster {
             disaster_type,
-            marker: resolve_range(event.fixed_target, event.min_target) as u8,
+            marker_min: resolve_range(event.fixed_target, event.min_target) as u8,
+            marker_max: resolve_range(event.fixed_target, event.max_target) as u8,
             occurrence: Occurrence::from_data(event),
         };
     }
@@ -816,10 +854,14 @@ impl Disaster {
             DisasterSubtype::SinkLand => (28, 0),
         };
 
+        let (fixed_target, min_target, max_target) = to_fixed_or_range(self.marker_min as u16, self.marker_max as u16);
+
         return with_occurrence(
             EventData {
                 event_type,
-                fixed_target: self.marker as i16,
+                fixed_target,
+                min_target,
+                max_target,
                 permanent_flag,
                 ..EventData::default()
             },
@@ -839,23 +881,36 @@ pub enum DisasterSubtype {
 
 #[derive(PartialEq, Debug)]
 pub struct WageIncrease {
-    pub amount: u8,
+    pub amount_min: u8,
+    pub amount_max: u8,
     pub occurrence: Occurrence,
 }
 
 impl WageIncrease {
     fn from_data(event: &EventData) -> WageIncrease {
-        let amount = resolve_range(event.fixed_amount, event.min_amount) as u8;
+        let (amount_min, amount_max) = if event.fixed_amount != -1 {
+            (event.fixed_amount as u8, event.fixed_amount as u8)
+        } else {
+            (event.min_amount as u8, event.max_amount as u8)
+        };
         let occurrence = Occurrence::from_data(event);
 
-        return WageIncrease { amount, occurrence };
+        return WageIncrease {
+            amount_min,
+            amount_max,
+            occurrence,
+        };
     }
 
     fn to_data(&self) -> EventData {
+        let (fixed_amount, min_amount, max_amount) = to_fixed_or_range(self.amount_min as u16, self.amount_max as u16);
+
         return with_occurrence(
             EventData {
                 event_type: 8,
-                fixed_amount: self.amount as i16,
+                fixed_amount,
+                min_amount,
+                max_amount,
                 ..EventData::default()
             },
             &self.occurrence,
@@ -892,7 +947,9 @@ impl WageDecrease {
 /// A change in a resource's trade demand, supply, price, or open/closed status at a city.
 ///
 /// `occurrence` is the only field common to every `TradeChangeSubtype`: `city` is absent from the
-/// price variants, and the traded `amount` is absent from the shut-down/opens-up variants.
+/// price variants, and the traded amount isn't modeled at all for the demand/supply/shut-down/
+/// opens-up variants - the raw `fixed_amount`/`min_amount`/`max_amount` triple isn't observed
+/// carrying meaningful data for those event types, only for the price variants.
 #[derive(PartialEq, Debug)]
 pub struct TradeChange {
     pub occurrence: Occurrence,
@@ -903,21 +960,29 @@ default_differ_impl!(TradeChange);
 
 impl TradeChange {
     fn from_data(event: &EventData, new_file_ver: bool) -> TradeChange {
-        let city = event.other_city as u16;
-        let amount = resolve_range(event.fixed_amount, event.min_amount);
-        let resource = ResourceType::try_resolve_for_format(&(event.first_item as i8), new_file_ver).unwrap_or(ResourceType::Urchin);
+        let (city_min, city_max) = if event.fixed_target != -1 {
+            (event.fixed_target as u16, event.fixed_target as u16)
+        } else {
+            (event.min_target as u16, event.max_target as u16)
+        };
+        let resources = resolve_items(event, new_file_ver);
+        let (amount_min, amount_max) = if event.fixed_amount != -1 {
+            (event.fixed_amount as u8, event.fixed_amount as u8)
+        } else {
+            (event.min_amount as u8, event.max_amount as u8)
+        };
         let occurrence = Occurrence::from_data(event);
 
         let subtype = match (event.event_type, event.subtype) {
-            (14, _) => TradeChangeSubtype::DemandDecrease(city, resource, amount as u8),
-            (15, _) => TradeChangeSubtype::PriceIncrease(resource, amount as u8),
-            (16, _) => TradeChangeSubtype::PriceDecrease(resource, amount as u8),
-            (19, 2) => TradeChangeSubtype::TradeShutsDown(city),
-            (19, 3) => TradeChangeSubtype::TradeOpensUp(city),
-            (21, _) => TradeChangeSubtype::SupplyIncrease(city, resource, amount as u8),
-            (22, _) => TradeChangeSubtype::SupplyDecrease(city, resource, amount as u8),
+            (14, _) => TradeChangeSubtype::DemandDecrease(city_min, city_max, resources),
+            (15, _) => TradeChangeSubtype::PriceIncrease(resources, amount_min, amount_max),
+            (16, _) => TradeChangeSubtype::PriceDecrease(resources, amount_min, amount_max),
+            (19, 2) => TradeChangeSubtype::TradeShutsDown(city_min, city_max),
+            (19, 3) => TradeChangeSubtype::TradeOpensUp(city_min, city_max),
+            (21, _) => TradeChangeSubtype::SupplyIncrease(city_min, city_max, resources),
+            (22, _) => TradeChangeSubtype::SupplyDecrease(city_min, city_max, resources),
             // Covers `(13, _)` (`DemandIncrease`'s real encoding) and any unrecognized combination.
-            _ => TradeChangeSubtype::DemandIncrease(city, resource, amount as u8),
+            _ => TradeChangeSubtype::DemandIncrease(city_min, city_max, resources),
         };
 
         return TradeChange { occurrence, subtype };
@@ -925,58 +990,100 @@ impl TradeChange {
 
     fn to_data(&self) -> EventData {
         let data = match &self.subtype {
-            TradeChangeSubtype::DemandIncrease(city, resource, amount) => EventData {
-                event_type: 13,
-                other_city: *city as u8,
-                first_item: resource.value() as i16,
-                fixed_amount: *amount as i16,
-                ..EventData::default()
-            },
-            TradeChangeSubtype::DemandDecrease(city, resource, amount) => EventData {
-                event_type: 14,
-                other_city: *city as u8,
-                first_item: resource.value() as i16,
-                fixed_amount: *amount as i16,
-                ..EventData::default()
-            },
-            TradeChangeSubtype::SupplyIncrease(city, resource, amount) => EventData {
-                event_type: 21,
-                other_city: *city as u8,
-                first_item: resource.value() as i16,
-                fixed_amount: *amount as i16,
-                ..EventData::default()
-            },
-            TradeChangeSubtype::SupplyDecrease(city, resource, amount) => EventData {
-                event_type: 22,
-                other_city: *city as u8,
-                first_item: resource.value() as i16,
-                fixed_amount: *amount as i16,
-                ..EventData::default()
-            },
-            TradeChangeSubtype::PriceIncrease(resource, amount) => EventData {
-                event_type: 15,
-                first_item: resource.value() as i16,
-                fixed_amount: *amount as i16,
-                ..EventData::default()
-            },
-            TradeChangeSubtype::PriceDecrease(resource, amount) => EventData {
-                event_type: 16,
-                first_item: resource.value() as i16,
-                fixed_amount: *amount as i16,
-                ..EventData::default()
-            },
-            TradeChangeSubtype::TradeShutsDown(city) => EventData {
-                event_type: 19,
-                subtype: 2,
-                other_city: *city as u8,
-                ..EventData::default()
-            },
-            TradeChangeSubtype::TradeOpensUp(city) => EventData {
-                event_type: 19,
-                subtype: 3,
-                other_city: *city as u8,
-                ..EventData::default()
-            },
+            TradeChangeSubtype::DemandIncrease(city_min, city_max, resources) => {
+                let (first_item, second_item, third_item) = write_items(resources);
+                let mut data = EventData {
+                    event_type: 13,
+                    first_item,
+                    second_item,
+                    third_item,
+                    ..EventData::default()
+                };
+                (data.fixed_target, data.min_target, data.max_target) = to_fixed_or_range(*city_min, *city_max);
+                data
+            }
+            TradeChangeSubtype::DemandDecrease(city_min, city_max, resources) => {
+                let (first_item, second_item, third_item) = write_items(resources);
+                let mut data = EventData {
+                    event_type: 14,
+                    first_item,
+                    second_item,
+                    third_item,
+                    ..EventData::default()
+                };
+                (data.fixed_target, data.min_target, data.max_target) = to_fixed_or_range(*city_min, *city_max);
+                data
+            }
+            TradeChangeSubtype::SupplyIncrease(city_min, city_max, resources) => {
+                let (first_item, second_item, third_item) = write_items(resources);
+                let mut data = EventData {
+                    event_type: 21,
+                    first_item,
+                    second_item,
+                    third_item,
+                    ..EventData::default()
+                };
+                (data.fixed_target, data.min_target, data.max_target) = to_fixed_or_range(*city_min, *city_max);
+                data
+            }
+            TradeChangeSubtype::SupplyDecrease(city_min, city_max, resources) => {
+                let (first_item, second_item, third_item) = write_items(resources);
+                let mut data = EventData {
+                    event_type: 22,
+                    first_item,
+                    second_item,
+                    third_item,
+                    ..EventData::default()
+                };
+                (data.fixed_target, data.min_target, data.max_target) = to_fixed_or_range(*city_min, *city_max);
+                data
+            }
+            TradeChangeSubtype::PriceIncrease(resources, amount_min, amount_max) => {
+                let (first_item, second_item, third_item) = write_items(resources);
+                let (fixed_amount, min_amount, max_amount) = to_fixed_or_range(*amount_min as u16, *amount_max as u16);
+                EventData {
+                    event_type: 15,
+                    first_item,
+                    second_item,
+                    third_item,
+                    fixed_amount,
+                    min_amount,
+                    max_amount,
+                    ..EventData::default()
+                }
+            }
+            TradeChangeSubtype::PriceDecrease(resources, amount_min, amount_max) => {
+                let (first_item, second_item, third_item) = write_items(resources);
+                let (fixed_amount, min_amount, max_amount) = to_fixed_or_range(*amount_min as u16, *amount_max as u16);
+                EventData {
+                    event_type: 16,
+                    first_item,
+                    second_item,
+                    third_item,
+                    fixed_amount,
+                    min_amount,
+                    max_amount,
+                    ..EventData::default()
+                }
+            }
+            TradeChangeSubtype::TradeShutsDown(city_min, city_max) => {
+                let mut data = EventData {
+                    event_type: 19,
+                    subtype: 2,
+                    ..EventData::default()
+                };
+                (data.fixed_target, data.min_target, data.max_target) = to_fixed_or_range(*city_min, *city_max);
+                data
+            }
+            TradeChangeSubtype::TradeOpensUp(city_min, city_max) => {
+                let mut data = EventData {
+                    event_type: 19,
+                    subtype: 3,
+                    ..EventData::default()
+                };
+                (data.fixed_target, data.min_target, data.max_target) = to_fixed_or_range(*city_min, *city_max);
+                data
+            }
         };
 
         return with_occurrence(data, &self.occurrence);
@@ -985,14 +1092,14 @@ impl TradeChange {
 
 #[derive(PartialEq, Debug)]
 pub enum TradeChangeSubtype {
-    DemandIncrease(CityId, ResourceType, u8),
-    DemandDecrease(CityId, ResourceType, u8),
-    SupplyIncrease(CityId, ResourceType, u8),
-    SupplyDecrease(CityId, ResourceType, u8),
-    PriceIncrease(ResourceType, u8),
-    PriceDecrease(ResourceType, u8),
-    TradeShutsDown(CityId),
-    TradeOpensUp(CityId),
+    DemandIncrease(CityId, CityId, Vec<ResourceType>),
+    DemandDecrease(CityId, CityId, Vec<ResourceType>),
+    SupplyIncrease(CityId, CityId, Vec<ResourceType>),
+    SupplyDecrease(CityId, CityId, Vec<ResourceType>),
+    PriceIncrease(Vec<ResourceType>, u8, u8),
+    PriceDecrease(Vec<ResourceType>, u8, u8),
+    TradeShutsDown(CityId, CityId),
+    TradeOpensUp(CityId, CityId),
 }
 
 /// A change in a city's diplomatic standing, strength, activity, or visibility.
@@ -1002,17 +1109,21 @@ pub enum TradeChangeSubtype {
 /// range (see `to_data`).
 #[derive(PartialEq, Debug)]
 pub struct CityStatusChange {
+    pub subtype: CityStatusChangeSubtype,
     pub city_min: CityId,
     pub city_max: CityId,
     pub occurrence: Occurrence,
-    pub subtype: CityStatusChangeSubtype,
 }
 
 default_differ_impl!(CityStatusChange);
 
 impl CityStatusChange {
     fn from_data(event: &EventData) -> CityStatusChange {
-        let amount = resolve_range(event.fixed_amount, event.min_amount);
+        let (amount_min, amount_max) = if event.fixed_amount != -1 {
+            (event.fixed_amount as u8, event.fixed_amount as u8)
+        } else {
+            (event.min_amount as u8, event.max_amount as u8)
+        };
         let (city_min, city_max) = if event.fixed_target != -1 {
             (event.fixed_target as u16, event.fixed_target as u16)
         } else {
@@ -1026,10 +1137,10 @@ impl CityStatusChange {
                 let god = God::try_resolve(&(*event.god_or_mon_or_warship_id as u32)).unwrap_or(God::Zeus);
                 CityStatusChangeSubtype::GodDisaster(god, event.warnings as u8)
             }
-            14 => CityStatusChangeSubtype::MilitaryBuildup(amount as u8),
-            15 => CityStatusChangeSubtype::MilitaryDecline(amount as u8),
-            16 => CityStatusChangeSubtype::EconomicProsperity(amount as u8),
-            17 => CityStatusChangeSubtype::EconomicDecline(amount as u8),
+            14 => CityStatusChangeSubtype::MilitaryBuildup(amount_min..=amount_max),
+            15 => CityStatusChangeSubtype::MilitaryDecline(amount_min..=amount_max),
+            16 => CityStatusChangeSubtype::EconomicProsperity(amount_min..=amount_max),
+            17 => CityStatusChangeSubtype::EconomicDecline(amount_min..=amount_max),
             18 => CityStatusChangeSubtype::CityBecomesActive,
             19 => CityStatusChangeSubtype::CityBecomesInactive,
             20 => CityStatusChangeSubtype::CityAppears,
@@ -1068,26 +1179,46 @@ impl CityStatusChange {
                 warnings: *warning_months as i16,
                 ..EventData::default()
             },
-            CityStatusChangeSubtype::MilitaryBuildup(amount) => EventData {
-                subtype: 14,
-                fixed_amount: *amount as i16,
-                ..EventData::default()
-            },
-            CityStatusChangeSubtype::MilitaryDecline(amount) => EventData {
-                subtype: 15,
-                fixed_amount: *amount as i16,
-                ..EventData::default()
-            },
-            CityStatusChangeSubtype::EconomicProsperity(amount) => EventData {
-                subtype: 16,
-                fixed_amount: *amount as i16,
-                ..EventData::default()
-            },
-            CityStatusChangeSubtype::EconomicDecline(amount) => EventData {
-                subtype: 17,
-                fixed_amount: *amount as i16,
-                ..EventData::default()
-            },
+            CityStatusChangeSubtype::MilitaryBuildup(amount) => {
+                let (fixed_amount, min_amount, max_amount) = to_fixed_or_range(*amount.start() as u16, *amount.end() as u16);
+                EventData {
+                    subtype: 14,
+                    fixed_amount,
+                    min_amount,
+                    max_amount,
+                    ..EventData::default()
+                }
+            }
+            CityStatusChangeSubtype::MilitaryDecline(amount) => {
+                let (fixed_amount, min_amount, max_amount) = to_fixed_or_range(*amount.start() as u16, *amount.end() as u16);
+                EventData {
+                    subtype: 15,
+                    fixed_amount,
+                    min_amount,
+                    max_amount,
+                    ..EventData::default()
+                }
+            }
+            CityStatusChangeSubtype::EconomicProsperity(amount) => {
+                let (fixed_amount, min_amount, max_amount) = to_fixed_or_range(*amount.start() as u16, *amount.end() as u16);
+                EventData {
+                    subtype: 16,
+                    fixed_amount,
+                    min_amount,
+                    max_amount,
+                    ..EventData::default()
+                }
+            }
+            CityStatusChangeSubtype::EconomicDecline(amount) => {
+                let (fixed_amount, min_amount, max_amount) = to_fixed_or_range(*amount.start() as u16, *amount.end() as u16);
+                EventData {
+                    subtype: 17,
+                    fixed_amount,
+                    min_amount,
+                    max_amount,
+                    ..EventData::default()
+                }
+            }
             CityStatusChangeSubtype::CityBecomesActive => EventData {
                 subtype: 18,
                 ..EventData::default()
@@ -1136,10 +1267,10 @@ pub enum CityStatusChangeSubtype {
     CityBecomesRival,
     CityBecomesVassal,
     GodDisaster(God, WarningMonths), // todo not warning months, but duration - make naming clearer
-    MilitaryBuildup(u8),
-    MilitaryDecline(u8),
-    EconomicProsperity(u8),
-    EconomicDecline(u8),
+    MilitaryBuildup(RangeInclusive<u8>),
+    MilitaryDecline(RangeInclusive<u8>),
+    EconomicProsperity(RangeInclusive<u8>),
+    EconomicDecline(RangeInclusive<u8>),
     CityBecomesActive,
     CityBecomesInactive,
     CityAppears,
@@ -1175,6 +1306,7 @@ impl RivalArmyChange {
 mod tests {
     use super::*;
     use crate::adventure::adventure::Adventure;
+    use crate::file_data::resource_id::ResourceId;
     use std::io::Result;
 
     #[test]
@@ -1188,7 +1320,7 @@ mod tests {
                 vec![
                     Event::TradeChange(TradeChange {
                         occurrence: Occurrence::OneTime(3, BetweenYears(0, 0)),
-                        subtype: TradeChangeSubtype::SupplyDecrease(0, ResourceType::Sculpture, 5),
+                        subtype: TradeChangeSubtype::SupplyDecrease(6, 6, vec![ResourceType::Sculpture]),
                     }),
                     Event::GoodsRequest(GoodsRequest {
                         subtype: GoodsRequestSubtype::GeneralRequest(vec![
@@ -1196,8 +1328,10 @@ mod tests {
                             ResourceType::Sculpture,
                             ResourceType::OliveOil,
                         ]),
-                        city: 0,
-                        amount: 6,
+                        city_min: 1,
+                        city_max: 1,
+                        amount_min: 6,
+                        amount_max: 10,
                         warning_months: 8,
                         occurrence: Occurrence::Repeating(2, BetweenYears(1, 2)),
                     }),
@@ -1207,15 +1341,19 @@ mod tests {
                             ResourceType::Wood,
                             ResourceType::Wine
                         ]),
-                        city: 0,
-                        amount: 6,
+                        city_min: 2,
+                        city_max: 2,
+                        amount_min: 6,
+                        amount_max: 10,
                         warning_months: 8,
                         occurrence: Occurrence::Repeating(11, BetweenYears(2, 3)),
                     }),
                     Event::GoodsRequest(GoodsRequest {
                         subtype: GoodsRequestSubtype::GeneralRequest(vec![ResourceType::Fleece, ResourceType::Sculpture]),
-                        city: 0,
-                        amount: 8,
+                        city_min: 3,
+                        city_max: 4,
+                        amount_min: 8,
+                        amount_max: 12,
                         warning_months: 6,
                         occurrence: Occurrence::Repeating(5, BetweenYears(4, 5)),
                     }),
@@ -1227,23 +1365,24 @@ mod tests {
                     }),
                     Event::TradeChange(TradeChange {
                         occurrence: Occurrence::Repeating(1, BetweenYears(8, 8)),
-                        subtype: TradeChangeSubtype::TradeShutsDown(0),
+                        subtype: TradeChangeSubtype::TradeShutsDown(6, 6),
                     }),
                     Event::TradeChange(TradeChange {
                         occurrence: Occurrence::Repeating(11, BetweenYears(8, 8)),
-                        subtype: TradeChangeSubtype::TradeOpensUp(0),
+                        subtype: TradeChangeSubtype::TradeOpensUp(6, 6),
                     }),
                     Event::TradeChange(TradeChange {
                         occurrence: Occurrence::Repeating(3, BetweenYears(12, 12)),
-                        subtype: TradeChangeSubtype::PriceIncrease(ResourceType::Wood, 20),
+                        subtype: TradeChangeSubtype::PriceIncrease(vec![ResourceType::Wood, ResourceType::Armor, ResourceId::Wine], 20, 20),
                     }),
                     Event::WageIncrease(WageIncrease {
-                        amount: 15,
+                        amount_min: 15,
+                        amount_max: 15,
                         occurrence: Occurrence::OneTime(5, BetweenYears(22, 22)),
                     }),
                     Event::TradeChange(TradeChange {
                         occurrence: Occurrence::Repeating(6, BetweenYears(26, 26)),
-                        subtype: TradeChangeSubtype::PriceDecrease(ResourceType::Wood, 15),
+                        subtype: TradeChangeSubtype::PriceDecrease(vec![ResourceType::Wood, ResourceType::Armor, ResourceId::Wine], 15, 15),
                     }),
                     Event::GodInvasion(GodInvasion {
                         gods: [11, u16::MAX, u16::MAX],
@@ -1269,31 +1408,31 @@ mod tests {
                         city_min: 11,
                         city_max: 11,
                         occurrence: Occurrence::OneTime(2, BetweenYears(0, 0)),
-                        subtype: CityStatusChangeSubtype::MilitaryBuildup(1),
+                        subtype: CityStatusChangeSubtype::MilitaryBuildup(1..=1),
                     }),
                     Event::CityStatusChange(CityStatusChange {
                         city_min: 11,
                         city_max: 11,
                         occurrence: Occurrence::OneTime(5, BetweenYears(0, 0)),
-                        subtype: CityStatusChangeSubtype::MilitaryBuildup(1),
+                        subtype: CityStatusChangeSubtype::MilitaryBuildup(1..=1),
                     }),
                     Event::CityStatusChange(CityStatusChange {
                         city_min: 11,
                         city_max: 11,
                         occurrence: Occurrence::OneTime(8, BetweenYears(0, 0)),
-                        subtype: CityStatusChangeSubtype::MilitaryBuildup(1),
+                        subtype: CityStatusChangeSubtype::MilitaryBuildup(1..=1),
                     }),
                     Event::CityStatusChange(CityStatusChange {
                         city_min: 10,
                         city_max: 10,
                         occurrence: Occurrence::OneTime(3, BetweenYears(0, 0)),
-                        subtype: CityStatusChangeSubtype::MilitaryBuildup(1),
+                        subtype: CityStatusChangeSubtype::MilitaryBuildup(1..=1),
                     }),
                     Event::CityStatusChange(CityStatusChange {
                         city_min: 10,
                         city_max: 10,
                         occurrence: Occurrence::OneTime(6, BetweenYears(0, 0)),
-                        subtype: CityStatusChangeSubtype::MilitaryBuildup(1),
+                        subtype: CityStatusChangeSubtype::MilitaryBuildup(1..=1),
                     }),
                     Event::CityStatusChange(CityStatusChange {
                         city_min: 9,
@@ -1323,25 +1462,25 @@ mod tests {
                         city_min: 9,
                         city_max: 9,
                         occurrence: Occurrence::OneTime(6, BetweenYears(1, 1)),
-                        subtype: CityStatusChangeSubtype::MilitaryBuildup(1),
+                        subtype: CityStatusChangeSubtype::MilitaryBuildup(1..=1),
                     }),
                     Event::CityStatusChange(CityStatusChange {
                         city_min: 8,
                         city_max: 8,
                         occurrence: Occurrence::OneTime(6, BetweenYears(2, 2)),
-                        subtype: CityStatusChangeSubtype::MilitaryBuildup(1),
+                        subtype: CityStatusChangeSubtype::MilitaryBuildup(1..=1),
                     }),
                     Event::CityStatusChange(CityStatusChange {
                         city_min: 7,
                         city_max: 7,
                         occurrence: Occurrence::OneTime(6, BetweenYears(3, 3)),
-                        subtype: CityStatusChangeSubtype::MilitaryBuildup(1),
+                        subtype: CityStatusChangeSubtype::MilitaryBuildup(1..=1),
                     }),
                     Event::CityStatusChange(CityStatusChange {
                         city_min: 6,
                         city_max: 6,
                         occurrence: Occurrence::OneTime(6, BetweenYears(4, 4)),
-                        subtype: CityStatusChangeSubtype::MilitaryBuildup(1),
+                        subtype: CityStatusChangeSubtype::MilitaryBuildup(1..=1),
                     }),
                 ]
             );
@@ -1405,37 +1544,40 @@ mod tests {
                         city_min: 2,
                         city_max: 5,
                         occurrence: Occurrence::Repeating(4, BetweenYears(1, 4)),
-                        subtype: CityStatusChangeSubtype::MilitaryBuildup(1),
+                        subtype: CityStatusChangeSubtype::MilitaryBuildup(1..=1),
                     }),
                     Event::CityStatusChange(CityStatusChange {
                         city_min: 2,
                         city_max: 5,
                         occurrence: Occurrence::OneTime(1, BetweenYears(0, 2)),
-                        subtype: CityStatusChangeSubtype::MilitaryBuildup(1),
+                        subtype: CityStatusChangeSubtype::MilitaryBuildup(1..=1),
                     }),
                     Event::CityStatusChange(CityStatusChange {
                         city_min: 2,
                         city_max: 5,
                         occurrence: Occurrence::OneTime(8, BetweenYears(0, 1)),
-                        subtype: CityStatusChangeSubtype::MilitaryBuildup(1),
+                        subtype: CityStatusChangeSubtype::MilitaryBuildup(1..=1),
                     }),
                     Event::MilitaryRequest(MilitaryRequest {
                         subtype: MilitaryRequestSubtype::GreekCityTerrorized(0),
-                        city: 3,
+                        city_min: 3,
+                        city_max: 3,
                         outcome: CityAttackOutcome::Unaffected,
                         warning_months: 4,
                         occurrence: Occurrence::OneTime(1, BetweenYears(0, 1)),
                     }),
                     Event::MilitaryRequest(MilitaryRequest {
                         subtype: MilitaryRequestSubtype::GreekCityTerrorized(1),
-                        city: 4,
+                        city_min: 4,
+                        city_max: 4,
                         outcome: CityAttackOutcome::Unaffected,
                         warning_months: 4,
                         occurrence: Occurrence::OneTime(5, BetweenYears(1, 2)),
                     }),
                     Event::MilitaryRequest(MilitaryRequest {
                         subtype: MilitaryRequestSubtype::GreekCityTerrorized(2),
-                        city: 5,
+                        city_min: 5,
+                        city_max: 5,
                         outcome: CityAttackOutcome::Unaffected,
                         warning_months: 4,
                         occurrence: Occurrence::OneTime(10, BetweenYears(2, 3)),
@@ -1459,46 +1601,46 @@ mod tests {
                 colony_episode.events,
                 vec![
                     Event::CityStatusChange(CityStatusChange {
+                        subtype: CityStatusChangeSubtype::CityConqueredBy(12),
                         city_min: 9,
                         city_max: 9,
                         occurrence: Occurrence::OneTime(6, BetweenYears(0, 0)),
-                        subtype: CityStatusChangeSubtype::CityConqueredBy(12)
                     }),
                     Event::CityStatusChange(CityStatusChange {
+                        subtype: CityStatusChangeSubtype::CityConqueredBy(12),
                         city_min: 8,
                         city_max: 8,
                         occurrence: Occurrence::OneTime(0, BetweenYears(1, 1)),
-                        subtype: CityStatusChangeSubtype::CityConqueredBy(12)
                     }),
                     Event::CityStatusChange(CityStatusChange {
+                        subtype: CityStatusChangeSubtype::CityConqueredBy(12),
                         city_min: 7,
                         city_max: 7,
                         occurrence: Occurrence::OneTime(6, BetweenYears(1, 1)),
-                        subtype: CityStatusChangeSubtype::CityConqueredBy(12)
                     }),
                     Event::CityStatusChange(CityStatusChange {
+                        subtype: CityStatusChangeSubtype::CityConqueredBy(12),
                         city_min: 6,
                         city_max: 6,
                         occurrence: Occurrence::OneTime(0, BetweenYears(2, 2)),
-                        subtype: CityStatusChangeSubtype::CityConqueredBy(12)
                     }),
                     Event::CityStatusChange(CityStatusChange {
+                        subtype: CityStatusChangeSubtype::MilitaryBuildup(1..=1),
                         city_min: 10,
                         city_max: 10,
                         occurrence: Occurrence::OneTime(9, BetweenYears(0, 1)),
-                        subtype: CityStatusChangeSubtype::MilitaryBuildup(1)
                     }),
                     Event::CityStatusChange(CityStatusChange {
+                        subtype: CityStatusChangeSubtype::MilitaryBuildup(1..=1),
                         city_min: 10,
                         city_max: 10,
                         occurrence: Occurrence::OneTime(3, BetweenYears(1, 1)),
-                        subtype: CityStatusChangeSubtype::MilitaryBuildup(1)
                     }),
                     Event::CityStatusChange(CityStatusChange {
                         city_min: 11,
                         city_max: 11,
                         occurrence: Occurrence::OneTime(4, BetweenYears(0, 0)),
-                        subtype: CityStatusChangeSubtype::MilitaryBuildup(1)
+                        subtype: CityStatusChangeSubtype::MilitaryBuildup(1..=1)
                     }),
                     Event::CityStatusChange(CityStatusChange {
                         city_min: 9,
@@ -1596,17 +1738,20 @@ mod tests {
                     }),
                     Event::Disaster(Disaster {
                         disaster_type: DisasterSubtype::LavaFlow,
-                        marker: 1, // needs to be marker_min=1, marker_max=2
+                        marker_min: 1,
+                        marker_max: 2,
                         occurrence: Occurrence::OneTime(11, BetweenYears(0, 1))
                     }),
                     Event::Disaster(Disaster {
                         disaster_type: DisasterSubtype::LavaFlow,
-                        marker: 3, // needs to be marker_min=3, marker_max=4
+                        marker_min: 3,
+                        marker_max: 4,
                         occurrence: Occurrence::OneTime(3, BetweenYears(1, 3))
                     }),
                     Event::Disaster(Disaster {
                         disaster_type: DisasterSubtype::LavaFlow,
-                        marker: 5, // needs to be marker_min=5, marker_max=5
+                        marker_min: 5,
+                        marker_max: 5,
                         occurrence: Occurrence::OneTime(4, BetweenYears(2, 4))
                     }),
                     Event::CityStatusChange(CityStatusChange {
@@ -1659,13 +1804,13 @@ mod tests {
                         city_min: 9, // Ismarus
                         city_max: 9,
                         occurrence: Occurrence::OneTime(6, BetweenYears(0, 0)),
-                        subtype: CityStatusChangeSubtype::MilitaryDecline(5),
+                        subtype: CityStatusChangeSubtype::MilitaryDecline(5..=5),
                     }),
                     Event::CityStatusChange(CityStatusChange {
                         city_min: 9,
                         city_max: 9,
                         occurrence: Occurrence::OneTime(7, BetweenYears(0, 0)),
-                        subtype: CityStatusChangeSubtype::EconomicDecline(3),
+                        subtype: CityStatusChangeSubtype::EconomicDecline(3..=3),
                     }),
                     Event::CityStatusChange(CityStatusChange {
                         city_min: 4, // Sparta
@@ -1708,7 +1853,7 @@ mod tests {
                         city_min: 8,
                         city_max: 8,
                         occurrence: Occurrence::EpisodeComplete,
-                        subtype: CityStatusChangeSubtype::MilitaryDecline(1),
+                        subtype: CityStatusChangeSubtype::MilitaryDecline(1..=1),
                     }),
                     Event::CityStatusChange(CityStatusChange {
                         city_min: 5,
@@ -1725,22 +1870,28 @@ mod tests {
                 vec![
                     Event::GoodsRequest(GoodsRequest {
                         subtype: GoodsRequestSubtype::GeneralRequest(vec![ResourceType::Food, ResourceType::OliveOil, ResourceType::Wine]),
-                        city: 0,   // city_min=6, city_max=7
-                        amount: 5, // min_amount=5, max_amount=20
+                        city_min: 6,
+                        city_max: 7,
+                        amount_min: 5,
+                        amount_max: 20,
                         warning_months: 2,
                         occurrence: Occurrence::OneTime(1, BetweenYears(0, 0)),
                     }),
                     Event::GoodsRequest(GoodsRequest {
                         subtype: GoodsRequestSubtype::GeneralRequest(vec![ResourceType::Wine, ResourceType::Food, ResourceType::OliveOil]),
-                        city: 0,   // city_min=6, city_max=7
-                        amount: 5, // min_amount=5, max_amount=20
+                        city_min: 6,
+                        city_max: 7,
+                        amount_min: 5,
+                        amount_max: 20,
                         warning_months: 2,
                         occurrence: Occurrence::Repeating(2, BetweenYears(1, 3)),
                     }),
                     Event::GoodsRequest(GoodsRequest {
                         subtype: GoodsRequestSubtype::GeneralRequest(vec![ResourceType::OliveOil, ResourceType::Wine, ResourceType::Food]),
-                        city: 0,   // city_min=6, city_max=7
-                        amount: 5, // min_amount=5, max_amount=20
+                        city_min: 6,
+                        city_max: 7,
+                        amount_min: 5,
+                        amount_max: 20,
                         warning_months: 2,
                         occurrence: Occurrence::OneTime(11, BetweenYears(1, 3)),
                     }),
@@ -1753,22 +1904,28 @@ mod tests {
                 vec![
                     Event::GoodsRequest(GoodsRequest {
                         subtype: GoodsRequestSubtype::GeneralRequest(vec![ResourceType::Food, ResourceType::OliveOil, ResourceType::Wine]),
-                        city: 0,
-                        amount: 10,
+                        city_min: 6,
+                        city_max: 7,
+                        amount_min: 10,
+                        amount_max: 30,
                         warning_months: 2,
                         occurrence: Occurrence::OneTime(6, BetweenYears(0, 0)),
                     }),
                     Event::GoodsRequest(GoodsRequest {
                         subtype: GoodsRequestSubtype::GeneralRequest(vec![ResourceType::Wine, ResourceType::Food, ResourceType::OliveOil]),
-                        city: 0,
-                        amount: 10,
+                        city_min: 6,
+                        city_max: 7,
+                        amount_min: 10,
+                        amount_max: 30,
                         warning_months: 2,
                         occurrence: Occurrence::Repeating(1, BetweenYears(1, 3)),
                     }),
                     Event::GoodsRequest(GoodsRequest {
                         subtype: GoodsRequestSubtype::GeneralRequest(vec![ResourceType::OliveOil, ResourceType::Wine, ResourceType::Food]),
-                        city: 0,
-                        amount: 10,
+                        city_min: 6,
+                        city_max: 7,
+                        amount_min: 10,
+                        amount_max: 30,
                         warning_months: 2,
                         occurrence: Occurrence::Repeating(8, BetweenYears(1, 3)),
                     }),
@@ -1790,43 +1947,46 @@ mod tests {
                     }),
                     Event::Disaster(Disaster {
                         disaster_type: DisasterSubtype::Earthquake,
-                        marker: 1, // marker_min=1 marker_max=3
+                        marker_min: 1,
+                        marker_max: 3,
                         occurrence: Occurrence::OneTime(2, BetweenYears(1, 1)),
                     }),
                     Event::Disaster(Disaster {
                         disaster_type: DisasterSubtype::LavaFlow,
-                        marker: 4,
+                        marker_min: 4,
+                        marker_max: 5,
                         occurrence: Occurrence::OneTime(3, BetweenYears(1, 1)),
                     }),
                     Event::Disaster(Disaster {
                         disaster_type: DisasterSubtype::TidalWave(false),
-                        marker: 6,
+                        marker_min: 6,
+                        marker_max: 8,
                         occurrence: Occurrence::OneTime(1, BetweenYears(1, 1)),
                     }),
                     Event::MonsterInvasion(MonsterInvasion {
+                        subtype: MonsterInvasionSubtype::MonsterUnleashed(Occurrence::OneTime(0, BetweenYears(1, 1))),
                         attack: MonsterAttack {
                             monsters: vec![0],
                             monument: false,
-                            target: vec![MonsterTarget::Troops, MonsterTarget::Sea, MonsterTarget::Sea],
+                            target: [MonsterTarget::Troops, MonsterTarget::Sea, MonsterTarget::Sea],
                             aggression: 2,
                             event_on_success: EventToTrigger {
                                 event_id: 5,
                                 trigger_type: TriggerType::DirectResult,
                             },
                         },
-                        subtype: MonsterInvasionSubtype::MonsterUnleashed(Occurrence::OneTime(0, BetweenYears(1, 1))),
                     }),
                     Event::CityStatusChange(CityStatusChange {
                         city_min: 4,
                         city_max: 4,
                         occurrence: Occurrence::OneTime(7, BetweenYears(0, 0)),
-                        subtype: CityStatusChangeSubtype::MilitaryBuildup(1),
+                        subtype: CityStatusChangeSubtype::MilitaryBuildup(1..=1),
                     }),
                     Event::CityStatusChange(CityStatusChange {
                         city_min: 4,
                         city_max: 4,
                         occurrence: Occurrence::OneTime(8, BetweenYears(0, 0)),
-                        subtype: CityStatusChangeSubtype::EconomicProsperity(1),
+                        subtype: CityStatusChangeSubtype::EconomicProsperity(1..=1),
                     }),
                 ]
             );
@@ -1875,14 +2035,16 @@ mod tests {
                     }),
                     Event::MilitaryRequest(MilitaryRequest {
                         subtype: MilitaryRequestSubtype::CityUnderAttack(6),
-                        city: 1,
+                        city_min: 1,
+                        city_max: 2,
                         outcome: CityAttackOutcome::Conquered,
                         warning_months: 4,
                         occurrence: Occurrence::OneTime(4, BetweenYears(6, 6)),
                     }),
                     Event::MilitaryRequest(MilitaryRequest {
                         subtype: MilitaryRequestSubtype::CityUnderAttack(7),
-                        city: 1,
+                        city_min: 1,
+                        city_max: 2,
                         outcome: CityAttackOutcome::Conquered,
                         warning_months: 4,
                         occurrence: Occurrence::OneTime(9, BetweenYears(8, 8)),
@@ -1891,7 +2053,7 @@ mod tests {
                         attack: MonsterAttack {
                             monsters: vec![2],
                             monument: true,
-                            target: vec![MonsterTarget::Random, MonsterTarget::Random, MonsterTarget::Random],
+                            target: [MonsterTarget::Random, MonsterTarget::Random, MonsterTarget::Random],
                             aggression: 1,
                             event_on_success: EventToTrigger {
                                 event_id: -1,
@@ -1902,14 +2064,16 @@ mod tests {
                     }),
                     Event::MilitaryRequest(MilitaryRequest {
                         subtype: MilitaryRequestSubtype::CityUnderAttack(7),
-                        city: 6, // city_min=6, city_max=6
+                        city_min: 6,
+                        city_max: 6,
                         outcome: CityAttackOutcome::Conquered,
                         warning_months: 4,
                         occurrence: Occurrence::Repeating(0, BetweenYears(2, 10)),
                     }),
                     Event::MilitaryRequest(MilitaryRequest {
                         subtype: MilitaryRequestSubtype::CityUnderAttack(6),
-                        city: 7, // city_min=7, city_max=7
+                        city_min: 7,
+                        city_max: 7,
                         outcome: CityAttackOutcome::Conquered,
                         warning_months: 4,
                         occurrence: Occurrence::Repeating(1, BetweenYears(2, 10)),
@@ -1941,7 +2105,7 @@ mod tests {
                         attack: MonsterAttack {
                             monsters: vec![2],
                             monument: true,
-                            target: vec![MonsterTarget::Random, MonsterTarget::Random, MonsterTarget::Random],
+                            target: [MonsterTarget::Random, MonsterTarget::Random, MonsterTarget::Random],
                             aggression: 0,
                             event_on_success: EventToTrigger {
                                 event_id: -1,
@@ -1999,7 +2163,7 @@ mod tests {
                         attack: MonsterAttack {
                             monsters: vec![1],
                             monument: true,
-                            target: vec![MonsterTarget::Random, MonsterTarget::Random, MonsterTarget::Random],
+                            target: [MonsterTarget::Random, MonsterTarget::Random, MonsterTarget::Random],
                             aggression: 0,
                             event_on_success: EventToTrigger {
                                 event_id: 0,

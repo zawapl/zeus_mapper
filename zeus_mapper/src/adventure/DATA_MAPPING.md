@@ -624,7 +624,7 @@ further by `subtype`:
 
 | `event_type` | Meaning                         | `subtype` dispatch                                                                                                                                                                                                                                                                                                                                                                     |
 |-------------:|---------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-|            1 | goods/military request           | `0`=`GoodsRequestSubtype::GeneralRequest`, `3`=`GoodsRequestSubtype::Festival`, `4`=`GoodsRequestSubtype::Construction`, `5`=`GoodsRequestSubtype::Famine`, `6`=`GoodsRequestSubtype::FinancialWoes`, `1`/`2`/`7`=`MilitaryRequestSubtype::CityUnderAttack`/`CityAttacksRival`/`GreekCityTerrorized`. `MilitaryRequest.city` is `fixed_target`/`min_target`/`max_target` like every other fixed-or-range field in this format (`1`/`2` always carry `first_item == Troops`, validated exactly) - see `MilitaryRequestSubtype`'s own doc comment |
+|            1 | goods/military request           | `0`=`GoodsRequestSubtype::GeneralRequest`, `3`=`GoodsRequestSubtype::Festival`, `4`=`GoodsRequestSubtype::Construction`, `5`=`GoodsRequestSubtype::Famine`, `6`=`GoodsRequestSubtype::FinancialWoes`, `1`/`2`/`7`=`MilitaryRequestSubtype::CityUnderAttack`/`CityAttacksRival`/`GreekCityTerrorized`. Both `GoodsRequest.city_min`/`city_max` and `MilitaryRequest.city_min`/`city_max` are `fixed_target`/`min_target`/`max_target` like every other fixed-or-range field in this format (`1`/`2` always carry `first_item == Troops`, validated exactly) - see `MilitaryRequestSubtype`'s own doc comment |
 |            2 | invasion                        | `Invasion`                                                                                                                                                                                                                                                                                                                                                                             |
 |            4 | quest                           | `Quest` - `subtype`/`quest` give the offering god/`QuestType`, the same fields `episode_goals::resolve_quest` reads off the linked event (see the `goal_type == 4` note above)                                                                                                                                                                                                        |
 |            3 | earthquake                      | `Disaster(Earthquake)`                                                                                                                                                                                                                                                                                                                                                                 |
@@ -662,11 +662,21 @@ Field notes:
   `CityConquered` events. `ally_city` is not used by any subtype observed; the earlier assumption that
   it held `CityConquered`'s second city, and that `other_city` held every other subtype's city, was
   wrong (`other_city` reads `0` for every non-`CityConquered` event actually observed).
-- `resolve_range(fixed, min)` collapses `EventData`'s fixed-or-min/max-range quantity pattern (an event
-  stores either a fixed value or a range, whichever half is unused is `u16::MAX`) to one representative
-  value, since `Event` variants only have room for one `u16`/`u8` quantity - this drops the
-  `max` bound on range-based events, an accepted simplification (`Event::to_data` still reproduces
-  whatever it read, so it's not a round-trip bug).
+- `TradeChange.city_min`/`city_max` (the `DemandIncrease`/`DemandDecrease`/`SupplyIncrease`/
+  `SupplyDecrease`/`TradeShutsDown`/`TradeOpensUp` variants) is likewise `fixed_target`/`min_target`/
+  `max_target`, not `other_city` - an earlier version read `other_city` here (which reads `0` for
+  these event types too, the same trap `CityStatusChange` fell into), confirmed wrong against `The
+  Founding of Troy` episode 3's `SupplyDecrease` event (`other_city == 0` but `fixed_target == 6`).
+  The traded
+  resource(s) reuse `resolve_items`/`write_items` (the same up-to-3-item-slot mechanism
+  `GoodsRequestSubtype::GeneralRequest` uses), not a single `first_item` read.
+- `EventData`'s fixed-or-min/max-range quantity pattern (an event stores either a fixed value or a
+  range, whichever half is unused is `u16::MAX`/`-1`) is preserved as a `_min`/`_max` pair (or
+  `RangeInclusive`) on most `Event` variants - a fixed value reads back as `min == max` and
+  round-trips through `to_fixed_or_range` (the write-side inverse of the `if fixed != -1 { .. } else
+  { .. }` read). `WageDecrease.amount` is the one remaining case that collapses the pattern to a
+  single representative value via `resolve_range(fixed, min)` (dropping the `max` bound), an accepted
+  simplification for that type until there's a reason to give it the same `_min`/`_max` treatment.
 - `CityAttackOutcome` is `eff_on_city`'s low byte; the high byte (a "warning stage" flag) isn't modeled.
 - `MonsterAttack.monument` is `mtar1`'s high byte; `target` is built from `mtar1`'s low byte plus
   `mtar2`/`mtar3` (each a `MonsterTarget` id).
