@@ -763,28 +763,40 @@ impl GodInvasion {
 pub struct Disaster {
     pub disaster_type: DisasterSubtype,
     pub marker: u8,
-    pub permanent: bool,
     pub occurrence: Occurrence,
 }
 
 impl Disaster {
-    // `disaster_type` is encoded as `event_type` itself (see DATA_MAPPING.md), so it's always
-    // resolvable for the `event_type`s this is dispatched for; `unwrap_or` is defensive only.
     fn from_data(event: &EventData) -> Disaster {
+        let disaster_type = match event.event_type {
+            5 => DisasterSubtype::Landslide,
+            24 => DisasterSubtype::LavaFlow,
+            25 => DisasterSubtype::TidalWave(event.permanent_flag > 0),
+            28 => DisasterSubtype::SinkLand,
+            _ => DisasterSubtype::Earthquake,
+        };
+
         return Disaster {
-            disaster_type: DisasterSubtype::try_resolve(&event.event_type).unwrap_or(DisasterSubtype::Earthquake),
+            disaster_type,
             marker: resolve_range(event.fixed_target, event.min_target) as u8,
-            permanent: event.permanent_flag > 0,
             occurrence: Occurrence::from_data(event),
         };
     }
 
     fn to_data(&self) -> EventData {
+        let (event_type, permanent_flag) = match self.disaster_type {
+            DisasterSubtype::Earthquake => (3, 0),
+            DisasterSubtype::Landslide => (5, 0),
+            DisasterSubtype::LavaFlow => (24, 0),
+            DisasterSubtype::TidalWave(permanent) => (25, if permanent { 1 } else { 0 }),
+            DisasterSubtype::SinkLand => (28, 0),
+        };
+
         return with_occurrence(
             EventData {
-                event_type: self.disaster_type.value(),
+                event_type,
                 fixed_target: self.marker as i16,
-                permanent_flag: if self.permanent { 1 } else { 0 },
+                permanent_flag,
                 ..EventData::default()
             },
             &self.occurrence,
@@ -792,13 +804,14 @@ impl Disaster {
     }
 }
 
-data_constants!(DisasterSubtype<u8> {
-    Earthquake = 3,
-    Landslide = 5,
-    LavaFlow = 24,
-    TidalWave = 25,
-    SinkLand = 28,
-});
+#[derive(PartialEq, Debug)]
+pub enum DisasterSubtype {
+    Earthquake,
+    Landslide,
+    LavaFlow,
+    TidalWave(bool),
+    SinkLand,
+}
 
 #[derive(PartialEq, Debug)]
 pub struct WageIncrease {
@@ -1552,19 +1565,16 @@ mod tests {
                     Event::Disaster(Disaster {
                         disaster_type: DisasterSubtype::LavaFlow,
                         marker: 1, // needs to be marker_min=1, marker_max=2
-                        permanent: false,
                         occurrence: Occurrence::OneTime(11, BetweenYears(0, 1))
                     }),
                     Event::Disaster(Disaster {
                         disaster_type: DisasterSubtype::LavaFlow,
                         marker: 3, // needs to be marker_min=3, marker_max=4
-                        permanent: false,
                         occurrence: Occurrence::OneTime(3, BetweenYears(1, 3))
                     }),
                     Event::Disaster(Disaster {
                         disaster_type: DisasterSubtype::LavaFlow,
                         marker: 5, // needs to be marker_min=5, marker_max=5
-                        permanent: false,
                         occurrence: Occurrence::OneTime(4, BetweenYears(2, 4))
                     }),
                     Event::CityStatusChange(CityStatusChange {
@@ -1748,20 +1758,17 @@ mod tests {
                     }),
                     Event::Disaster(Disaster {
                         disaster_type: DisasterSubtype::Earthquake,
-                        marker: 1,        // marker_min=1 marker_max=3
-                        permanent: false, // this field only makes sense to TidalWave
+                        marker: 1, // marker_min=1 marker_max=3
                         occurrence: Occurrence::OneTime(2, BetweenYears(1, 1)),
                     }),
                     Event::Disaster(Disaster {
                         disaster_type: DisasterSubtype::LavaFlow,
                         marker: 4,
-                        permanent: false,
                         occurrence: Occurrence::OneTime(3, BetweenYears(1, 1)),
                     }),
                     Event::Disaster(Disaster {
-                        disaster_type: DisasterSubtype::TidalWave,
+                        disaster_type: DisasterSubtype::TidalWave(false),
                         marker: 6,
-                        permanent: false,
                         occurrence: Occurrence::OneTime(1, BetweenYears(1, 1)),
                     }),
                     Event::MonsterInvasion(MonsterInvasion {

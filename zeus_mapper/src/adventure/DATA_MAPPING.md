@@ -670,13 +670,13 @@ Field notes:
 - `CityAttackOutcome` is `eff_on_city`'s low byte; the high byte (a "warning stage" flag) isn't modeled.
 - `MonsterAttack.monument` is `mtar1`'s high byte; `target` is built from `mtar1`'s low byte plus
   `mtar2`/`mtar3` (each a `MonsterTarget` id).
-- `Disaster.permanent` is `EventData.permanent_flag` (confirmed `0`/`1` only - split out of what was a single
-  `unknown_1`/`permanent_flag: UnconfirmedSign<u16>` field, with the other, always-`0` byte promoted to
-  `constant_5_0x00`; see `examples/survey_event_fields.rs`, 1344 real events surveyed). `TidalWave` (`event_type == 25`)
-  is the only disaster kind seen setting it (`EventData::validate_tidal_wave` enforces `0`/`1`); `disaster_type` is
-  encoded as `event_type` itself
-  (each disaster kind is its own top-level type, not a shared type with a subtype), so
-  `DisasterSubtype::value()` returns that raw `event_type` byte directly.
+- `DisasterSubtype::TidalWave(bool)`'s payload is `EventData.permanent_flag` (confirmed `0`/`1` only - split out of
+  what was a single `unknown_1`/`permanent_flag: UnconfirmedSign<u16>` field, with the other, always-`0` byte
+  promoted to `constant_5_0x00`; see `examples/survey_event_fields.rs`, 1344 real events surveyed). `TidalWave`
+  (`event_type == 25`) is the only disaster kind seen setting it (`EventData::validate_tidal_wave` enforces
+  `0`/`1`), so it's the only `DisasterSubtype` variant carrying the flag rather than a shared `Disaster.permanent`
+  field; `disaster_type` is encoded as `event_type` itself (each disaster kind is its own top-level type, not a
+  shared type with a subtype).
 - `Occurrence` comes from `flags` bits `0`/`1` (`1`=triggered-only, `2`=recurring) plus a
   `fixed_time`/`min_time`/`max_time` range (same fixed-or-range pattern as above, but `BetweenYears`
   keeps both bounds since it has room for two `u16`s). Bit `0x20000` is `EpisodeComplete` (no
