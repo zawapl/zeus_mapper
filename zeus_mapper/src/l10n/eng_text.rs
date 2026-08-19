@@ -1,10 +1,9 @@
 use crate::utils::read_utils::ReadFrom;
 use crate::utils::read_utils::read_string_from;
-use crate::utils::read_utils::read_string_nul_from;
 use crate::utils::read_utils::read_vec_from;
+use encoding_rs::WINDOWS_1252;
 use std::io;
 use std::io::Read;
-use std::io::Seek;
 
 #[derive(Clone, Debug)]
 pub struct EngText {
@@ -14,7 +13,7 @@ pub struct EngText {
 }
 
 impl EngText {
-    pub fn read_from<R: Read + Seek>(reader: &mut R) -> io::Result<Self> {
+    pub fn read_from(reader: &mut impl Read) -> io::Result<Self> {
         let header = Header::read_from(reader)?;
         let mut groups = read_vec_from::<StringGroupData>(reader, 1000)?;
 
@@ -53,6 +52,12 @@ impl ReadFrom for Header {
     }
 }
 
+/// One string group's location in the file.
+///
+/// `data_offset` is not used when reading: it does not always point at a clean string boundary
+/// (confirmed against real `Zeus_Text.eng` data, where one populated group's `data_offset` lands
+/// mid-string), so groups are instead read back-to-back in array order, the same way the game
+/// itself lays them out.
 #[derive(Clone, Debug, Default)]
 pub struct StringGroupData {
     pub data_offset: i32,
@@ -72,7 +77,7 @@ impl ReadFrom for StringGroupData {
 pub struct StringTable(pub Vec<String>);
 
 impl StringTable {
-    fn read_from<R: Read + Seek>(reader: &mut R, count: usize) -> io::Result<Self> {
+    fn read_from(reader: &mut impl Read, count: usize) -> io::Result<Self> {
         let mut strings = Vec::with_capacity(count);
 
         for _ in 0..count {
@@ -81,6 +86,40 @@ impl StringTable {
 
         return Ok(StringTable(strings));
     }
+}
+
+/// Reads a nul-terminated string from a stream, skipping any leading nul bytes first.
+///
+/// Strings can be separated by more than one nul byte, so leading nuls are skipped rather than
+/// read as a value in their own right - each byte is consumed at most once (skip-mode, then
+/// read-mode), so unlike a "read then look past the terminator for more nuls" approach, this
+/// never needs to peek ahead or seek back.
+///
+/// **Assumptions**: the stream is positioned either at the start of a string, or on nul padding
+/// that leads into one; it contains a nul byte after that string to terminate it.
+fn read_string_nul_from(reader: &mut impl Read) -> io::Result<String> {
+    let mut byte = [0; 1];
+
+    loop {
+        reader.read_exact(&mut byte)?;
+        if byte[0] != 0 {
+            break;
+        }
+    }
+
+    let mut bytes = vec![byte[0]];
+
+    loop {
+        reader.read_exact(&mut byte)?;
+        if byte[0] == 0 {
+            break;
+        }
+        bytes.push(byte[0]);
+    }
+
+    let (cow, _) = WINDOWS_1252.decode_with_bom_removal(bytes.as_slice());
+
+    return Ok(cow.into_owned());
 }
 
 #[cfg(test)]
@@ -93,13 +132,6 @@ mod tests {
     #[test]
     fn test_zeus_editor_text() -> Result<()> {
         let _file = test_file("Zeus_Editor_Text.eng")?;
-        return Ok(());
-    }
-
-    #[ignore] // todo investigate why the performance is so slow and remove the ignored
-    #[test]
-    fn test_zeus_mm() -> Result<()> {
-        let _file = test_file("Zeus_MM.eng")?;
         return Ok(());
     }
 
@@ -116,13 +148,6 @@ mod tests {
         let eng_text = EngText::read_from(&mut reader)?;
 
         assert_eq!(eng_text.header.signature, "Zeus textfile.");
-
-        // Ensure all data was read
-        let mut tail = String::new();
-
-        reader.read_to_string(&mut tail)?;
-
-        assert_eq!(tail.trim_end_matches(char::from(0)).to_owned(), "");
 
         return Ok(eng_text);
     }

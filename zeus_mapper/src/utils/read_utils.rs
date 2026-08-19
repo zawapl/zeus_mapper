@@ -6,8 +6,6 @@ use std::io::Cursor;
 use std::io::Error;
 use std::io::ErrorKind;
 use std::io::Read;
-use std::io::Seek;
-use std::io::SeekFrom;
 
 pub trait ReadFrom: Sized {
     fn read_from(reader: &mut impl Read) -> io::Result<Self>;
@@ -92,37 +90,6 @@ pub fn read_string_from(reader: &mut impl Read, bytes: usize) -> io::Result<Stri
 
     // todo this may need to vary depending on language, PL seems to be WINDOWS_1250 for example, or maybe all of them are?
     let (cow, _) = WINDOWS_1252.decode_with_bom_removal(buffer.as_slice());
-
-    let result = cow.trim_end_matches(char::from(0)).to_owned();
-
-    return Ok(result);
-}
-
-pub fn read_string_nul_from<R: Read + Seek>(reader: &mut R) -> io::Result<String> {
-    let mut bytes = Vec::new();
-
-    loop {
-        let mut buffer = [0];
-        reader.read_exact(&mut buffer)?;
-
-        if buffer == [0] {
-            // String might be terminated with multiple nul chars, read them all
-            loop {
-                let mut buffer = [0];
-                let count = reader.read(&mut buffer)?;
-                if count == 0 || buffer != [0] {
-                    break;
-                }
-            }
-            reader.seek(SeekFrom::Current(-1))?;
-            break;
-        } else {
-            bytes.push(buffer[0]);
-        }
-    }
-
-    // todo this may need to vary depending on language, PL seems to be WINDOWS_1250 for example, or maybe all of them are?
-    let (cow, _) = WINDOWS_1252.decode_with_bom_removal(bytes.as_slice());
 
     let result = cow.trim_end_matches(char::from(0)).to_owned();
 

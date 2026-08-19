@@ -45,6 +45,8 @@ pub use crate::file_data::world_location_data::WorldLocationData;
 pub use crate::file_data::world_map_element_data::WorldMapElementData;
 pub use crate::l10n::adventure_text::AdventureText;
 pub use crate::l10n::eng_text::EngText;
+pub use crate::l10n::mm_text::MmEntry;
+pub use crate::l10n::mm_text::MmText;
 pub use crate::map_helper::map_accessor::MapAccessor;
 pub use crate::map_helper::map_position::MapPosition;
 pub use crate::map_helper::position_iterator::for_each_position;
