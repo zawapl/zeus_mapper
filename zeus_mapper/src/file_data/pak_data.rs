@@ -103,7 +103,7 @@ impl PakData {
             let row_events = &row[..real_count];
 
             for (j, event) in row_events.iter().enumerate() {
-                if !matches!(event.event_type, 4 | 26) || event.on_success == u16::MAX {
+                if !matches!(event.event_type, 4 | 26) || event.on_success < 0 {
                     continue;
                 }
 
@@ -112,7 +112,7 @@ impl PakData {
                         format!("settings_data.events[{i}][{j}].on_success"),
                         event.on_success,
                         0,
-                        real_count.saturating_sub(1) as u16,
+                        real_count.saturating_sub(1) as i16,
                     ));
                 }
             }

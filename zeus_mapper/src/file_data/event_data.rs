@@ -19,21 +19,21 @@ pub struct EventData {
     pub second_item: i16,
     pub third_item: i16,
     pub amount: u16,
-    pub fixed_amount: u16,
-    pub min_amount: u16,
-    pub max_amount: u16,
+    pub fixed_amount: i16,
+    pub min_amount: i16,
+    pub max_amount: i16,
     pub time: u16,
-    pub fixed_time: u16,
-    pub min_time: u16,
-    pub max_time: u16,
+    pub fixed_time: i16,
+    pub min_time: i16,
+    pub max_time: i16,
     pub target: u16,
-    pub fixed_target: u16,
-    pub min_target: u16,
-    pub max_target: u16,
-    pub on_success: u16,
+    pub fixed_target: i16,
+    pub min_target: i16,
+    pub max_target: i16,
+    pub on_success: i16,
     pub on_failure: u16,
     pub flags: u32,
-    pub warnings: u16,
+    pub warnings: i16,
     pub time_ctr: u16,
     pub status: u16,
     pub need_msg_res: u16,
@@ -48,9 +48,9 @@ pub struct EventData {
     pub trigger_on_2: u16,
     pub eff_on_city: u16,
     pub source: u16,
-    pub source_fixed: u16,
-    pub source_min: u16,
-    pub source_max: u16,
+    pub source_fixed: i16,
+    pub source_min: i16,
+    pub source_max: i16,
     pub subtype: u16,
     pub prev_amount: u16,
     pub related_to_triggered_evt: u32,
@@ -89,6 +89,8 @@ impl EventData {
         }
 
         self.validate_month()?;
+        EventData::validate_non_negative_or_unset("on_success", self.on_success)?;
+        EventData::validate_non_negative("warnings", self.warnings)?;
 
         return match self.event_type {
             1 => self.validate_request(new_file_ver),
@@ -125,7 +127,7 @@ impl EventData {
         self.validate_target_range()?;
 
         if self.warnings < 1 {
-            return Err(ValidationError::expected_range("warnings", self.warnings, 1, u16::MAX));
+            return Err(ValidationError::expected_range("warnings", self.warnings, 1, i16::MAX));
         }
 
         return match self.subtype {
@@ -384,7 +386,7 @@ impl EventData {
         // `warnings` doubles as the disaster's duration here - confirmed against every real
         // adventure, none of which leaves it at `0`, same as `validate_request`'s requirement.
         if self.warnings == 0 {
-            return Err(ValidationError::expected_range("warnings", self.warnings, 1, u16::MAX));
+            return Err(ValidationError::expected_range("warnings", self.warnings, 1, i16::MAX));
         }
 
         return Ok(());
@@ -543,20 +545,24 @@ impl EventData {
     }
 
     fn validate_target_range(&self) -> ValidationResult {
-        if self.fixed_target != u16::MAX {
-            if self.min_target != u16::MAX {
-                return Err(ValidationError::expected_exactly("min_target", self.min_target, u16::MAX));
+        EventData::validate_non_negative_or_unset("fixed_target", self.fixed_target)?;
+        EventData::validate_non_negative_or_unset("min_target", self.min_target)?;
+        EventData::validate_non_negative_or_unset("max_target", self.max_target)?;
+
+        if self.fixed_target >= 0 {
+            if self.min_target >= 0 {
+                return Err(ValidationError::expected_exactly("min_target", self.min_target, -1));
             }
 
-            if self.max_target != u16::MAX {
-                return Err(ValidationError::expected_exactly("max_target", self.max_target, u16::MAX));
+            if self.max_target >= 0 {
+                return Err(ValidationError::expected_exactly("max_target", self.max_target, -1));
             }
 
             return Ok(());
         }
 
-        if self.min_target == u16::MAX || self.max_target == u16::MAX {
-            return Err(ValidationError::expected_range("fixed_target", self.fixed_target, 0, u16::MAX - 1));
+        if self.min_target < 0 || self.max_target < 0 {
+            return Err(ValidationError::expected_range("fixed_target", self.fixed_target, 0, i16::MAX));
         }
 
         if self.max_target < self.min_target {
@@ -564,7 +570,7 @@ impl EventData {
                 "max_target",
                 self.max_target,
                 self.min_target,
-                u16::MAX - 1,
+                i16::MAX,
             ));
         }
 
@@ -572,20 +578,24 @@ impl EventData {
     }
 
     fn validate_source_range(&self) -> ValidationResult {
-        if self.source_fixed != u16::MAX {
-            if self.source_min != u16::MAX {
-                return Err(ValidationError::expected_exactly("source_min", self.source_min, u16::MAX));
+        EventData::validate_non_negative_or_unset("source_fixed", self.source_fixed)?;
+        EventData::validate_non_negative_or_unset("source_min", self.source_min)?;
+        EventData::validate_non_negative_or_unset("source_max", self.source_max)?;
+
+        if self.source_fixed >= 0 {
+            if self.source_min >= 0 {
+                return Err(ValidationError::expected_exactly("source_min", self.source_min, -1));
             }
 
-            if self.source_max != u16::MAX {
-                return Err(ValidationError::expected_exactly("source_max", self.source_max, u16::MAX));
+            if self.source_max >= 0 {
+                return Err(ValidationError::expected_exactly("source_max", self.source_max, -1));
             }
 
             return Ok(());
         }
 
-        if self.source_min == u16::MAX || self.source_max == u16::MAX {
-            return Err(ValidationError::expected_range("source_fixed", self.source_fixed, 0, u16::MAX - 1));
+        if self.source_min < 0 || self.source_max < 0 {
+            return Err(ValidationError::expected_range("source_fixed", self.source_fixed, 0, i16::MAX));
         }
 
         if self.source_max < self.source_min {
@@ -593,7 +603,7 @@ impl EventData {
                 "source_max",
                 self.source_max,
                 self.source_min,
-                u16::MAX - 1,
+                i16::MAX,
             ));
         }
 
@@ -601,37 +611,35 @@ impl EventData {
     }
 
     fn validate_time_range(&self) -> ValidationResult {
-        if self.fixed_time != u16::MAX {
-            if self.min_time != u16::MAX {
-                return Err(ValidationError::expected_exactly("min_time", self.min_time, u16::MAX));
+        EventData::validate_non_negative_or_unset("fixed_time", self.fixed_time)?;
+        EventData::validate_non_negative_or_unset("min_time", self.min_time)?;
+        EventData::validate_non_negative_or_unset("max_time", self.max_time)?;
+
+        if self.fixed_time >= 0 {
+            if self.min_time >= 0 {
+                return Err(ValidationError::expected_exactly("min_time", self.min_time, -1));
             }
 
-            if self.max_time != u16::MAX {
-                return Err(ValidationError::expected_exactly("max_time", self.max_time, u16::MAX));
+            if self.max_time >= 0 {
+                return Err(ValidationError::expected_exactly("max_time", self.max_time, -1));
             }
 
             return Ok(());
         }
 
-        if self.min_time == u16::MAX || self.max_time == u16::MAX {
-            return Err(ValidationError::expected_range("fixed_time", self.fixed_time, 0, u16::MAX - 1));
+        if self.min_time < 0 || self.max_time < 0 {
+            return Err(ValidationError::expected_range("fixed_time", self.fixed_time, 0, i16::MAX));
         }
 
         if self.max_time < self.min_time {
-            return Err(ValidationError::expected_range(
-                "max_time",
-                self.max_time,
-                self.min_time,
-                u16::MAX - 1,
-            ));
+            return Err(ValidationError::expected_range("max_time", self.max_time, self.min_time, i16::MAX));
         }
 
         return Ok(());
     }
 
     fn validate_month(&self) -> ValidationResult {
-        if self.month < 0 || self.month > 11 {
-            // still unsure if that field should be u8 or i8
+        if self.month > 11 {
             return Err(ValidationError::expected_range("month", self.month, 0, 11));
         }
 
@@ -639,7 +647,7 @@ impl EventData {
     }
 
     fn validate_disaster_marker(&self) -> ValidationResult {
-        let marker = if self.fixed_target != u16::MAX {
+        let marker = if self.fixed_target >= 0 {
             self.fixed_target
         } else {
             self.min_target
@@ -711,27 +719,31 @@ impl EventData {
     }
 
     fn validate_amount_range(&self) -> ValidationResult {
-        return self.validate_amount_range_bounded(1, u16::MAX - 1);
+        return self.validate_amount_range_bounded(1, i16::MAX);
     }
 
-    fn validate_amount_range_bounded(&self, min: u16, max: u16) -> ValidationResult {
-        if self.fixed_amount != u16::MAX {
+    fn validate_amount_range_bounded(&self, min: i16, max: i16) -> ValidationResult {
+        EventData::validate_non_negative_or_unset("fixed_amount", self.fixed_amount)?;
+        EventData::validate_non_negative_or_unset("min_amount", self.min_amount)?;
+        EventData::validate_non_negative_or_unset("max_amount", self.max_amount)?;
+
+        if self.fixed_amount >= 0 {
             if !(min..=max).contains(&self.fixed_amount) {
                 return Err(ValidationError::expected_range("fixed_amount", self.fixed_amount, min, max));
             }
 
-            if self.min_amount != u16::MAX {
-                return Err(ValidationError::expected_exactly("min_amount", self.min_amount, u16::MAX));
+            if self.min_amount >= 0 {
+                return Err(ValidationError::expected_exactly("min_amount", self.min_amount, -1));
             }
 
-            if self.max_amount != u16::MAX {
-                return Err(ValidationError::expected_exactly("max_amount", self.max_amount, u16::MAX));
+            if self.max_amount >= 0 {
+                return Err(ValidationError::expected_exactly("max_amount", self.max_amount, -1));
             }
 
             return Ok(());
         }
 
-        if self.min_amount == u16::MAX || self.max_amount == u16::MAX {
+        if self.min_amount < 0 || self.max_amount < 0 {
             return Err(ValidationError::expected_range("fixed_amount", self.fixed_amount, min, max));
         }
 
@@ -741,6 +753,22 @@ impl EventData {
 
         if !(min..=max).contains(&self.min_amount) {
             return Err(ValidationError::expected_range("min_amount", self.min_amount, min, max));
+        }
+
+        return Ok(());
+    }
+
+    fn validate_non_negative_or_unset(name: &'static str, value: i16) -> ValidationResult {
+        if value < -1 {
+            return Err(ValidationError::expected_range(name, value, -1, i16::MAX));
+        }
+
+        return Ok(());
+    }
+
+    fn validate_non_negative(name: &'static str, value: i16) -> ValidationResult {
+        if value < 0 {
+            return Err(ValidationError::expected_range(name, value, 0, i16::MAX));
         }
 
         return Ok(());
@@ -759,18 +787,18 @@ impl Default for EventData {
             second_item: -1,
             third_item: -1,
             amount: 0,
-            fixed_amount: u16::MAX,
-            min_amount: u16::MAX,
-            max_amount: u16::MAX,
+            fixed_amount: -1,
+            min_amount: -1,
+            max_amount: -1,
             time: 0,
-            fixed_time: u16::MAX,
-            min_time: u16::MAX,
-            max_time: u16::MAX,
+            fixed_time: -1,
+            min_time: -1,
+            max_time: -1,
             target: 0,
-            fixed_target: u16::MAX,
-            min_target: u16::MAX,
-            max_target: u16::MAX,
-            on_success: u16::MAX,
+            fixed_target: -1,
+            min_target: -1,
+            max_target: -1,
+            on_success: -1,
             on_failure: u16::MAX,
             flags: 0,
             warnings: 0,
@@ -788,9 +816,9 @@ impl Default for EventData {
             trigger_on_2: u16::MAX,
             eff_on_city: 0,
             source: 0,
-            source_fixed: u16::MAX,
-            source_min: u16::MAX,
-            source_max: u16::MAX,
+            source_fixed: -1,
+            source_min: -1,
+            source_max: -1,
             subtype: 0,
             prev_amount: 0,
             related_to_triggered_evt: 0,

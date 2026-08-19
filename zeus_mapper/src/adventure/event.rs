@@ -67,7 +67,7 @@ impl Event {
         // `subtype` `1`/`2` is shared with some other, still-unidentified `event_type == 1` kind
         // that leaves `fixed_target` unset (a `min_target`/`max_target` range instead) - a real
         // `CityUnderAttack`/`CityAttacksRival` always names one specific city, so gate on that too.
-        let is_city_attack = matches!(event.subtype, 1 | 2) && event.fixed_target != u16::MAX;
+        let is_city_attack = matches!(event.subtype, 1 | 2) && event.fixed_target >= 0;
         if event.event_type == 1 && (event.subtype == 7 || is_city_attack) {
             return Event::MilitaryRequest(MilitaryRequest::from_data(event));
         }
@@ -114,8 +114,8 @@ default_differ_impl!(Event);
 
 // Collapses a fixed-or-range quantity to one representative value; drops the range's `max` bound
 // (see DATA_MAPPING.md) since `Event` variants only have room for one quantity.
-fn resolve_range(fixed: u16, min: u16) -> u16 {
-    return if fixed != u16::MAX { fixed } else { min };
+fn resolve_range(fixed: i16, min: i16) -> u16 {
+    return if fixed != -1 { fixed as u16 } else { min as u16 };
 }
 
 // Stamps `occurrence`'s month/flags/time range onto `event`; used by the various `to_data`
@@ -182,7 +182,7 @@ impl Occurrence {
     }
 
     /// Returns `(month, flags, fixed_time, min_time, max_time)`.
-    fn to_data(self) -> (u8, u32, u16, u16, u16) {
+    fn to_data(self) -> (u8, u32, i16, i16, i16) {
         let (month, between_years, flags) = match self {
             Occurrence::OneTime(month, between_years) => (month, between_years, 0u32),
             Occurrence::Repeating(month, between_years) => (month, between_years, 0x2),
@@ -199,20 +199,20 @@ impl Occurrence {
 pub struct BetweenYears(pub u16, pub u16);
 
 impl BetweenYears {
-    fn from_data(fixed: u16, min: u16, max: u16) -> BetweenYears {
-        return if fixed != u16::MAX {
-            BetweenYears(fixed, fixed)
+    fn from_data(fixed: i16, min: i16, max: i16) -> BetweenYears {
+        return if fixed != -1 {
+            BetweenYears(fixed as u16, fixed as u16)
         } else {
-            BetweenYears(min, max)
+            BetweenYears(min as u16, max as u16)
         };
     }
 
     /// Returns `(fixed_time, min_time, max_time)`.
-    fn to_data(self) -> (u16, u16, u16) {
+    fn to_data(self) -> (i16, i16, i16) {
         if self.0 == self.1 {
-            return (self.0, u16::MAX, u16::MAX);
+            return (self.0 as i16, -1, -1);
         }
-        return (u16::MAX, self.0, self.1);
+        return (-1, self.0 as i16, self.1 as i16);
     }
 }
 
@@ -281,8 +281,8 @@ impl GoodsRequest {
         };
         data.event_type = 1;
         data.other_city = self.city as u8;
-        data.fixed_amount = self.amount;
-        data.warnings = self.warning_months as u16;
+        data.fixed_amount = self.amount as i16;
+        data.warnings = self.warning_months as i16;
 
         return with_occurrence(data, &self.occurrence);
     }
@@ -347,9 +347,9 @@ impl MilitaryRequest {
             },
         };
         data.event_type = 1;
-        data.fixed_target = self.city;
+        data.fixed_target = self.city as i16;
         data.eff_on_city = self.outcome.value();
-        data.warnings = self.warning_months as u16;
+        data.warnings = self.warning_months as i16;
 
         return with_occurrence(data, &self.occurrence);
     }
@@ -393,15 +393,15 @@ pub struct Gift {
 
 impl Gift {
     fn from_data(event: &EventData, new_file_ver: bool) -> Gift {
-        let (city_min, city_max) = if event.fixed_target != u16::MAX {
-            (event.fixed_target, event.fixed_target)
+        let (city_min, city_max) = if event.fixed_target != -1 {
+            (event.fixed_target as u16, event.fixed_target as u16)
         } else {
-            (event.min_target, event.max_target)
+            (event.min_target as u16, event.max_target as u16)
         };
-        let (amount_min, amount_max) = if event.fixed_amount != u16::MAX {
-            (event.fixed_amount, event.fixed_amount)
+        let (amount_min, amount_max) = if event.fixed_amount != -1 {
+            (event.fixed_amount as u16, event.fixed_amount as u16)
         } else {
-            (event.min_amount, event.max_amount)
+            (event.min_amount as u16, event.max_amount as u16)
         };
 
         return Gift {
@@ -422,19 +422,19 @@ impl Gift {
         };
 
         if self.city_min == self.city_max {
-            data.fixed_target = self.city_min;
+            data.fixed_target = self.city_min as i16;
         } else {
-            data.fixed_target = u16::MAX;
-            data.min_target = self.city_min;
-            data.max_target = self.city_max;
+            data.fixed_target = -1;
+            data.min_target = self.city_min as i16;
+            data.max_target = self.city_max as i16;
         }
 
         if self.amount_min == self.amount_max {
-            data.fixed_amount = self.amount_min;
+            data.fixed_amount = self.amount_min as i16;
         } else {
-            data.fixed_amount = u16::MAX;
-            data.min_amount = self.amount_min;
-            data.max_amount = self.amount_max;
+            data.fixed_amount = -1;
+            data.min_amount = self.amount_min as i16;
+            data.max_amount = self.amount_max as i16;
         }
 
         return with_occurrence(data, &self.occurrence);
@@ -490,26 +490,22 @@ data_constants!(MonumentReward<u16> {
 
 #[derive(PartialEq, Debug)]
 pub struct EventToTrigger {
-    /// `-1` (raw `u16::MAX`) means no event is triggered - the game itself displays it as `-1`,
-    /// not `0`, so it's kept distinct here rather than collapsed into a valid event index.
+    /// `-1` means no event is triggered - confirmed against the real editor, which renders
+    /// `EventData.on_success`'s `-1` sentinel as `-1` directly, not `65535`.
     pub event_id: i16,
     pub trigger_type: TriggerType,
 }
 
 impl EventToTrigger {
-    fn from_data(event_id: u16, trigger_type: u16) -> EventToTrigger {
-        let event_id = if event_id == u16::MAX { -1 } else { event_id as i16 };
-
+    fn from_data(event_id: i16, trigger_type: u16) -> EventToTrigger {
         return EventToTrigger {
             event_id,
             trigger_type: TriggerType::try_resolve(&trigger_type).unwrap_or(TriggerType::DirectResult),
         };
     }
 
-    fn to_data(&self) -> (u16, u16) {
-        let event_id = if self.event_id < 0 { u16::MAX } else { self.event_id as u16 };
-
-        return (event_id, self.trigger_type.value());
+    fn to_data(&self) -> (i16, u16) {
+        return (self.event_id, self.trigger_type.value());
     }
 }
 
@@ -541,20 +537,20 @@ pub struct Invasion {
 
 impl Invasion {
     fn from_data(event: &EventData) -> Invasion {
-        let (city_min, city_max) = if event.source_fixed != u16::MAX {
-            (event.source_fixed, event.source_fixed)
+        let (city_min, city_max) = if event.source_fixed != -1 {
+            (event.source_fixed as u16, event.source_fixed as u16)
         } else {
-            (event.source_min, event.source_max)
+            (event.source_min as u16, event.source_max as u16)
         };
-        let (amount_min, amount_max) = if event.fixed_amount != u16::MAX {
-            (event.fixed_amount, event.fixed_amount)
+        let (amount_min, amount_max) = if event.fixed_amount != -1 {
+            (event.fixed_amount as u16, event.fixed_amount as u16)
         } else {
-            (event.min_amount, event.max_amount)
+            (event.min_amount as u16, event.max_amount as u16)
         };
-        let (marker_min, marker_max) = if event.fixed_target != u16::MAX {
-            (event.fixed_target, event.fixed_target)
+        let (marker_min, marker_max) = if event.fixed_target != -1 {
+            (event.fixed_target as u16, event.fixed_target as u16)
         } else {
-            (event.min_target, event.max_target)
+            (event.min_target as u16, event.max_target as u16)
         };
 
         return Invasion {
@@ -574,32 +570,32 @@ impl Invasion {
         let mut data = EventData {
             event_type: 2,
             god_or_mon_or_warship_id: self.warships,
-            warnings: self.warning_months as u16,
+            warnings: self.warning_months as i16,
             ..EventData::default()
         };
 
         if self.city_min == self.city_max {
-            data.source_fixed = self.city_min;
+            data.source_fixed = self.city_min as i16;
         } else {
-            data.source_fixed = u16::MAX;
-            data.source_min = self.city_min;
-            data.source_max = self.city_max;
+            data.source_fixed = -1;
+            data.source_min = self.city_min as i16;
+            data.source_max = self.city_max as i16;
         }
 
         if self.amount_min == self.amount_max {
-            data.fixed_amount = self.amount_min;
+            data.fixed_amount = self.amount_min as i16;
         } else {
-            data.fixed_amount = u16::MAX;
-            data.min_amount = self.amount_min;
-            data.max_amount = self.amount_max;
+            data.fixed_amount = -1;
+            data.min_amount = self.amount_min as i16;
+            data.max_amount = self.amount_max as i16;
         }
 
         if self.marker_min == self.marker_max {
-            data.fixed_target = self.marker_min;
+            data.fixed_target = self.marker_min as i16;
         } else {
-            data.fixed_target = u16::MAX;
-            data.min_target = self.marker_min;
-            data.max_target = self.marker_max;
+            data.fixed_target = -1;
+            data.min_target = self.marker_min as i16;
+            data.max_target = self.marker_max as i16;
         }
 
         return with_occurrence(data, &self.occurrence);
@@ -651,7 +647,7 @@ impl MonsterInvasion {
             MonsterInvasionSubtype::MonsterUnleashed(occurrence) => with_occurrence(self.attack.to_data(26, 1), occurrence),
             MonsterInvasionSubtype::MonsterInvades(warning_months, occurrence) => {
                 let mut data = self.attack.to_data(26, 2);
-                data.warnings = *warning_months as u16;
+                data.warnings = *warning_months as i16;
 
                 with_occurrence(data, occurrence)
             }
@@ -804,7 +800,7 @@ impl Disaster {
         return with_occurrence(
             EventData {
                 event_type: self.disaster_type.value(),
-                fixed_target: self.marker as u16,
+                fixed_target: self.marker as i16,
                 unknown_1: if self.permanent { 0x0100 } else { 0 },
                 ..EventData::default()
             },
@@ -839,7 +835,7 @@ impl WageIncrease {
         return with_occurrence(
             EventData {
                 event_type: 8,
-                fixed_amount: self.amount as u16,
+                fixed_amount: self.amount as i16,
                 ..EventData::default()
             },
             &self.occurrence,
@@ -865,7 +861,7 @@ impl WageDecrease {
         return with_occurrence(
             EventData {
                 event_type: 9,
-                fixed_amount: self.amount as u16,
+                fixed_amount: self.amount as i16,
                 ..EventData::default()
             },
             &self.occurrence,
@@ -913,40 +909,40 @@ impl TradeChange {
                 event_type: 13,
                 other_city: *city as u8,
                 first_item: resource.value() as i16,
-                fixed_amount: *amount as u16,
+                fixed_amount: *amount as i16,
                 ..EventData::default()
             },
             TradeChangeSubtype::DemandDecrease(city, resource, amount) => EventData {
                 event_type: 14,
                 other_city: *city as u8,
                 first_item: resource.value() as i16,
-                fixed_amount: *amount as u16,
+                fixed_amount: *amount as i16,
                 ..EventData::default()
             },
             TradeChangeSubtype::SupplyIncrease(city, resource, amount) => EventData {
                 event_type: 21,
                 other_city: *city as u8,
                 first_item: resource.value() as i16,
-                fixed_amount: *amount as u16,
+                fixed_amount: *amount as i16,
                 ..EventData::default()
             },
             TradeChangeSubtype::SupplyDecrease(city, resource, amount) => EventData {
                 event_type: 22,
                 other_city: *city as u8,
                 first_item: resource.value() as i16,
-                fixed_amount: *amount as u16,
+                fixed_amount: *amount as i16,
                 ..EventData::default()
             },
             TradeChangeSubtype::PriceIncrease(resource, amount) => EventData {
                 event_type: 15,
                 first_item: resource.value() as i16,
-                fixed_amount: *amount as u16,
+                fixed_amount: *amount as i16,
                 ..EventData::default()
             },
             TradeChangeSubtype::PriceDecrease(resource, amount) => EventData {
                 event_type: 16,
                 first_item: resource.value() as i16,
-                fixed_amount: *amount as u16,
+                fixed_amount: *amount as i16,
                 ..EventData::default()
             },
             TradeChangeSubtype::TradeShutsDown(city) => EventData {
@@ -997,10 +993,10 @@ default_differ_impl!(CityStatusChange);
 impl CityStatusChange {
     fn from_data(event: &EventData) -> CityStatusChange {
         let amount = resolve_range(event.fixed_amount, event.min_amount);
-        let (city_min, city_max) = if event.fixed_target != u16::MAX {
-            (event.fixed_target, event.fixed_target)
+        let (city_min, city_max) = if event.fixed_target != -1 {
+            (event.fixed_target as u16, event.fixed_target as u16)
         } else {
-            (event.min_target, event.max_target)
+            (event.min_target as u16, event.max_target as u16)
         };
 
         let subtype = match event.subtype {
@@ -1054,27 +1050,27 @@ impl CityStatusChange {
             CityStatusChangeSubtype::GodDisaster(god, warning_months) => EventData {
                 subtype: 13,
                 god_or_mon_or_warship_id: god.value() as u16,
-                warnings: *warning_months as u16,
+                warnings: *warning_months as i16,
                 ..EventData::default()
             },
             CityStatusChangeSubtype::MilitaryBuildup(amount) => EventData {
                 subtype: 14,
-                fixed_amount: *amount as u16,
+                fixed_amount: *amount as i16,
                 ..EventData::default()
             },
             CityStatusChangeSubtype::MilitaryDecline(amount) => EventData {
                 subtype: 15,
-                fixed_amount: *amount as u16,
+                fixed_amount: *amount as i16,
                 ..EventData::default()
             },
             CityStatusChangeSubtype::EconomicProsperity(amount) => EventData {
                 subtype: 16,
-                fixed_amount: *amount as u16,
+                fixed_amount: *amount as i16,
                 ..EventData::default()
             },
             CityStatusChangeSubtype::EconomicDecline(amount) => EventData {
                 subtype: 17,
-                fixed_amount: *amount as u16,
+                fixed_amount: *amount as i16,
                 ..EventData::default()
             },
             CityStatusChangeSubtype::CityBecomesActive => EventData {
@@ -1106,13 +1102,13 @@ impl CityStatusChange {
         data.event_type = 19;
 
         if self.city_min == self.city_max {
-            data.fixed_target = self.city_min;
-            data.min_target = u16::MAX;
-            data.max_target = u16::MAX;
+            data.fixed_target = self.city_min as i16;
+            data.min_target = -1;
+            data.max_target = -1;
         } else {
-            data.fixed_target = u16::MAX;
-            data.min_target = self.city_min;
-            data.max_target = self.city_max;
+            data.fixed_target = -1;
+            data.min_target = self.city_min as i16;
+            data.max_target = self.city_max as i16;
         }
 
         return with_occurrence(data, &self.occurrence);
