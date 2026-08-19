@@ -792,7 +792,7 @@ impl Disaster {
         return Disaster {
             disaster_type: DisasterSubtype::try_resolve(&event.event_type).unwrap_or(DisasterSubtype::Earthquake),
             marker: resolve_range(event.fixed_target, event.min_target) as u8,
-            permanent: (*event.unknown_1 >> 8) != 0,
+            permanent: event.permanent_flag > 0,
             occurrence: Occurrence::from_data(event),
         };
     }
@@ -802,7 +802,7 @@ impl Disaster {
             EventData {
                 event_type: self.disaster_type.value(),
                 fixed_target: self.marker as i16,
-                unknown_1: UnconfirmedSign(if self.permanent { 0x0100 } else { 0 }),
+                permanent_flag: if self.permanent { 1 } else { 0 },
                 ..EventData::default()
             },
             &self.occurrence,

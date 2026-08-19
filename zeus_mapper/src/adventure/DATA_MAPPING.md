@@ -670,7 +670,11 @@ Field notes:
 - `CityAttackOutcome` is `eff_on_city`'s low byte; the high byte (a "warning stage" flag) isn't modeled.
 - `MonsterAttack.monument` is `mtar1`'s high byte; `target` is built from `mtar1`'s low byte plus
   `mtar2`/`mtar3` (each a `MonsterTarget` id).
-- `Disaster.permanent` is `unknown_5`'s high byte; `disaster_type` is encoded as `event_type` itself
+- `Disaster.permanent` is `EventData.permanent_flag` (confirmed `0`/`1` only - split out of what was a single
+  `unknown_1`/`permanent_flag: UnconfirmedSign<u16>` field, with the other, always-`0` byte promoted to
+  `constant_5_0x00`; see `examples/survey_event_fields.rs`, 1344 real events surveyed). `TidalWave` (`event_type == 25`)
+  is the only disaster kind seen setting it (`EventData::validate_tidal_wave` enforces `0`/`1`); `disaster_type` is
+  encoded as `event_type` itself
   (each disaster kind is its own top-level type, not a shared type with a subtype), so
   `DisasterSubtype::value()` returns that raw `event_type` byte directly.
 - `Occurrence` comes from `flags` bits `0`/`1` (`1`=triggered-only, `2`=recurring) plus a

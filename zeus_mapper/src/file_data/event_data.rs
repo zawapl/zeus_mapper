@@ -66,7 +66,8 @@ pub struct EventData {
     pub ally_city: UnconfirmedSign<u8>,
     pub ally_strength: UnconfirmedSign<u8>,
     pub to_strength: UnconfirmedSign<u8>,
-    pub unknown_1: UnconfirmedSign<u16>,
+    pub constant_5_0x00: u8,
+    pub permanent_flag: u8,
     pub quest: u8,
     pub tail: UnconfirmedSign<u8>,
 }
@@ -87,6 +88,10 @@ impl EventData {
 
         if self.constant_4_0x00 != 0 {
             return Err(ValidationError::expected_exactly("constant_4_0x00", self.constant_4_0x00, 0));
+        }
+
+        if self.constant_5_0x00 != 0 {
+            return Err(ValidationError::expected_exactly("constant_5_0x00", self.constant_5_0x00, 0));
         }
 
         self.validate_month()?;
@@ -486,7 +491,13 @@ impl EventData {
     fn validate_tidal_wave(&self) -> ValidationResult {
         self.validate_time_range()?;
         self.validate_target_range()?;
-        return self.validate_disaster_marker();
+        self.validate_disaster_marker()?;
+
+        if !matches!(self.permanent_flag, 0 | 1) {
+            return Err(ValidationError::expected_one_of("permanent_flag", self.permanent_flag, &[0, 1]));
+        }
+
+        return Ok(());
     }
 
     fn validate_monster_invasion(&self, new_file_ver: bool) -> ValidationResult {
@@ -834,7 +845,8 @@ impl Default for EventData {
             ally_city: UnconfirmedSign(0),
             ally_strength: UnconfirmedSign(0),
             to_strength: UnconfirmedSign(0),
-            unknown_1: UnconfirmedSign(0),
+            constant_5_0x00: 0,
+            permanent_flag: 0,
             quest: 0,
             tail: UnconfirmedSign(0),
         };
@@ -898,7 +910,8 @@ impl ReadFrom for EventData {
             ally_city: ReadFrom::read_from(reader)?,
             ally_strength: ReadFrom::read_from(reader)?,
             to_strength: ReadFrom::read_from(reader)?,
-            unknown_1: ReadFrom::read_from(reader)?,
+            constant_5_0x00: ReadFrom::read_from(reader)?,
+            permanent_flag: ReadFrom::read_from(reader)?,
             quest: ReadFrom::read_from(reader)?,
             tail: ReadFrom::read_from(reader)?,
         });
@@ -963,7 +976,8 @@ impl WriteTo for EventData {
         bytes += WriteTo::write_to(&self.ally_city, writer)?;
         bytes += WriteTo::write_to(&self.ally_strength, writer)?;
         bytes += WriteTo::write_to(&self.to_strength, writer)?;
-        bytes += WriteTo::write_to(&self.unknown_1, writer)?;
+        bytes += WriteTo::write_to(&self.constant_5_0x00, writer)?;
+        bytes += WriteTo::write_to(&self.permanent_flag, writer)?;
         bytes += WriteTo::write_to(&self.quest, writer)?;
         bytes += WriteTo::write_to(&self.tail, writer)?;
 
@@ -1044,9 +1058,10 @@ mod tests {
             ally_city: UnconfirmedSign(60),
             ally_strength: UnconfirmedSign(61),
             to_strength: UnconfirmedSign(62),
-            unknown_1: UnconfirmedSign(63),
-            quest: 64,
-            tail: UnconfirmedSign(65),
+            constant_5_0x00: 63,
+            permanent_flag: 64,
+            quest: 65,
+            tail: UnconfirmedSign(66),
         };
 
         let mut buffer = vec![];

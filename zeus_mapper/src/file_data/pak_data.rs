@@ -496,7 +496,8 @@ mod tests {
                 ally_city: self.generate_data(),
                 ally_strength: self.generate_data(),
                 to_strength: self.generate_data(),
-                unknown_1: self.generate_data(),
+                constant_5_0x00: self.generate_data(),
+                permanent_flag: self.generate_data(),
                 quest: self.generate_data(),
                 tail: self.generate_data(),
             };
