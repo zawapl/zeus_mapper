@@ -1,5 +1,6 @@
 use crate::constants::data_constant::DataConstant;
 use crate::file_data::resource_id::ResourceId;
+use crate::file_data::unconfirmed_sign::UnconfirmedSign;
 use crate::utils::read_utils::ReadFrom;
 use crate::utils::validation::ValidationError;
 use crate::utils::validation::ValidationResult;
@@ -18,56 +19,56 @@ pub struct EventData {
     pub first_item: i16,
     pub second_item: i16,
     pub third_item: i16,
-    pub amount: u16,
+    pub amount: UnconfirmedSign<u16>,
     pub fixed_amount: i16,
     pub min_amount: i16,
     pub max_amount: i16,
-    pub time: u16,
+    pub time: UnconfirmedSign<u16>,
     pub fixed_time: i16,
     pub min_time: i16,
     pub max_time: i16,
-    pub target: u16,
+    pub target: UnconfirmedSign<u16>,
     pub fixed_target: i16,
     pub min_target: i16,
     pub max_target: i16,
     pub on_success: i16,
-    pub on_failure: u16,
+    pub on_failure: UnconfirmedSign<u16>,
     pub flags: u32,
     pub warnings: i16,
-    pub time_ctr: u16,
-    pub status: u16,
-    pub need_msg_res: u16,
-    pub triggerer: u16,
-    pub god_or_mon_or_warship_id: u16,
-    pub mtar1: u16,
-    pub mtar2: u16,
-    pub mtar3: u16,
-    pub magg: u16,
-    pub unkown_row: [u16; 9],
-    pub trigger_on_1: u16,
-    pub trigger_on_2: u16,
-    pub eff_on_city: u16,
-    pub source: u16,
+    pub time_ctr: UnconfirmedSign<u16>,
+    pub status: UnconfirmedSign<u16>,
+    pub need_msg_res: UnconfirmedSign<u16>,
+    pub triggerer: UnconfirmedSign<u16>,
+    pub god_or_mon_or_warship_id: UnconfirmedSign<u16>,
+    pub mtar1: UnconfirmedSign<u16>,
+    pub mtar2: UnconfirmedSign<u16>,
+    pub mtar3: UnconfirmedSign<u16>,
+    pub magg: UnconfirmedSign<u16>,
+    pub unkown_row: [UnconfirmedSign<u16>; 9],
+    pub trigger_on_1: UnconfirmedSign<u16>,
+    pub trigger_on_2: UnconfirmedSign<u16>,
+    pub eff_on_city: UnconfirmedSign<u16>,
+    pub source: UnconfirmedSign<u16>,
     pub source_fixed: i16,
     pub source_min: i16,
     pub source_max: i16,
     pub subtype: u16,
-    pub prev_amount: u16,
-    pub related_to_triggered_evt: u32,
+    pub prev_amount: UnconfirmedSign<u16>,
+    pub related_to_triggered_evt: UnconfirmedSign<u32>,
     pub constant_1_0x00: u16,
-    pub trig_reason: u16,
+    pub trig_reason: UnconfirmedSign<u16>,
     pub constant_2_0x00: u16,
     pub constant_3_0x00: u8,
     pub other_city: u8,
-    pub loot_type: u16,
-    pub loot_amount: u16,
+    pub loot_type: UnconfirmedSign<u16>,
+    pub loot_amount: UnconfirmedSign<u16>,
     pub constant_4_0x00: u8,
-    pub ally_city: u8,
-    pub ally_strength: u8,
-    pub to_strength: u8,
-    pub unknown_1: u16,
+    pub ally_city: UnconfirmedSign<u8>,
+    pub ally_strength: UnconfirmedSign<u8>,
+    pub to_strength: UnconfirmedSign<u8>,
+    pub unknown_1: UnconfirmedSign<u16>,
     pub quest: u8,
-    pub tail: u8,
+    pub tail: UnconfirmedSign<u8>,
 }
 
 impl EventData {
@@ -169,16 +170,16 @@ impl EventData {
     }
 
     fn validate_city_under_attack(&self, new_file_ver: bool) -> ValidationResult {
-        if !matches!(self.eff_on_city, 0 | 1 | 2) {
-            return Err(ValidationError::expected_one_of("eff_on_city", self.eff_on_city, &[0, 1, 2]));
+        if !matches!(*self.eff_on_city, 0 | 1 | 2) {
+            return Err(ValidationError::expected_one_of("eff_on_city", *self.eff_on_city, &[0, 1, 2]));
         }
 
         return self.validate_item_exact(ResourceId::Troops.value(), new_file_ver);
     }
 
     fn validate_city_attacks_rival(&self, new_file_ver: bool) -> ValidationResult {
-        if !matches!(self.eff_on_city, 0 | 2) {
-            return Err(ValidationError::expected_one_of("eff_on_city", self.eff_on_city, &[0, 2]));
+        if !matches!(*self.eff_on_city, 0 | 2) {
+            return Err(ValidationError::expected_one_of("eff_on_city", *self.eff_on_city, &[0, 2]));
         }
         return self.validate_item_exact(ResourceId::Troops.value(), new_file_ver);
     }
@@ -202,10 +203,10 @@ impl EventData {
             new_file_ver,
         )?;
 
-        if self.god_or_mon_or_warship_id > 13 {
+        if *self.god_or_mon_or_warship_id > 13 {
             return Err(ValidationError::expected_range(
                 "god_or_mon_or_warship_id",
-                self.god_or_mon_or_warship_id,
+                *self.god_or_mon_or_warship_id,
                 0,
                 13,
             ));
@@ -215,14 +216,14 @@ impl EventData {
     }
 
     fn validate_city_terrorized(&self, new_file_ver: bool) -> ValidationResult {
-        if !matches!(self.eff_on_city, 0 | 1) {
-            return Err(ValidationError::expected_one_of("eff_on_city", self.eff_on_city, &[0, 1]));
+        if !matches!(*self.eff_on_city, 0 | 1) {
+            return Err(ValidationError::expected_one_of("eff_on_city", *self.eff_on_city, &[0, 1]));
         }
 
-        if !matches!(self.god_or_mon_or_warship_id, 0 | 1 | 2) {
+        if !matches!(*self.god_or_mon_or_warship_id, 0 | 1 | 2) {
             return Err(ValidationError::expected_one_of(
                 "god_or_mon_or_warship_id",
-                self.god_or_mon_or_warship_id,
+                *self.god_or_mon_or_warship_id,
                 &[0, 1, 2],
             ));
         }
@@ -374,10 +375,10 @@ impl EventData {
     }
 
     fn validate_god_disaster(&self) -> ValidationResult {
-        if self.god_or_mon_or_warship_id > 13 {
+        if *self.god_or_mon_or_warship_id > 13 {
             return Err(ValidationError::expected_range(
                 "god_or_mon_or_warship_id",
-                self.god_or_mon_or_warship_id,
+                *self.god_or_mon_or_warship_id,
                 0,
                 13,
             ));
@@ -786,56 +787,56 @@ impl Default for EventData {
             first_item: -1,
             second_item: -1,
             third_item: -1,
-            amount: 0,
+            amount: UnconfirmedSign(0),
             fixed_amount: -1,
             min_amount: -1,
             max_amount: -1,
-            time: 0,
+            time: UnconfirmedSign(0),
             fixed_time: -1,
             min_time: -1,
             max_time: -1,
-            target: 0,
+            target: UnconfirmedSign(0),
             fixed_target: -1,
             min_target: -1,
             max_target: -1,
             on_success: -1,
-            on_failure: u16::MAX,
+            on_failure: UnconfirmedSign(u16::MAX),
             flags: 0,
             warnings: 0,
-            time_ctr: 0,
-            status: 0,
-            need_msg_res: 0,
-            triggerer: u16::MAX,
-            god_or_mon_or_warship_id: 0,
-            mtar1: 0,
-            mtar2: 0,
-            mtar3: 0,
-            magg: 0,
-            unkown_row: [0; 9],
-            trigger_on_1: u16::MAX,
-            trigger_on_2: u16::MAX,
-            eff_on_city: 0,
-            source: 0,
+            time_ctr: UnconfirmedSign(0),
+            status: UnconfirmedSign(0),
+            need_msg_res: UnconfirmedSign(0),
+            triggerer: UnconfirmedSign(u16::MAX),
+            god_or_mon_or_warship_id: UnconfirmedSign(0),
+            mtar1: UnconfirmedSign(0),
+            mtar2: UnconfirmedSign(0),
+            mtar3: UnconfirmedSign(0),
+            magg: UnconfirmedSign(0),
+            unkown_row: [UnconfirmedSign(0); 9],
+            trigger_on_1: UnconfirmedSign(u16::MAX),
+            trigger_on_2: UnconfirmedSign(u16::MAX),
+            eff_on_city: UnconfirmedSign(0),
+            source: UnconfirmedSign(0),
             source_fixed: -1,
             source_min: -1,
             source_max: -1,
             subtype: 0,
-            prev_amount: 0,
-            related_to_triggered_evt: 0,
+            prev_amount: UnconfirmedSign(0),
+            related_to_triggered_evt: UnconfirmedSign(0),
             constant_1_0x00: 0,
-            trig_reason: 0,
+            trig_reason: UnconfirmedSign(0),
             constant_2_0x00: 0,
             constant_3_0x00: 0,
             other_city: 0,
-            loot_type: 0,
-            loot_amount: 0,
+            loot_type: UnconfirmedSign(0),
+            loot_amount: UnconfirmedSign(0),
             constant_4_0x00: 0,
-            ally_city: 0,
-            ally_strength: 0,
-            to_strength: 0,
-            unknown_1: 0,
+            ally_city: UnconfirmedSign(0),
+            ally_strength: UnconfirmedSign(0),
+            to_strength: UnconfirmedSign(0),
+            unknown_1: UnconfirmedSign(0),
             quest: 0,
-            tail: 0,
+            tail: UnconfirmedSign(0),
         };
     }
 }
@@ -986,56 +987,66 @@ mod tests {
             first_item: 5,
             second_item: 6,
             third_item: 7,
-            amount: 8,
+            amount: UnconfirmedSign(8),
             fixed_amount: 9,
             min_amount: 10,
             max_amount: 11,
-            time: 12,
+            time: UnconfirmedSign(12),
             fixed_time: 13,
             min_time: 14,
             max_time: 15,
-            target: 16,
+            target: UnconfirmedSign(16),
             fixed_target: 17,
             min_target: 18,
             max_target: 19,
             on_success: 20,
-            on_failure: 21,
+            on_failure: UnconfirmedSign(21),
             flags: 22,
             warnings: 23,
-            time_ctr: 24,
-            status: 25,
-            need_msg_res: 26,
-            triggerer: 27,
-            god_or_mon_or_warship_id: 28,
-            mtar1: 29,
-            mtar2: 30,
-            mtar3: 31,
-            magg: 32,
-            unkown_row: [33, 34, 35, 36, 37, 38, 39, 40, 41],
-            trigger_on_1: 42,
-            trigger_on_2: 43,
-            eff_on_city: 44,
-            source: 45,
+            time_ctr: UnconfirmedSign(24),
+            status: UnconfirmedSign(25),
+            need_msg_res: UnconfirmedSign(26),
+            triggerer: UnconfirmedSign(27),
+            god_or_mon_or_warship_id: UnconfirmedSign(28),
+            mtar1: UnconfirmedSign(29),
+            mtar2: UnconfirmedSign(30),
+            mtar3: UnconfirmedSign(31),
+            magg: UnconfirmedSign(32),
+            unkown_row: [
+                UnconfirmedSign(33),
+                UnconfirmedSign(34),
+                UnconfirmedSign(35),
+                UnconfirmedSign(36),
+                UnconfirmedSign(37),
+                UnconfirmedSign(38),
+                UnconfirmedSign(39),
+                UnconfirmedSign(40),
+                UnconfirmedSign(41),
+            ],
+            trigger_on_1: UnconfirmedSign(42),
+            trigger_on_2: UnconfirmedSign(43),
+            eff_on_city: UnconfirmedSign(44),
+            source: UnconfirmedSign(45),
             source_fixed: 46,
             source_min: 47,
             source_max: 48,
             subtype: 49,
-            prev_amount: 50,
-            related_to_triggered_evt: 51,
+            prev_amount: UnconfirmedSign(50),
+            related_to_triggered_evt: UnconfirmedSign(51),
             constant_1_0x00: 52,
-            trig_reason: 53,
+            trig_reason: UnconfirmedSign(53),
             constant_2_0x00: 54,
             constant_3_0x00: 55,
             other_city: 56,
-            loot_type: 57,
-            loot_amount: 58,
+            loot_type: UnconfirmedSign(57),
+            loot_amount: UnconfirmedSign(58),
             constant_4_0x00: 59,
-            ally_city: 60,
-            ally_strength: 61,
-            to_strength: 62,
-            unknown_1: 63,
+            ally_city: UnconfirmedSign(60),
+            ally_strength: UnconfirmedSign(61),
+            to_strength: UnconfirmedSign(62),
+            unknown_1: UnconfirmedSign(63),
             quest: 64,
-            tail: 65,
+            tail: UnconfirmedSign(65),
         };
 
         let mut buffer = vec![];

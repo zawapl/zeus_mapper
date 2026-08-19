@@ -65,6 +65,17 @@ impl<T: DataConstant + PartialEq + Debug> LogDifferences for T {
     }
 }
 
+impl<T> LogDifferences for UnconfirmedSign<T>
+where
+    T: PartialEq + Debug,
+{
+    fn log_differences(a: &Self, b: &Self, context: String) {
+        if a != b {
+            println!("{context}: difference: {a:?} vs {b:?}");
+        }
+    }
+}
+
 macro_rules! default_differ_impl {
     ($x:tt) => {
         impl crate::prelude::LogDifferences for $x {
@@ -78,6 +89,7 @@ macro_rules! default_differ_impl {
 }
 
 use crate::prelude::DataConstant;
+use crate::prelude::UnconfirmedSign;
 pub(crate) use default_differ_impl;
 
 default_differ_impl!(bool);

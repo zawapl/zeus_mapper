@@ -7,6 +7,7 @@ use crate::differ::default_differ_impl;
 use crate::prelude::BoxedArray;
 use crate::prelude::DataConstant;
 use crate::prelude::EventData;
+use crate::prelude::UnconfirmedSign;
 
 pub type WarningMonths = u8;
 
@@ -233,7 +234,7 @@ impl GoodsRequest {
 
         let subtype = match event.subtype {
             3 => {
-                let god = God::try_resolve(&(event.god_or_mon_or_warship_id as u32)).unwrap_or(God::Zeus);
+                let god = God::try_resolve(&(*event.god_or_mon_or_warship_id as u32)).unwrap_or(God::Zeus);
                 GoodsRequestSubtype::Festival(resource, god)
             }
             4 => GoodsRequestSubtype::Construction(resource),
@@ -262,7 +263,7 @@ impl GoodsRequest {
             GoodsRequestSubtype::Festival(resource, god) => EventData {
                 subtype: 3,
                 first_item: resource.value() as i16,
-                god_or_mon_or_warship_id: god.value() as u16,
+                god_or_mon_or_warship_id: UnconfirmedSign(god.value() as u16),
                 ..EventData::default()
             },
             GoodsRequestSubtype::Construction(resource) => EventData {
@@ -310,13 +311,13 @@ default_differ_impl!(MilitaryRequest);
 
 impl MilitaryRequest {
     fn from_data(event: &EventData) -> MilitaryRequest {
-        let outcome = CityAttackOutcome::try_resolve(&(event.eff_on_city & 0xFF)).unwrap_or(CityAttackOutcome::Unaffected);
+        let outcome = CityAttackOutcome::try_resolve(&(*event.eff_on_city & 0xFF)).unwrap_or(CityAttackOutcome::Unaffected);
 
         let subtype = match event.subtype {
             1 => MilitaryRequestSubtype::CityUnderAttack(event.other_city as u16),
             2 => MilitaryRequestSubtype::CityAttacksRival(event.other_city as u16),
             // Covers `7` and any unrecognized subtype.
-            _ => MilitaryRequestSubtype::GreekCityTerrorized(event.god_or_mon_or_warship_id),
+            _ => MilitaryRequestSubtype::GreekCityTerrorized(*event.god_or_mon_or_warship_id),
         };
 
         return MilitaryRequest {
@@ -342,13 +343,13 @@ impl MilitaryRequest {
             },
             MilitaryRequestSubtype::GreekCityTerrorized(monster_index) => EventData {
                 subtype: 7,
-                god_or_mon_or_warship_id: *monster_index,
+                god_or_mon_or_warship_id: UnconfirmedSign(*monster_index),
                 ..EventData::default()
             },
         };
         data.event_type = 1;
         data.fixed_target = self.city as i16;
-        data.eff_on_city = self.outcome.value();
+        data.eff_on_city = UnconfirmedSign(self.outcome.value());
         data.warnings = self.warning_months as i16;
 
         return with_occurrence(data, &self.occurrence);
@@ -457,8 +458,8 @@ impl Quest {
             god: God::try_resolve(&(event.subtype as u32)).unwrap_or(God::Zeus),
             quest_type: if event.quest == 0 { QuestType::Type0 } else { QuestType::Type1 },
             city: event.other_city as u16,
-            reward: MonumentReward::try_resolve(&event.loot_type).unwrap_or(MonumentReward::None),
-            trigger: EventToTrigger::from_data(event.on_success, event.trig_reason),
+            reward: MonumentReward::try_resolve(&*event.loot_type).unwrap_or(MonumentReward::None),
+            trigger: EventToTrigger::from_data(event.on_success, *event.trig_reason),
             occurrence: Occurrence::from_data(event),
         };
     }
@@ -472,9 +473,9 @@ impl Quest {
                 subtype: self.god.value() as u16,
                 quest: if self.quest_type == QuestType::Type0 { 0 } else { 1 },
                 other_city: self.city as u8,
-                loot_type: self.reward.value(),
+                loot_type: UnconfirmedSign(self.reward.value()),
                 on_success,
-                trig_reason,
+                trig_reason: UnconfirmedSign(trig_reason),
                 ..EventData::default()
             },
             &self.occurrence,
@@ -556,7 +557,7 @@ impl Invasion {
         return Invasion {
             city_min,
             city_max,
-            warships: event.god_or_mon_or_warship_id,
+            warships: *event.god_or_mon_or_warship_id,
             amount_min,
             amount_max,
             marker_min,
@@ -569,7 +570,7 @@ impl Invasion {
     fn to_data(&self) -> EventData {
         let mut data = EventData {
             event_type: 2,
-            god_or_mon_or_warship_id: self.warships,
+            god_or_mon_or_warship_id: UnconfirmedSign(self.warships),
             warnings: self.warning_months as i16,
             ..EventData::default()
         };
@@ -683,18 +684,18 @@ impl MonsterAttack {
             .map(|id| id as u8)
             .collect();
 
-        let target = [event.mtar1 & 0xFF, event.mtar2, event.mtar3]
+        let target = [*event.mtar1 & 0xFF, *event.mtar2, *event.mtar3]
             .into_iter()
             .filter_map(|value| MonsterTarget::try_resolve(&value))
             .collect();
 
-        let event_on_success = EventToTrigger::from_data(event.on_success, event.trig_reason);
+        let event_on_success = EventToTrigger::from_data(event.on_success, *event.trig_reason);
 
         return MonsterAttack {
             monsters,
-            monument: (event.mtar1 >> 8) != 0,
+            monument: (*event.mtar1 >> 8) != 0,
             target,
-            aggression: event.magg as u8,
+            aggression: *event.magg as u8,
             event_on_success,
         };
     }
@@ -718,12 +719,12 @@ impl MonsterAttack {
             first_item,
             second_item,
             third_item,
-            mtar1: mtar1_target | monument_bit,
-            mtar2,
-            mtar3,
-            magg: self.aggression as u16,
+            mtar1: UnconfirmedSign(mtar1_target | monument_bit),
+            mtar2: UnconfirmedSign(mtar2),
+            mtar3: UnconfirmedSign(mtar3),
+            magg: UnconfirmedSign(self.aggression as u16),
             on_success,
-            trig_reason,
+            trig_reason: UnconfirmedSign(trig_reason),
             ..EventData::default()
         };
     }
@@ -791,7 +792,7 @@ impl Disaster {
         return Disaster {
             disaster_type: DisasterSubtype::try_resolve(&event.event_type).unwrap_or(DisasterSubtype::Earthquake),
             marker: resolve_range(event.fixed_target, event.min_target) as u8,
-            permanent: (event.unknown_1 >> 8) != 0,
+            permanent: (*event.unknown_1 >> 8) != 0,
             occurrence: Occurrence::from_data(event),
         };
     }
@@ -801,7 +802,7 @@ impl Disaster {
             EventData {
                 event_type: self.disaster_type.value(),
                 fixed_target: self.marker as i16,
-                unknown_1: if self.permanent { 0x0100 } else { 0 },
+                unknown_1: UnconfirmedSign(if self.permanent { 0x0100 } else { 0 }),
                 ..EventData::default()
             },
             &self.occurrence,
@@ -1003,7 +1004,7 @@ impl CityStatusChange {
             10 => CityStatusChangeSubtype::CityBecomesRival,
             11 => CityStatusChangeSubtype::CityBecomesVassal,
             13 => {
-                let god = God::try_resolve(&(event.god_or_mon_or_warship_id as u32)).unwrap_or(God::Zeus);
+                let god = God::try_resolve(&(*event.god_or_mon_or_warship_id as u32)).unwrap_or(God::Zeus);
                 CityStatusChangeSubtype::GodDisaster(god, event.warnings as u8)
             }
             14 => CityStatusChangeSubtype::MilitaryBuildup(amount as u8),
@@ -1049,7 +1050,7 @@ impl CityStatusChange {
             },
             CityStatusChangeSubtype::GodDisaster(god, warning_months) => EventData {
                 subtype: 13,
-                god_or_mon_or_warship_id: god.value() as u16,
+                god_or_mon_or_warship_id: UnconfirmedSign(god.value() as u16),
                 warnings: *warning_months as i16,
                 ..EventData::default()
             },

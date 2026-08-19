@@ -504,7 +504,6 @@ mod tests {
     use std::fs::File;
     use std::io;
     use std::io::BufReader;
-    use std::io::BufWriter;
 
     #[test]
     #[ignore] // a bit slow, will remove ignored after looking into this more

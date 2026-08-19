@@ -10,7 +10,6 @@ use std::io;
 use std::io::Read;
 use std::io::Seek;
 use std::io::Write;
-use std::panic::Location;
 
 #[derive(Debug, Clone, PartialEq, LogDifferences)]
 pub struct PakData {
@@ -161,6 +160,7 @@ mod tests {
     use crate::prelude::SettingsData;
     use crate::prelude::TradeRouteData;
     use crate::prelude::TradeRoutePointData;
+    use crate::prelude::UnconfirmedSign;
     use crate::prelude::WorldLocationData;
     use crate::prelude::WorldMapElementData;
     use std::fs;
@@ -726,6 +726,15 @@ mod tests {
     impl GenerateData<u16> for TestDataGenerator {
         fn generate_data(&mut self) -> u16 {
             return self.next() as u16;
+        }
+    }
+
+    impl<T> GenerateData<UnconfirmedSign<T>> for TestDataGenerator
+    where
+        TestDataGenerator: GenerateData<T>,
+    {
+        fn generate_data(&mut self) -> UnconfirmedSign<T> {
+            return UnconfirmedSign(self.generate_data());
         }
     }
 

@@ -12,6 +12,7 @@ pub(crate) mod resource_id;
 pub(crate) mod sav_data;
 pub(crate) mod settings_data;
 pub(crate) mod trade_route_data;
+pub(crate) mod unconfirmed_sign;
 pub(crate) mod unit_data;
 pub(crate) mod world_location_data;
 pub(crate) mod world_map_element_data;

@@ -39,6 +39,7 @@ pub use crate::file_data::sav_data::SavData;
 pub use crate::file_data::settings_data::SettingsData;
 pub use crate::file_data::trade_route_data::TradeRouteData;
 pub use crate::file_data::trade_route_data::TradeRoutePointData;
+pub use crate::file_data::unconfirmed_sign::UnconfirmedSign;
 pub use crate::file_data::unit_data::UnitData;
 pub use crate::file_data::world_location_data::WorldLocationData;
 pub use crate::file_data::world_map_element_data::WorldMapElementData;
