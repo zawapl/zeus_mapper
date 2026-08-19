@@ -1,6 +1,6 @@
 [package]
 name = "zeus_mapper"
-version = "0.1.1"
+version = "0.2.0"
 authors = ["Jakub Zawadzki <kuba.zaw@gmail.com>"]
 edition = "2024"
 license = "MIT"

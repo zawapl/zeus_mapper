@@ -509,7 +509,7 @@ dependencies = [
 
 [[package]]
 name = "my_macros"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "quote",
  "syn 2.0.119",
@@ -1099,7 +1099,7 @@ dependencies = [
 
 [[package]]
 name = "zeus_mapper"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "encoding_rs",
  "image",
