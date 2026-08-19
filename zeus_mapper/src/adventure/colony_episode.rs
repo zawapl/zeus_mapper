@@ -55,20 +55,14 @@ impl ColonyEpisode {
 
             let events = &pak_data.settings_data.events[settings_index];
             let raw_event_count = pak_data.settings_data.colony_event_counts.get(i).copied().unwrap_or(0) as usize;
-            // `colony_event_counts` was only confirmed to gate real vs. leftover-template slots
-            // against new-format data - for old-format adventures a whole row's count can read `0`
-            // despite holding real events (confirmed against `The Odyssey`'s second colony, which
-            // has 7 real events but a stored count of `0`). Fall back to scanning for the run of
-            // populated (`event_type != 0`) slots only when the stored count itself looks like it
-            // dropped everything - and, matching the same "one extra unused editor-template slot"
-            // pattern already documented for `basic_episode_data`/`real_episode_data`, drop the
-            // scan's own last slot too (confirmed against the same colony: 8 populated slots, 7
-            // real events).
-            let event_count = if new_file_ver || raw_event_count > 0 || events.first().map(|event| event.event_type) == Some(0) {
+
+            // todo can this be replaced with a version check?
+            let event_count = if raw_event_count > 0 || events.first().map(|event| event.event_type) == Some(0) {
                 raw_event_count
             } else {
                 events.iter().take_while(|event| event.event_type != 0).count().saturating_sub(1)
             };
+
             let mythology = Mythology::from_data(&pak_data.settings_data.mythology[settings_index]);
 
             result.push(ColonyEpisode {

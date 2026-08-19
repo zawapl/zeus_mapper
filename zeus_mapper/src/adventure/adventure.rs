@@ -33,17 +33,6 @@ use std::io::Error;
 use std::io::ErrorKind;
 use std::path::Path;
 
-// todo this doesn't look like a civilization related thing, but a file version thing
-// `MapData.scenario_data.civilization` in every new-format (`version_2 == 26`) real adventure
-// surveyed is `1`, regardless of the adventure's actual civilization (confirmed against Greek and
-// Atlantean examples, including "The Odyssey" resaved into the new format by the real game) - this
-// field does not use the `Civilization` enum's values in the new format the way it does in the old
-// one (there, it matches `self.civilization.value()` exactly). Where the new format actually
-// stores the map's civilization, if not here, is not yet understood; this constant only reproduces
-// the observed real-file value so `to_pak()` (which always writes the new format) doesn't corrupt
-// it, not a real fix for civilization selection at the map level.
-const NEW_FORMAT_MAP_CIVILIZATION: u32 = 1;
-
 // There are issues with adventures with long names, UI allows for ~21, longest observed is 23
 // Might need a proper investigation to find what a safe limit is
 const MAX_ADVENTURE_NAME_LENGTH: usize = 23;
@@ -239,7 +228,7 @@ impl Adventure {
         }
 
         for map in &mut map_data {
-            map.scenario_data.civilization = NEW_FORMAT_MAP_CIVILIZATION;
+            map.scenario_data.civilization = self.civilization.value();
             map.world_locations = world_locations.clone();
             map.world_map_elements = world_map_elements.clone();
             map.trade_routes = trade_routes.clone();
@@ -266,7 +255,7 @@ impl Adventure {
             }
             None => self.parent_city.to_map_data(),
         };
-        map_data_duplicate.scenario_data.civilization = NEW_FORMAT_MAP_CIVILIZATION;
+        map_data_duplicate.scenario_data.civilization = self.civilization.value();
         map_data_duplicate.world_locations = world_locations;
         map_data_duplicate.world_map_elements = world_map_elements;
         map_data_duplicate.trade_routes = trade_routes;

@@ -65,11 +65,7 @@ impl Event {
     // `GoodsRequest` for any `event_type`/`subtype` combination this doesn't recognize at all.
     // TODO: defaults are provisional, to be revisited once more real adventures have been surveyed.
     fn from_data(event: &EventData, new_file_ver: bool) -> Event {
-        // `subtype` `1`/`2` is shared with some other, still-unidentified `event_type == 1` kind
-        // that leaves `fixed_target` unset (a `min_target`/`max_target` range instead) - a real
-        // `CityUnderAttack`/`CityAttacksRival` always names one specific city, so gate on that too.
-        let is_city_attack = matches!(event.subtype, 1 | 2) && event.fixed_target >= 0;
-        if event.event_type == 1 && (event.subtype == 7 || is_city_attack) {
+        if event.event_type == 1 && matches!(event.subtype, 1 | 2 | 7) {
             return Event::MilitaryRequest(MilitaryRequest::from_data(event));
         }
 
@@ -79,13 +75,13 @@ impl Event {
             3 | 5 | 24 | 25 | 28 => Event::Disaster(Disaster::from_data(event)),
             8 => Event::WageIncrease(WageIncrease::from_data(event)),
             9 => Event::WageDecrease(WageDecrease::from_data(event)),
-            13 | 14 | 15 | 16 | 21 | 22 => Event::TradeChange(TradeChange::from_data(event)),
-            19 if matches!(event.subtype, 2 | 3) => Event::TradeChange(TradeChange::from_data(event)),
+            13 | 14 | 15 | 16 | 21 | 22 => Event::TradeChange(TradeChange::from_data(event, new_file_ver)),
+            19 if matches!(event.subtype, 2 | 3) => Event::TradeChange(TradeChange::from_data(event, new_file_ver)),
             19 => Event::CityStatusChange(CityStatusChange::from_data(event)),
             23 => Event::Gift(Gift::from_data(event, new_file_ver)),
             26 => Event::MonsterInvasion(MonsterInvasion::from_data(event)),
             27 => Event::GodInvasion(GodInvasion::from_data(event)),
-            _ => Event::GoodsRequest(GoodsRequest::from_data(event)),
+            _ => Event::GoodsRequest(GoodsRequest::from_data(event, new_file_ver)),
         };
     }
 
@@ -117,6 +113,16 @@ default_differ_impl!(Event);
 // (see DATA_MAPPING.md) since `Event` variants only have room for one quantity.
 fn resolve_range(fixed: i16, min: i16) -> u16 {
     return if fixed != -1 { fixed as u16 } else { min as u16 };
+}
+
+// Resolves `event`'s up-to-3 populated item slots (`first_item`/`second_item`/`third_item`, `-1`
+// meaning unpopulated) into resources, dropping any that don't resolve rather than defaulting them.
+fn resolve_items(event: &EventData, new_file_ver: bool) -> Vec<ResourceType> {
+    return [event.first_item, event.second_item, event.third_item]
+        .into_iter()
+        .filter(|&id| id >= 0)
+        .filter_map(|id| ResourceType::try_resolve_for_format(&(id as i8), new_file_ver))
+        .collect();
 }
 
 // Stamps `occurrence`'s month/flags/time range onto `event`; used by the various `to_data`
@@ -211,8 +217,8 @@ pub struct GoodsRequest {
 default_differ_impl!(GoodsRequest);
 
 impl GoodsRequest {
-    fn from_data(event: &EventData) -> GoodsRequest {
-        let resource = ResourceType::try_resolve(&(event.first_item as i8)).unwrap_or(ResourceType::Urchin);
+    fn from_data(event: &EventData, new_file_ver: bool) -> GoodsRequest {
+        let resource = ResourceType::try_resolve_for_format(&(event.first_item as i8), new_file_ver).unwrap_or(ResourceType::Urchin);
 
         let subtype = match event.subtype {
             3 => {
@@ -223,7 +229,7 @@ impl GoodsRequest {
             5 => GoodsRequestSubtype::Famine,
             6 => GoodsRequestSubtype::FinancialWoes,
             // Covers `0` (`GeneralRequest`'s real encoding) and any unrecognized subtype.
-            _ => GoodsRequestSubtype::GeneralRequest(resource),
+            _ => GoodsRequestSubtype::GeneralRequest(resolve_items(event, new_file_ver)),
         };
 
         return GoodsRequest {
@@ -237,11 +243,16 @@ impl GoodsRequest {
 
     fn to_data(&self) -> EventData {
         let mut data = match &self.subtype {
-            GoodsRequestSubtype::GeneralRequest(resource) => EventData {
-                subtype: 0,
-                first_item: resource.value() as i16,
-                ..EventData::default()
-            },
+            GoodsRequestSubtype::GeneralRequest(resources) => {
+                let mut ids = resources.iter().map(|resource| resource.value() as i16);
+                EventData {
+                    subtype: 0,
+                    first_item: ids.next().unwrap_or(-1),
+                    second_item: ids.next().unwrap_or(-1),
+                    third_item: ids.next().unwrap_or(-1),
+                    ..EventData::default()
+                }
+            }
             GoodsRequestSubtype::Festival(resource, god) => EventData {
                 subtype: 3,
                 first_item: resource.value() as i16,
@@ -271,9 +282,15 @@ impl GoodsRequest {
     }
 }
 
+/// `GeneralRequest`'s resources: the raw format allows up to 3 (`first_item`/`second_item`/
+/// `third_item`), any of which fulfills the request.
+///
+/// Confirmed against `The Odyssey`: `parent_episodes[2]`/`[3]`'s 3 general requests each carry all 3
+/// of `Food`/`Wine`/`OliveOil`, just in different `first`/`second`/`third` order per event - `Vec`
+/// order is not meaningful, only membership.
 #[derive(PartialEq, Debug)]
 pub enum GoodsRequestSubtype {
-    GeneralRequest(ResourceType),
+    GeneralRequest(Vec<ResourceType>),
     Festival(ResourceType, God),
     Construction(ResourceType),
     Famine,
@@ -342,6 +359,13 @@ impl MilitaryRequest {
 /// where a reciprocal pair of `CityUnderAttack` events threatens cities `6` and `7` with each
 /// other. `CityAttacksRival` is assumed to carry the same shape by symmetry, not yet confirmed
 /// against real data of its own.
+///
+/// The outer `MilitaryRequest.city` (the city under attack) can itself be a `fixed_target`/
+/// `min_target`/`max_target` range rather than one specific city, the same `resolve_range` every
+/// other fixed-or-range field in this format uses (dropping the range's `max` bound) - confirmed
+/// against another pair in the same episode, an earlier warning for the same conflict: `min_target`/
+/// `max_target` `1`/`2` (city `1`, `max` dropped) attacked by `6` then by `7`, immediately followed by
+/// the reciprocal `fixed_target`-based pair above once the war actually starts.
 ///
 /// `GreekCityTerrorized`'s payload is the raw in-game index selecting which of the episode's
 /// monster sources attacks (`0`/`1` for the first/second opponent god's signature monster, `2` for
@@ -878,10 +902,10 @@ pub struct TradeChange {
 default_differ_impl!(TradeChange);
 
 impl TradeChange {
-    fn from_data(event: &EventData) -> TradeChange {
+    fn from_data(event: &EventData, new_file_ver: bool) -> TradeChange {
         let city = event.other_city as u16;
         let amount = resolve_range(event.fixed_amount, event.min_amount);
-        let resource = ResourceType::try_resolve(&(event.first_item as i8)).unwrap_or(ResourceType::Urchin);
+        let resource = ResourceType::try_resolve_for_format(&(event.first_item as i8), new_file_ver).unwrap_or(ResourceType::Urchin);
         let occurrence = Occurrence::from_data(event);
 
         let subtype = match (event.event_type, event.subtype) {
@@ -1167,21 +1191,29 @@ mod tests {
                         subtype: TradeChangeSubtype::SupplyDecrease(0, ResourceType::Sculpture, 5),
                     }),
                     Event::GoodsRequest(GoodsRequest {
-                        subtype: GoodsRequestSubtype::GeneralRequest(ResourceType::Orichalc),
+                        subtype: GoodsRequestSubtype::GeneralRequest(vec![
+                            ResourceType::Orichalc,
+                            ResourceType::Sculpture,
+                            ResourceType::OliveOil,
+                        ]),
                         city: 0,
                         amount: 6,
                         warning_months: 8,
                         occurrence: Occurrence::Repeating(2, BetweenYears(1, 2)),
                     }),
                     Event::GoodsRequest(GoodsRequest {
-                        subtype: GoodsRequestSubtype::GeneralRequest(ResourceType::BlackMarble),
+                        subtype: GoodsRequestSubtype::GeneralRequest(vec![
+                            ResourceType::BlackMarble,
+                            ResourceType::Wood,
+                            ResourceType::Wine
+                        ]),
                         city: 0,
                         amount: 6,
                         warning_months: 8,
                         occurrence: Occurrence::Repeating(11, BetweenYears(2, 3)),
                     }),
                     Event::GoodsRequest(GoodsRequest {
-                        subtype: GoodsRequestSubtype::GeneralRequest(ResourceType::Fleece),
+                        subtype: GoodsRequestSubtype::GeneralRequest(vec![ResourceType::Fleece, ResourceType::Sculpture]),
                         city: 0,
                         amount: 8,
                         warning_months: 6,
@@ -1692,23 +1724,23 @@ mod tests {
                 episode_3.events,
                 vec![
                     Event::GoodsRequest(GoodsRequest {
-                        subtype: GoodsRequestSubtype::GeneralRequest(ResourceType::Wine), // this should have 3 valued: Food, Oil, Wine
-                        city: 0,                                                          // city_min=6, city_max=7
-                        amount: 5,                                                        // min_amount=5, max_amount=20
+                        subtype: GoodsRequestSubtype::GeneralRequest(vec![ResourceType::Food, ResourceType::OliveOil, ResourceType::Wine]),
+                        city: 0,   // city_min=6, city_max=7
+                        amount: 5, // min_amount=5, max_amount=20
                         warning_months: 2,
                         occurrence: Occurrence::OneTime(1, BetweenYears(0, 0)),
                     }),
                     Event::GoodsRequest(GoodsRequest {
-                        subtype: GoodsRequestSubtype::GeneralRequest(ResourceType::Armor), // this should have 3 valued: Wine, Food, Oil
-                        city: 0,                                                           // city_min=6, city_max=7
-                        amount: 5,                                                         // min_amount=5, max_amount=20
+                        subtype: GoodsRequestSubtype::GeneralRequest(vec![ResourceType::Wine, ResourceType::Food, ResourceType::OliveOil]),
+                        city: 0,   // city_min=6, city_max=7
+                        amount: 5, // min_amount=5, max_amount=20
                         warning_months: 2,
                         occurrence: Occurrence::Repeating(2, BetweenYears(1, 3)),
                     }),
                     Event::GoodsRequest(GoodsRequest {
-                        subtype: GoodsRequestSubtype::GeneralRequest(ResourceType::Orichalc), // this should have 3 valued: Oil, Wine, Food
-                        city: 0,                                                              // city_min=6, city_max=7
-                        amount: 5,                                                            // min_amount=5, max_amount=20
+                        subtype: GoodsRequestSubtype::GeneralRequest(vec![ResourceType::OliveOil, ResourceType::Wine, ResourceType::Food]),
+                        city: 0,   // city_min=6, city_max=7
+                        amount: 5, // min_amount=5, max_amount=20
                         warning_months: 2,
                         occurrence: Occurrence::OneTime(11, BetweenYears(1, 3)),
                     }),
@@ -1720,21 +1752,21 @@ mod tests {
                 episode_4.events,
                 vec![
                     Event::GoodsRequest(GoodsRequest {
-                        subtype: GoodsRequestSubtype::GeneralRequest(ResourceType::Wine),
+                        subtype: GoodsRequestSubtype::GeneralRequest(vec![ResourceType::Food, ResourceType::OliveOil, ResourceType::Wine]),
                         city: 0,
                         amount: 10,
                         warning_months: 2,
                         occurrence: Occurrence::OneTime(6, BetweenYears(0, 0)),
                     }),
                     Event::GoodsRequest(GoodsRequest {
-                        subtype: GoodsRequestSubtype::GeneralRequest(ResourceType::Armor),
+                        subtype: GoodsRequestSubtype::GeneralRequest(vec![ResourceType::Wine, ResourceType::Food, ResourceType::OliveOil]),
                         city: 0,
                         amount: 10,
                         warning_months: 2,
                         occurrence: Occurrence::Repeating(1, BetweenYears(1, 3)),
                     }),
                     Event::GoodsRequest(GoodsRequest {
-                        subtype: GoodsRequestSubtype::GeneralRequest(ResourceType::Orichalc),
+                        subtype: GoodsRequestSubtype::GeneralRequest(vec![ResourceType::OliveOil, ResourceType::Wine, ResourceType::Food]),
                         city: 0,
                         amount: 10,
                         warning_months: 2,
@@ -1841,17 +1873,17 @@ mod tests {
                         warning_months: 4,
                         occurrence: Occurrence::Repeating(10, BetweenYears(2, 5)),
                     }),
-                    Event::GoodsRequest(GoodsRequest {
-                        subtype: GoodsRequestSubtype::GeneralRequest(ResourceType::OliveOil),
-                        city: 6,
-                        amount: 5,
+                    Event::MilitaryRequest(MilitaryRequest {
+                        subtype: MilitaryRequestSubtype::CityUnderAttack(6),
+                        city: 1,
+                        outcome: CityAttackOutcome::Conquered,
                         warning_months: 4,
                         occurrence: Occurrence::OneTime(4, BetweenYears(6, 6)),
                     }),
-                    Event::GoodsRequest(GoodsRequest {
-                        subtype: GoodsRequestSubtype::GeneralRequest(ResourceType::OliveOil),
-                        city: 7,
-                        amount: 5,
+                    Event::MilitaryRequest(MilitaryRequest {
+                        subtype: MilitaryRequestSubtype::CityUnderAttack(7),
+                        city: 1,
+                        outcome: CityAttackOutcome::Conquered,
                         warning_months: 4,
                         occurrence: Occurrence::OneTime(9, BetweenYears(8, 8)),
                     }),

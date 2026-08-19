@@ -1,3 +1,4 @@
+use crate::adventure::AdventureType;
 use crate::adventure::Civilization;
 use crate::constants::data_constant::DataConstant;
 use crate::file_data::map_data::MapData;
@@ -37,13 +38,15 @@ impl PakData {
         return WriteTo::write_to(self, writer);
     }
 
-    /// This adventure's civilization, resolved from `settings_data.real_episode_data[0].civilization`.
-    ///
-    /// The same resolution `Adventure::from_pak` already performs - exposed directly here too so
-    /// callers with only a `PakData` (no `AdventureText`, which `Adventure::from_pak` requires) can
-    /// still get it, and so `SavData::civilization` (the `.sav` equivalent) has a `.pak`-side
-    /// counterpart at the same layer.
     pub fn civilization(&self) -> Civilization {
+        let adventure_type = AdventureType::try_resolve(&self.settings_data.adventure_type).unwrap_or(AdventureType::PoseidonCustom);
+        if matches!(
+            adventure_type,
+            AdventureType::ZeusCampaign | AdventureType::ZeusCustom | AdventureType::Tutorial
+        ) {
+            return Civilization::Greek;
+        }
+
         return Civilization::try_resolve(&self.settings_data.real_episode_data[0].civilization).unwrap_or(Civilization::Greek);
     }
 
