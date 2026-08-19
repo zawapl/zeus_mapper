@@ -146,18 +146,10 @@ pub enum Occurrence {
 default_differ_impl!(Occurrence);
 
 impl Occurrence {
-    /// Parses the occurrence, folding `event.warnings` into the month.
-    ///
-    /// **Assumptions**: the caller has nowhere else to store `event.warnings`.
-    /// Types with a dedicated `WarningMonths` field of their own (`GoodsRequest`,
-    /// `MilitaryRequest`, `Invasion`) must use `unfolded_from_data` instead, to avoid
-    /// double-counting the warning both there and here.
+    /// Parses the occurrence. `event.warnings` is never folded in here - it's a separate
+    /// concept (how far ahead the event is telegraphed to the player), not part of when the
+    /// event actually fires.
     fn from_data(event: &EventData) -> Occurrence {
-        return Occurrence::unfolded_from_data(event).with_added_month(event.warnings as u8);
-    }
-
-    /// Parses the occurrence without folding `event.warnings` into the month.
-    fn unfolded_from_data(event: &EventData) -> Occurrence {
         let between_years = BetweenYears::from_data(event.fixed_time, event.min_time, event.max_time);
 
         if event.flags & 0x1 != 0 {
@@ -170,16 +162,6 @@ impl Occurrence {
             return Occurrence::EpisodeComplete;
         }
         return Occurrence::OneTime(event.month as Month, between_years);
-    }
-
-    /// Adds `additional_months` to the occurrence's month, if it has one.
-    fn with_added_month(self, additional_months: WarningMonths) -> Occurrence {
-        return match self {
-            Occurrence::OneTime(month, between_years) => Occurrence::OneTime(month + additional_months as Month, between_years),
-            Occurrence::Repeating(month, between_years) => Occurrence::Repeating(month + additional_months as Month, between_years),
-            Occurrence::Triggered(between_years) => Occurrence::Triggered(between_years),
-            Occurrence::EpisodeComplete => Occurrence::EpisodeComplete,
-        };
     }
 
     /// Returns `(month, flags, fixed_time, min_time, max_time)`.
@@ -249,7 +231,7 @@ impl GoodsRequest {
             city: event.other_city as u16,
             amount: resolve_range(event.fixed_amount, event.min_amount),
             warning_months: event.warnings as u8,
-            occurrence: Occurrence::unfolded_from_data(event),
+            occurrence: Occurrence::from_data(event),
         };
     }
 
@@ -325,7 +307,7 @@ impl MilitaryRequest {
             city: resolve_range(event.fixed_target, event.min_target),
             outcome,
             warning_months: event.warnings as u8,
-            occurrence: Occurrence::unfolded_from_data(event),
+            occurrence: Occurrence::from_data(event),
         };
     }
 
@@ -563,7 +545,7 @@ impl Invasion {
             marker_min,
             marker_max,
             warning_months: event.warnings as u8,
-            occurrence: Occurrence::unfolded_from_data(event),
+            occurrence: Occurrence::from_data(event),
         };
     }
 
@@ -615,11 +597,11 @@ pub struct MonsterInvasion {
 
 default_differ_impl!(MonsterInvasion);
 
-// `MonsterUnleashed` reuses the general `month`/`fixed_time`/`warnings` fields, but confirmed
-// against `The Odyssey` with two real records: a raw `month` of `0` means the real month is
-// folded in from `warnings` as usual (`fixed_time` giving the between-years range), while a
-// non-zero `month` is already the real target month on its own - `fixed_time`/`warnings` are
-// leftover template values in that case, and between years defaults to `(0, 0)`.
+// `MonsterUnleashed` reuses the general `month`/`fixed_time` fields, but confirmed against
+// `The Odyssey` with two real records: a raw `month` of `0` means the between-years range comes
+// from `fixed_time`/`min_time`/`max_time` as usual, while a non-zero `month` is already the real
+// target month on its own - `fixed_time` is a leftover template value in that case, and between
+// years defaults to `(0, 0)`.
 fn monster_unleashed_occurrence_from_data(event: &EventData) -> Occurrence {
     if event.month != 0 {
         return Occurrence::OneTime(event.month as Month, BetweenYears(0, 0));
@@ -631,7 +613,7 @@ impl MonsterInvasion {
     fn from_data(event: &EventData) -> MonsterInvasion {
         let subtype = match event.subtype {
             1 => MonsterInvasionSubtype::MonsterUnleashed(monster_unleashed_occurrence_from_data(event)),
-            2 => MonsterInvasionSubtype::MonsterInvades(event.warnings as u8, Occurrence::unfolded_from_data(event)),
+            2 => MonsterInvasionSubtype::MonsterInvades(event.warnings as u8, Occurrence::from_data(event)),
             // Covers `0` and any unrecognized subtype.
             _ => MonsterInvasionSubtype::MonsterInCity,
         };
@@ -1024,12 +1006,7 @@ impl CityStatusChange {
         return CityStatusChange {
             city_min,
             city_max,
-            occurrence: if event.subtype == 13 {
-                // todo review if this split is correct
-                Occurrence::unfolded_from_data(event)
-            } else {
-                Occurrence::from_data(event)
-            },
+            occurrence: Occurrence::from_data(event),
             subtype,
         };
     }
@@ -1121,7 +1098,7 @@ pub enum CityStatusChangeSubtype {
     RivalBecomesAlly,
     CityBecomesRival,
     CityBecomesVassal,
-    GodDisaster(God, WarningMonths),
+    GodDisaster(God, WarningMonths), // todo not warning months, but duration - make naming clearer
     MilitaryBuildup(u8),
     MilitaryDecline(u8),
     EconomicProsperity(u8),
@@ -1173,7 +1150,7 @@ mod tests {
                 episode_3.events,
                 vec![
                     Event::TradeChange(TradeChange {
-                        occurrence: Occurrence::OneTime(5, BetweenYears(0, 0)),
+                        occurrence: Occurrence::OneTime(3, BetweenYears(0, 0)),
                         subtype: TradeChangeSubtype::SupplyDecrease(0, ResourceType::Sculpture, 5),
                     }),
                     Event::GoodsRequest(GoodsRequest {
@@ -1204,28 +1181,28 @@ mod tests {
                         subtype: CityStatusChangeSubtype::GodDisaster(God::Hera, 6),
                     }),
                     Event::TradeChange(TradeChange {
-                        occurrence: Occurrence::Repeating(3, BetweenYears(8, 8)),
+                        occurrence: Occurrence::Repeating(1, BetweenYears(8, 8)),
                         subtype: TradeChangeSubtype::TradeShutsDown(0),
                     }),
                     Event::TradeChange(TradeChange {
-                        occurrence: Occurrence::Repeating(13, BetweenYears(8, 8)),
+                        occurrence: Occurrence::Repeating(11, BetweenYears(8, 8)),
                         subtype: TradeChangeSubtype::TradeOpensUp(0),
                     }),
                     Event::TradeChange(TradeChange {
-                        occurrence: Occurrence::Repeating(5, BetweenYears(12, 12)),
+                        occurrence: Occurrence::Repeating(3, BetweenYears(12, 12)),
                         subtype: TradeChangeSubtype::PriceIncrease(ResourceType::Wood, 20),
                     }),
                     Event::WageIncrease(WageIncrease {
                         amount: 15,
-                        occurrence: Occurrence::OneTime(7, BetweenYears(22, 22)),
+                        occurrence: Occurrence::OneTime(5, BetweenYears(22, 22)),
                     }),
                     Event::TradeChange(TradeChange {
-                        occurrence: Occurrence::Repeating(8, BetweenYears(26, 26)),
+                        occurrence: Occurrence::Repeating(6, BetweenYears(26, 26)),
                         subtype: TradeChangeSubtype::PriceDecrease(ResourceType::Wood, 15),
                     }),
                     Event::GodInvasion(GodInvasion {
                         gods: [11, u16::MAX, u16::MAX],
-                        occurrence: Occurrence::Repeating(12, BetweenYears(3, 4)),
+                        occurrence: Occurrence::Repeating(10, BetweenYears(3, 4)),
                     }),
                 ]
             );
@@ -1246,79 +1223,79 @@ mod tests {
                     Event::CityStatusChange(CityStatusChange {
                         city_min: 11,
                         city_max: 11,
-                        occurrence: Occurrence::OneTime(4, BetweenYears(0, 0)),
+                        occurrence: Occurrence::OneTime(2, BetweenYears(0, 0)),
                         subtype: CityStatusChangeSubtype::MilitaryBuildup(1),
                     }),
                     Event::CityStatusChange(CityStatusChange {
                         city_min: 11,
                         city_max: 11,
-                        occurrence: Occurrence::OneTime(7, BetweenYears(0, 0)),
-                        subtype: CityStatusChangeSubtype::MilitaryBuildup(1),
-                    }),
-                    Event::CityStatusChange(CityStatusChange {
-                        city_min: 11,
-                        city_max: 11,
-                        occurrence: Occurrence::OneTime(10, BetweenYears(0, 0)),
-                        subtype: CityStatusChangeSubtype::MilitaryBuildup(1),
-                    }),
-                    Event::CityStatusChange(CityStatusChange {
-                        city_min: 10,
-                        city_max: 10,
                         occurrence: Occurrence::OneTime(5, BetweenYears(0, 0)),
                         subtype: CityStatusChangeSubtype::MilitaryBuildup(1),
                     }),
                     Event::CityStatusChange(CityStatusChange {
-                        city_min: 10,
-                        city_max: 10,
+                        city_min: 11,
+                        city_max: 11,
                         occurrence: Occurrence::OneTime(8, BetweenYears(0, 0)),
                         subtype: CityStatusChangeSubtype::MilitaryBuildup(1),
                     }),
                     Event::CityStatusChange(CityStatusChange {
+                        city_min: 10,
+                        city_max: 10,
+                        occurrence: Occurrence::OneTime(3, BetweenYears(0, 0)),
+                        subtype: CityStatusChangeSubtype::MilitaryBuildup(1),
+                    }),
+                    Event::CityStatusChange(CityStatusChange {
+                        city_min: 10,
+                        city_max: 10,
+                        occurrence: Occurrence::OneTime(6, BetweenYears(0, 0)),
+                        subtype: CityStatusChangeSubtype::MilitaryBuildup(1),
+                    }),
+                    Event::CityStatusChange(CityStatusChange {
                         city_min: 9,
                         city_max: 9,
-                        occurrence: Occurrence::OneTime(2, BetweenYears(1, 1)),
+                        occurrence: Occurrence::OneTime(0, BetweenYears(1, 1)),
                         subtype: CityStatusChangeSubtype::CityConqueredBy(12),
                     }),
                     Event::CityStatusChange(CityStatusChange {
                         city_min: 8,
                         city_max: 8,
-                        occurrence: Occurrence::OneTime(2, BetweenYears(2, 2)),
+                        occurrence: Occurrence::OneTime(0, BetweenYears(2, 2)),
                         subtype: CityStatusChangeSubtype::CityConqueredBy(12),
                     }),
                     Event::CityStatusChange(CityStatusChange {
                         city_min: 7,
                         city_max: 7,
-                        occurrence: Occurrence::OneTime(2, BetweenYears(3, 3)),
+                        occurrence: Occurrence::OneTime(0, BetweenYears(3, 3)),
                         subtype: CityStatusChangeSubtype::CityConqueredBy(12),
                     }),
                     Event::CityStatusChange(CityStatusChange {
                         city_min: 6,
                         city_max: 6,
-                        occurrence: Occurrence::OneTime(2, BetweenYears(4, 4)),
+                        occurrence: Occurrence::OneTime(0, BetweenYears(4, 4)),
                         subtype: CityStatusChangeSubtype::CityConqueredBy(12),
                     }),
                     Event::CityStatusChange(CityStatusChange {
                         city_min: 9,
                         city_max: 9,
-                        occurrence: Occurrence::OneTime(8, BetweenYears(1, 1)),
+                        occurrence: Occurrence::OneTime(6, BetweenYears(1, 1)),
                         subtype: CityStatusChangeSubtype::MilitaryBuildup(1),
                     }),
                     Event::CityStatusChange(CityStatusChange {
                         city_min: 8,
                         city_max: 8,
-                        occurrence: Occurrence::OneTime(8, BetweenYears(2, 2)),
+                        occurrence: Occurrence::OneTime(6, BetweenYears(2, 2)),
                         subtype: CityStatusChangeSubtype::MilitaryBuildup(1),
                     }),
                     Event::CityStatusChange(CityStatusChange {
                         city_min: 7,
                         city_max: 7,
-                        occurrence: Occurrence::OneTime(8, BetweenYears(3, 3)),
+                        occurrence: Occurrence::OneTime(6, BetweenYears(3, 3)),
                         subtype: CityStatusChangeSubtype::MilitaryBuildup(1),
                     }),
                     Event::CityStatusChange(CityStatusChange {
                         city_min: 6,
                         city_max: 6,
-                        occurrence: Occurrence::OneTime(8, BetweenYears(4, 4)),
+                        occurrence: Occurrence::OneTime(6, BetweenYears(4, 4)),
                         subtype: CityStatusChangeSubtype::MilitaryBuildup(1),
                     }),
                 ]
@@ -1331,19 +1308,19 @@ mod tests {
                     Event::CityStatusChange(CityStatusChange {
                         city_min: 16,
                         city_max: 16,
-                        occurrence: Occurrence::OneTime(3, BetweenYears(1, 1)),
+                        occurrence: Occurrence::OneTime(1, BetweenYears(1, 1)),
                         subtype: CityStatusChangeSubtype::CityAppears,
                     }),
                     Event::CityStatusChange(CityStatusChange {
                         city_min: 17,
                         city_max: 17,
-                        occurrence: Occurrence::OneTime(10, BetweenYears(1, 1)),
+                        occurrence: Occurrence::OneTime(8, BetweenYears(1, 1)),
                         subtype: CityStatusChangeSubtype::CityAppears,
                     }),
                     Event::CityStatusChange(CityStatusChange {
                         city_min: 18,
                         city_max: 18,
-                        occurrence: Occurrence::OneTime(6, BetweenYears(2, 2)),
+                        occurrence: Occurrence::OneTime(4, BetweenYears(2, 2)),
                         subtype: CityStatusChangeSubtype::CityAppears,
                     }),
                     Event::Invasion(Invasion {
@@ -1382,19 +1359,19 @@ mod tests {
                     Event::CityStatusChange(CityStatusChange {
                         city_min: 2,
                         city_max: 5,
-                        occurrence: Occurrence::Repeating(6, BetweenYears(1, 4)),
+                        occurrence: Occurrence::Repeating(4, BetweenYears(1, 4)),
                         subtype: CityStatusChangeSubtype::MilitaryBuildup(1),
                     }),
                     Event::CityStatusChange(CityStatusChange {
                         city_min: 2,
                         city_max: 5,
-                        occurrence: Occurrence::OneTime(3, BetweenYears(0, 2)),
+                        occurrence: Occurrence::OneTime(1, BetweenYears(0, 2)),
                         subtype: CityStatusChangeSubtype::MilitaryBuildup(1),
                     }),
                     Event::CityStatusChange(CityStatusChange {
                         city_min: 2,
                         city_max: 5,
-                        occurrence: Occurrence::OneTime(10, BetweenYears(0, 1)),
+                        occurrence: Occurrence::OneTime(8, BetweenYears(0, 1)),
                         subtype: CityStatusChangeSubtype::MilitaryBuildup(1),
                     }),
                     Event::MilitaryRequest(MilitaryRequest {
@@ -1439,43 +1416,43 @@ mod tests {
                     Event::CityStatusChange(CityStatusChange {
                         city_min: 9,
                         city_max: 9,
-                        occurrence: Occurrence::OneTime(8, BetweenYears(0, 0)),
+                        occurrence: Occurrence::OneTime(6, BetweenYears(0, 0)),
                         subtype: CityStatusChangeSubtype::CityConqueredBy(12)
                     }),
                     Event::CityStatusChange(CityStatusChange {
                         city_min: 8,
                         city_max: 8,
-                        occurrence: Occurrence::OneTime(2, BetweenYears(1, 1)),
+                        occurrence: Occurrence::OneTime(0, BetweenYears(1, 1)),
                         subtype: CityStatusChangeSubtype::CityConqueredBy(12)
                     }),
                     Event::CityStatusChange(CityStatusChange {
                         city_min: 7,
                         city_max: 7,
-                        occurrence: Occurrence::OneTime(8, BetweenYears(1, 1)),
+                        occurrence: Occurrence::OneTime(6, BetweenYears(1, 1)),
                         subtype: CityStatusChangeSubtype::CityConqueredBy(12)
                     }),
                     Event::CityStatusChange(CityStatusChange {
                         city_min: 6,
                         city_max: 6,
-                        occurrence: Occurrence::OneTime(2, BetweenYears(2, 2)),
+                        occurrence: Occurrence::OneTime(0, BetweenYears(2, 2)),
                         subtype: CityStatusChangeSubtype::CityConqueredBy(12)
                     }),
                     Event::CityStatusChange(CityStatusChange {
                         city_min: 10,
                         city_max: 10,
-                        occurrence: Occurrence::OneTime(11, BetweenYears(0, 1)),
+                        occurrence: Occurrence::OneTime(9, BetweenYears(0, 1)),
                         subtype: CityStatusChangeSubtype::MilitaryBuildup(1)
                     }),
                     Event::CityStatusChange(CityStatusChange {
                         city_min: 10,
                         city_max: 10,
-                        occurrence: Occurrence::OneTime(5, BetweenYears(1, 1)),
+                        occurrence: Occurrence::OneTime(3, BetweenYears(1, 1)),
                         subtype: CityStatusChangeSubtype::MilitaryBuildup(1)
                     }),
                     Event::CityStatusChange(CityStatusChange {
                         city_min: 11,
                         city_max: 11,
-                        occurrence: Occurrence::OneTime(6, BetweenYears(0, 0)),
+                        occurrence: Occurrence::OneTime(4, BetweenYears(0, 0)),
                         subtype: CityStatusChangeSubtype::MilitaryBuildup(1)
                     }),
                     Event::CityStatusChange(CityStatusChange {
@@ -1505,13 +1482,13 @@ mod tests {
                     Event::CityStatusChange(CityStatusChange {
                         city_min: 21,
                         city_max: 21,
-                        occurrence: Occurrence::OneTime(4, BetweenYears(0, 0)),
+                        occurrence: Occurrence::OneTime(2, BetweenYears(0, 0)),
                         subtype: CityStatusChangeSubtype::CityAppears
                     }),
                     Event::CityStatusChange(CityStatusChange {
                         city_min: 20,
                         city_max: 20,
-                        occurrence: Occurrence::OneTime(7, BetweenYears(0, 0)),
+                        occurrence: Occurrence::OneTime(5, BetweenYears(0, 0)),
                         subtype: CityStatusChangeSubtype::CityAppears
                     }),
                     Event::Invasion(Invasion {
@@ -1557,38 +1534,38 @@ mod tests {
                     Event::CityStatusChange(CityStatusChange {
                         city_min: 13,
                         city_max: 13,
-                        occurrence: Occurrence::OneTime(12, BetweenYears(0, 1)),
+                        occurrence: Occurrence::OneTime(10, BetweenYears(0, 1)),
                         subtype: CityStatusChangeSubtype::CityBecomesRival
                     }),
                     Event::CityStatusChange(CityStatusChange {
                         city_min: 14,
                         city_max: 14,
-                        occurrence: Occurrence::OneTime(10, BetweenYears(1, 1)),
+                        occurrence: Occurrence::OneTime(8, BetweenYears(1, 1)),
                         subtype: CityStatusChangeSubtype::CityBecomesRival
                     }),
                     Event::CityStatusChange(CityStatusChange {
                         city_min: 15,
                         city_max: 15,
-                        occurrence: Occurrence::OneTime(7, BetweenYears(2, 2)),
+                        occurrence: Occurrence::OneTime(5, BetweenYears(2, 2)),
                         subtype: CityStatusChangeSubtype::CityBecomesRival
                     }),
                     Event::Disaster(Disaster {
                         disaster_type: DisasterSubtype::LavaFlow,
                         marker: 1, // needs to be marker_min=1, marker_max=2
                         permanent: false,
-                        occurrence: Occurrence::OneTime(13, BetweenYears(0, 1))
+                        occurrence: Occurrence::OneTime(11, BetweenYears(0, 1))
                     }),
                     Event::Disaster(Disaster {
                         disaster_type: DisasterSubtype::LavaFlow,
                         marker: 3, // needs to be marker_min=3, marker_max=4
                         permanent: false,
-                        occurrence: Occurrence::OneTime(5, BetweenYears(1, 3))
+                        occurrence: Occurrence::OneTime(3, BetweenYears(1, 3))
                     }),
                     Event::Disaster(Disaster {
                         disaster_type: DisasterSubtype::LavaFlow,
                         marker: 5, // needs to be marker_min=5, marker_max=5
                         permanent: false,
-                        occurrence: Occurrence::OneTime(6, BetweenYears(2, 4))
+                        occurrence: Occurrence::OneTime(4, BetweenYears(2, 4))
                     }),
                     Event::CityStatusChange(CityStatusChange {
                         city_min: 20,
@@ -1621,31 +1598,31 @@ mod tests {
                     Event::CityStatusChange(CityStatusChange {
                         city_min: 10, // Troy
                         city_max: 10,
-                        occurrence: Occurrence::OneTime(2 + 2, BetweenYears(0, 0)),
+                        occurrence: Occurrence::OneTime(2, BetweenYears(0, 0)),
                         subtype: CityStatusChangeSubtype::CityConqueredBy(5), // Tenedos
                     }),
                     Event::CityStatusChange(CityStatusChange {
                         city_min: 10,
                         city_max: 10,
-                        occurrence: Occurrence::Repeating(3 + 2, BetweenYears(0, 0)), // Confirmed happens in May
+                        occurrence: Occurrence::Repeating(3, BetweenYears(0, 0)),
                         subtype: CityStatusChangeSubtype::CityBecomesInactive,
                     }),
                     Event::CityStatusChange(CityStatusChange {
                         city_min: 10,
                         city_max: 10,
-                        occurrence: Occurrence::OneTime(4 + 2, BetweenYears(0, 0)), // Confirmed happens in June
+                        occurrence: Occurrence::OneTime(4, BetweenYears(0, 0)),
                         subtype: CityStatusChangeSubtype::CityDisappears,
                     }),
                     Event::CityStatusChange(CityStatusChange {
                         city_min: 9, // Ismarus
                         city_max: 9,
-                        occurrence: Occurrence::OneTime(6 + 2, BetweenYears(0, 0)), // Confirmed happens in August
+                        occurrence: Occurrence::OneTime(6, BetweenYears(0, 0)),
                         subtype: CityStatusChangeSubtype::MilitaryDecline(5),
                     }),
                     Event::CityStatusChange(CityStatusChange {
                         city_min: 9,
                         city_max: 9,
-                        occurrence: Occurrence::OneTime(7 + 2, BetweenYears(0, 0)), // Confirmed happens in September
+                        occurrence: Occurrence::OneTime(7, BetweenYears(0, 0)),
                         subtype: CityStatusChangeSubtype::EconomicDecline(3),
                     }),
                     Event::CityStatusChange(CityStatusChange {
@@ -1756,13 +1733,13 @@ mod tests {
                     Event::CityStatusChange(CityStatusChange {
                         city_min: 12,
                         city_max: 12,
-                        occurrence: Occurrence::OneTime(2, BetweenYears(0, 0)),
+                        occurrence: Occurrence::OneTime(0, BetweenYears(0, 0)),
                         subtype: CityStatusChangeSubtype::CityDisappears,
                     }),
                     Event::CityStatusChange(CityStatusChange {
                         city_min: 4,
                         city_max: 4,
-                        occurrence: Occurrence::OneTime(5, BetweenYears(0, 0)),
+                        occurrence: Occurrence::OneTime(3, BetweenYears(0, 0)),
                         subtype: CityStatusChangeSubtype::CityBecomesActive,
                     }),
                     Event::GodInvasion(GodInvasion {
@@ -1773,19 +1750,19 @@ mod tests {
                         disaster_type: DisasterSubtype::Earthquake,
                         marker: 1,        // marker_min=1 marker_max=3
                         permanent: false, // this field only makes sense to TidalWave
-                        occurrence: Occurrence::OneTime(4, BetweenYears(1, 1)),
+                        occurrence: Occurrence::OneTime(2, BetweenYears(1, 1)),
                     }),
                     Event::Disaster(Disaster {
                         disaster_type: DisasterSubtype::LavaFlow,
                         marker: 4,
                         permanent: false,
-                        occurrence: Occurrence::OneTime(5, BetweenYears(1, 1)),
+                        occurrence: Occurrence::OneTime(3, BetweenYears(1, 1)),
                     }),
                     Event::Disaster(Disaster {
                         disaster_type: DisasterSubtype::TidalWave,
                         marker: 6,
                         permanent: false,
-                        occurrence: Occurrence::OneTime(3, BetweenYears(1, 1)),
+                        occurrence: Occurrence::OneTime(1, BetweenYears(1, 1)),
                     }),
                     Event::MonsterInvasion(MonsterInvasion {
                         attack: MonsterAttack {
@@ -1798,18 +1775,18 @@ mod tests {
                                 trigger_type: TriggerType::DirectResult,
                             },
                         },
-                        subtype: MonsterInvasionSubtype::MonsterUnleashed(Occurrence::OneTime(1, BetweenYears(1, 1))),
+                        subtype: MonsterInvasionSubtype::MonsterUnleashed(Occurrence::OneTime(0, BetweenYears(1, 1))),
                     }),
                     Event::CityStatusChange(CityStatusChange {
                         city_min: 4,
                         city_max: 4,
-                        occurrence: Occurrence::OneTime(9, BetweenYears(0, 0)),
+                        occurrence: Occurrence::OneTime(7, BetweenYears(0, 0)),
                         subtype: CityStatusChangeSubtype::MilitaryBuildup(1),
                     }),
                     Event::CityStatusChange(CityStatusChange {
                         city_min: 4,
                         city_max: 4,
-                        occurrence: Occurrence::OneTime(10, BetweenYears(0, 0)),
+                        occurrence: Occurrence::OneTime(8, BetweenYears(0, 0)),
                         subtype: CityStatusChangeSubtype::EconomicProsperity(1),
                     }),
                 ]
@@ -1822,18 +1799,18 @@ mod tests {
                     Event::CityStatusChange(CityStatusChange {
                         city_min: 6,
                         city_max: 6,
-                        occurrence: Occurrence::OneTime(3, BetweenYears(0, 0)),
+                        occurrence: Occurrence::OneTime(1, BetweenYears(0, 0)),
                         subtype: CityStatusChangeSubtype::CityBecomesRival,
                     }),
                     Event::CityStatusChange(CityStatusChange {
                         city_min: 7,
                         city_max: 7,
-                        occurrence: Occurrence::OneTime(3, BetweenYears(0, 0)),
+                        occurrence: Occurrence::OneTime(1, BetweenYears(0, 0)),
                         subtype: CityStatusChangeSubtype::CityBecomesRival,
                     }),
                     Event::GodInvasion(GodInvasion {
                         gods: [God::Poseidon.value() as u16, God::Apollo.value() as u16, u16::MAX],
-                        occurrence: Occurrence::Repeating(9, BetweenYears(2, 4)),
+                        occurrence: Occurrence::Repeating(7, BetweenYears(2, 4)),
                     }),
                     Event::Invasion(Invasion {
                         city_min: 6,
@@ -1911,7 +1888,7 @@ mod tests {
                         resource: ResourceType::Fish,
                         amount_min: 32,
                         amount_max: 32,
-                        occurrence: Occurrence::OneTime(5, BetweenYears(0, 0)),
+                        occurrence: Occurrence::OneTime(3, BetweenYears(0, 0)),
                     }),
                     Event::Gift(Gift {
                         city_min: 0,
@@ -1919,7 +1896,7 @@ mod tests {
                         resource: ResourceType::OliveOil,
                         amount_min: 32,
                         amount_max: 32,
-                        occurrence: Occurrence::OneTime(6, BetweenYears(0, 0)),
+                        occurrence: Occurrence::OneTime(4, BetweenYears(0, 0)),
                     }),
                     Event::MonsterInvasion(MonsterInvasion {
                         attack: MonsterAttack {
@@ -1948,13 +1925,13 @@ mod tests {
                     Event::CityStatusChange(CityStatusChange {
                         city_min: 13,
                         city_max: 13,
-                        occurrence: Occurrence::OneTime(6, BetweenYears(0, 0)),
+                        occurrence: Occurrence::OneTime(4, BetweenYears(0, 0)),
                         subtype: CityStatusChangeSubtype::CityAppears,
                     }),
                     Event::CityStatusChange(CityStatusChange {
                         city_min: 13,
                         city_max: 13,
-                        occurrence: Occurrence::OneTime(7, BetweenYears(0, 0)),
+                        occurrence: Occurrence::OneTime(5, BetweenYears(0, 0)),
                         subtype: CityStatusChangeSubtype::CityBecomesActive,
                     }),
                     Event::Gift(Gift {
@@ -1963,7 +1940,7 @@ mod tests {
                         resource: ResourceType::Fish,
                         amount_min: 32,
                         amount_max: 32,
-                        occurrence: Occurrence::OneTime(5, BetweenYears(0, 0)),
+                        occurrence: Occurrence::OneTime(3, BetweenYears(0, 0)),
                     }),
                     Event::Gift(Gift {
                         city_min: 0,
@@ -1971,7 +1948,7 @@ mod tests {
                         resource: ResourceType::OliveOil,
                         amount_min: 32,
                         amount_max: 32,
-                        occurrence: Occurrence::OneTime(6, BetweenYears(0, 0)),
+                        occurrence: Occurrence::OneTime(4, BetweenYears(0, 0)),
                     }),
                     Event::CityStatusChange(CityStatusChange {
                         city_min: 13,

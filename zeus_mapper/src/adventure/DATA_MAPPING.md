@@ -690,10 +690,18 @@ Field notes:
   them (`first_item`, `fixed_target`, `source_min`/`source_max` show up with real, non-default values -
   e.g. recurring pairs like `(1, 8)` or `(0, 231)` - on events with no item/marker/source concept).
   Not yet modeled.
-- `CityStatusChangeSubtype::GodDisaster`'s `WarningMonths` payload is `event.warnings`, kept out of
-  `Occurrence`'s folded month like the other dedicated-`WarningMonths`-field types (`GoodsRequest`,
-  `MilitaryRequest`, `Invasion`) - it was previously folded into the month *and* separately recorded,
-  then dropped unwritten on `to_data`, which zeroed it on every round trip.
+- `event.warnings` is never folded into `Occurrence`'s month, for any event type - it's a separate
+  concept (how far ahead the event is telegraphed to the player), not part of when the event actually
+  fires. An earlier version of this code folded it in for every type without a dedicated
+  `WarningMonths` field, based on in-game observations that turned out to be misattributed: a raw
+  `month` of `N` fires `N + 1` calendar months into the episode, an indexing effect unrelated to
+  `warnings` - confirmed by cross-referencing `The Odyssey` fixture data directly (real events whose
+  in-game fire month had been "confirmed" against a folded value matched the *unfolded* raw `month`
+  once the off-by-one indexing was accounted for separately). Only `GoodsRequest`, `MilitaryRequest`,
+  `Invasion`, `MonsterInvasionSubtype::MonsterInvades`, and `CityStatusChangeSubtype::GodDisaster`
+  expose `event.warnings` at all (as a dedicated `WarningMonths` field); every other event type simply
+  drops the raw value on `from_data` (and writes back `0` on `to_data`), an accepted round-trip loss
+  until there's more evidence of what it means for those types.
 
 Not modeled at all (no `from_data` dispatch, `to_data` only): `RivalArmyChange` (its raw subtype
 wasn't observed in any real adventure surveyed). `Quest` is modeled both ways now, but
