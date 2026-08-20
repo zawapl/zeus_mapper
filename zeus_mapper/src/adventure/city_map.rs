@@ -1,6 +1,8 @@
 use crate::prelude::MAX_MAP_SIZE;
 use crate::prelude::MapData;
 use crate::prelude::RealEpisodeData;
+use crate::prelude::TerrainTypeFlag;
+use crate::prelude::TerrainTypeFlags;
 use crate::utils::boxed_array::BoxedArray;
 use my_macros::LogDifferences;
 
@@ -42,7 +44,7 @@ impl CityMap {
             tropical: map_data.scenario_data.tropical != 0,
             sprite: map_data.sprite.iter().map(|&sprite| strip_sprite_format_flags(sprite)).collect(),
             root_offset: map_data.root_offset.to_vec(),
-            terrain: map_data.terrain.to_vec(),
+            terrain: cleanup_terrain(&map_data.terrain[..]),
             tile_size: map_data.tile_size.to_vec(),
             random: map_data.random.to_vec(),
             meadow: map_data.meadow.to_vec(),
@@ -207,6 +209,19 @@ fn unzip_positions_u32<const N: usize>(positions: &[Option<(u16, u16)>; N]) -> (
     }
 
     return (x, y);
+}
+
+/// Cleanup terrain data from invalid combinations
+fn cleanup_terrain(terrain: &[u32]) -> Vec<u32> {
+    return terrain.iter().map(|&tile| cleanup_terrain_tile(tile)).collect();
+}
+
+fn cleanup_terrain_tile(tile: u32) -> u32 {
+    let flags = TerrainTypeFlags(tile);
+    if flags.is_all_of(TerrainTypeFlag::Forest | TerrainTypeFlag::Slope) {
+        return tile & !TerrainTypeFlags::from(TerrainTypeFlag::Forest).0;
+    }
+    return tile;
 }
 
 fn strip_sprite_format_flags(sprite: u32) -> u32 {
