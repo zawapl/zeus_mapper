@@ -38,15 +38,14 @@ pub struct WorldLocationData {
     pub tribute_pay_resource: i16,
     pub tribute_rec_resource: i16,
     pub unknown_3: BoxedArray<u8, 100>,
-    // See `resolve_favour` for how this and `favour_new` combine.
-    pub favour_old: u8,
+    pub favour: u8,
     pub constant_1_0x00: BoxedArray<u8, 11>,
     // See `resolve_active` for how this and `active_new` combine. Not read for `ParentCity`. Top
     // 3 bytes confirmed always 0 across every real record sampled, so this is a single
     // little-endian u32 (matching a C `BOOL`/`int` field's natural width) rather than a flag byte
     // plus 3 bytes of padding.
     pub active_old: u32,
-    pub favour_new: u32,
+    pub favour_or_visibility: u32, // depending on the version it might be one of the other
     pub constant_3_0x00: [u8; 8],
     pub active_new: u32,
     pub visible: u32,
@@ -81,10 +80,10 @@ impl Default for WorldLocationData {
             tribute_pay_resource: 0,
             tribute_rec_resource: 0,
             unknown_3: Default::default(),
-            favour_old: 0,
+            favour: 0,
             constant_1_0x00: Default::default(),
             active_old: 0,
-            favour_new: 0,
+            favour_or_visibility: 0,
             constant_3_0x00: Default::default(),
             active_new: 0,
             visible: 0,
@@ -160,10 +159,10 @@ impl WorldLocationData {
             tribute_pay_resource: ReadFrom::read_from(reader)?,
             tribute_rec_resource: ReadFrom::read_from(reader)?,
             unknown_3: ReadFrom::read_from(reader)?,
-            favour_old: ReadFrom::read_from(reader)?,
+            favour: ReadFrom::read_from(reader)?,
             constant_1_0x00: ReadFrom::read_from(reader)?,
             active_old: ReadFrom::read_from(reader)?,
-            favour_new: ReadFrom::read_from(reader)?,
+            favour_or_visibility: ReadFrom::read_from(reader)?,
             constant_3_0x00: ReadFrom::read_from(reader)?,
             active_new: ReadFrom::read_from(reader)?,
             visible: ReadFrom::read_from(reader)?,
@@ -212,10 +211,10 @@ impl WorldLocationData {
         bytes += WriteTo::write_to(&self.tribute_pay_resource, writer)?;
         bytes += WriteTo::write_to(&self.tribute_rec_resource, writer)?;
         bytes += WriteTo::write_to(&self.unknown_3, writer)?;
-        bytes += WriteTo::write_to(&self.favour_old, writer)?;
+        bytes += WriteTo::write_to(&self.favour, writer)?;
         bytes += WriteTo::write_to(&self.constant_1_0x00, writer)?;
         bytes += WriteTo::write_to(&self.active_old, writer)?;
-        bytes += WriteTo::write_to(&self.favour_new, writer)?;
+        bytes += WriteTo::write_to(&self.favour_or_visibility, writer)?;
         bytes += WriteTo::write_to(&self.constant_3_0x00, writer)?;
         bytes += WriteTo::write_to(&self.active_new, writer)?;
         bytes += WriteTo::write_to(&self.visible, writer)?;
@@ -296,10 +295,10 @@ mod tests {
             tribute_pay_resource: 16,
             tribute_rec_resource: 17,
             unknown_3: BoxedArray::from_vec(vec![18; 100]),
-            favour_old: 18,
+            favour: 18,
             constant_1_0x00: BoxedArray::from_vec(vec![18; 11]),
             active_old: 18,
-            favour_new: 19,
+            favour_or_visibility: 19,
             constant_3_0x00: [20; 8],
             active_new: 21,
             visible: 22,

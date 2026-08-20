@@ -125,33 +125,11 @@ impl WorldLocationType {
                     new_file_ver,
                 ),
             }),
-            4 => WorldLocationType::DistantCity(DistantCity {
-                leader_name,
-                // `civilization` is repurposed on `Distant` records to encode this marker's
-                // off-map compass direction rather than a nation skin - see `WorldDirection`.
-                direction: WorldDirection::try_resolve(&location.civilization).unwrap_or(WorldDirection::None),
-                active,
-                visible: location.visible == 0,
-                military_strength: location.military_strength,
-                economy_strength: location.economical_strength,
-                traded_goods: TradedGoods::vec_from_data(
-                    &location.selling,
-                    &location.buying,
-                    location.trade_quantities.as_slice(),
-                    new_file_ver,
-                ),
-            }),
-            5 => WorldLocationType::EnchantedPlace(EnchantedPlace {
-                active,
-                visible: location.visible == 0,
-                military_strength: location.military_strength,
-            }),
-            // Covers `2` (`Foreign`'s real encoding) and any unrecognized value.
-            _ => WorldLocationType::ForeignCity(ForeignCity {
+            2 => WorldLocationType::ForeignCity(ForeignCity {
                 leader_name,
                 civilization: LocationCivilization::try_resolve(&location.civilization).unwrap_or(LocationCivilization::Greek),
                 active,
-                visible: location.visible == 0,
+                visible: resolve_visible(location, new_file_ver),
                 relation: Relationship::try_resolve(&location.attitude).unwrap_or(Relationship::Ally),
                 paying_tribute: location.tribute != 0,
                 received_tribute: (
@@ -172,6 +150,25 @@ impl WorldLocationType {
                     new_file_ver,
                 ),
             }),
+            4 => WorldLocationType::DistantCity(DistantCity {
+                leader_name,
+                direction: WorldDirection::try_resolve(&location.civilization).unwrap_or(WorldDirection::None),
+                active,
+                visible: resolve_visible(location, new_file_ver),
+                military_strength: location.military_strength,
+                economy_strength: location.economical_strength,
+                traded_goods: TradedGoods::vec_from_data(
+                    &location.selling,
+                    &location.buying,
+                    location.trade_quantities.as_slice(),
+                    new_file_ver,
+                ),
+            }),
+            5 | _ => WorldLocationType::EnchantedPlace(EnchantedPlace {
+                active,
+                visible: resolve_visible(location, new_file_ver),
+                military_strength: location.military_strength,
+            }),
         };
     }
 
@@ -191,7 +188,7 @@ impl WorldLocationType {
                 data.tribute_pay_amount = colony.paid_tribute.1;
                 data.military_strength = colony.military_strength;
                 data.economical_strength = colony.economy_strength;
-                data.favour_new = colony.favour;
+                data.favour_or_visibility = colony.favour;
                 let (selling, buying, trade_quantities) = TradedGoods::vec_to_data::<8, 37>(&colony.traded_goods);
                 data.selling = selling;
                 data.buying = buying;
@@ -210,7 +207,7 @@ impl WorldLocationType {
                 data.tribute_pay_amount = foreign.paid_tribute.1;
                 data.military_strength = foreign.military_strength;
                 data.economical_strength = foreign.economy_strength;
-                data.favour_new = foreign.favour;
+                data.favour_or_visibility = foreign.favour;
                 let (selling, buying, trade_quantities) = TradedGoods::vec_to_data::<8, 37>(&foreign.traded_goods);
                 data.selling = selling;
                 data.buying = buying;
@@ -366,29 +363,28 @@ const DISTANT_INACTIVE_SPRITES: [(u8, (u16, u16)); 9] = [
     (125, (14, 13)),
 ];
 
-// Old-format (`new_file_ver == false`) locations leave `favour_new` `0` for most locations - the
-// real value instead lives in `favour_old`, confirmed against `The Odyssey`. A few old-format
-// locations do carry a real, nonzero value in `favour_new` itself, which is preferred when
-// present. Only `Colony`/`ForeignCity` keep a `favour` field at all, so this is never called for
-// `ParentCity` (which had no real favour value in either format per DATA_MAPPING.md) or the other
-// variants.
 fn resolve_favour(location: &WorldLocationData, new_file_ver: bool) -> u32 {
-    if !new_file_ver && location.favour_new == 0 {
-        return location.favour_old as u32;
-    }
-    return location.favour_new;
+    return if new_file_ver {
+        location.favour_or_visibility
+    } else {
+        location.favour as u32
+    };
 }
 
-// Unlike `favour`, old-format locations always leave `active_new` `0` - the real value lives
-// entirely in `active_old` instead, with no exceptions, confirmed against 250 real
-// `Colony`/`ForeignCity`/`DistantCity`/`EnchantedPlace` records. Not called for `ParentCity`,
-// which has no "not yet founded" state to toggle - see `WorldLocationType::sprite`.
+fn resolve_visible(location: &WorldLocationData, new_file_ver: bool) -> bool {
+    return if new_file_ver {
+        location.visible == 0
+    } else {
+        location.favour_or_visibility == 0
+    };
+}
+
 fn resolve_active(location: &WorldLocationData, new_file_ver: bool) -> bool {
-    if new_file_ver {
+    return if new_file_ver {
         location.active_new != 0
     } else {
         location.active_old != 0
-    }
+    };
 }
 
 impl WorldLocation {
@@ -1372,7 +1368,7 @@ mod tests {
                             leader_name: EntityName::TextId(82,),
                             direction: WorldDirection::Se,
                             active: false,
-                            visible: true,
+                            visible: false,
                             military_strength: 3,
                             economy_strength: 3,
                             traded_goods: vec![
@@ -1393,7 +1389,7 @@ mod tests {
                             leader_name: EntityName::TextId(25,),
                             direction: WorldDirection::Sw,
                             active: false,
-                            visible: true,
+                            visible: false,
                             military_strength: 3,
                             economy_strength: 3,
                             traded_goods: vec![
