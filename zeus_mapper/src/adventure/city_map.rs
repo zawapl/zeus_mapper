@@ -40,7 +40,7 @@ impl CityMap {
         return CityMap {
             map_size: map_data.scenario_data.map_size,
             tropical: map_data.scenario_data.tropical != 0,
-            sprite: map_data.sprite.to_vec(),
+            sprite: map_data.sprite.iter().map(|&sprite| strip_sprite_format_flags(sprite)).collect(),
             root_offset: map_data.root_offset.to_vec(),
             terrain: map_data.terrain.to_vec(),
             tile_size: map_data.tile_size.to_vec(),
@@ -149,7 +149,7 @@ impl CityMap {
         };
 
         return MapData {
-            sprite: BoxedArray::from_vec(self.sprite.clone()),
+            sprite: BoxedArray::from_vec(self.sprite.iter().map(|&sprite| add_sprite_new_format_flag(sprite)).collect()),
             root_offset: BoxedArray::from_vec(self.root_offset.clone()),
             terrain: BoxedArray::from_vec(self.terrain.clone()),
             tile_size: BoxedArray::from_vec(self.tile_size.clone()),
@@ -207,4 +207,15 @@ fn unzip_positions_u32<const N: usize>(positions: &[Option<(u16, u16)>; N]) -> (
     }
 
     return (x, y);
+}
+
+fn strip_sprite_format_flags(sprite: u32) -> u32 {
+    return sprite & !(0x8000 | 0x10000);
+}
+
+fn add_sprite_new_format_flag(sprite: u32) -> u32 {
+    if sprite == 0 {
+        return 0;
+    }
+    return sprite | 0x10000;
 }
