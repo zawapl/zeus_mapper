@@ -393,10 +393,13 @@ Sourced from one `MapData` (`map_data[0]` for `parent_city`, `map_data[1 + i]` f
   `monster_spawn`, `disembark_points` - where boats put ashore, `landslide_spawn`) and the single
   points (`earthquake_area`, `river_entry`, `river_exit`) all use the `u16::MAX`-is-unset convention.
   `monster_x`/`monster_y` are the one pair stored as `u32` rather than
-  `u16` in the raw format; every real value observed still fits `u16`. Each is `Vec<Option<(u16, u16)>>`
-  (or a single `Option`) rather than a dense `Vec`, because real adventures leave gaps mid-array
-  (confirmed on `The Youngest Twins`' `invasion_x/y`) - `None` preserves the gap; trailing `None`s are
-  stripped since they're indistinguishable from the array just being shorter.
+  `u16` in the raw format; every real value observed still fits `u16`. Each is a fixed-size
+  `[Option<(u16, u16)>; N]` (or a single `Option`) matching the raw array's own length, rather than a
+  dense `Vec`, because real adventures leave gaps mid-array (confirmed on `The Youngest Twins`'
+  `invasion_x/y`) - `None` preserves the gap and the slot's position, including trailing gaps.
+  `deer_spawn` is additionally forced to `[None; 4]` on old-format maps (`version_1 < 300`): every
+  old-format map surveyed leaves `deer_x`/`deer_y` zero-filled rather than using the `u16::MAX`
+  sentinel, since deer spawn points weren't a feature of that format yet.
 - `MapData.scenario_data`'s `start_date`/`starting_cash`/`panhellenic_games`/`text_buffer_1`/
   `text_buffer_2` are map-editor template constants, not real per-episode data (the real values live on
   `SettingsData.real_episode_data[i]`, written by `Adventure::to_pak`) - confirmed identical across

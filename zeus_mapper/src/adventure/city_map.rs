@@ -1,5 +1,4 @@
 use crate::prelude::MAX_MAP_SIZE;
-use crate::prelude::ManifestData;
 use crate::prelude::MapData;
 use crate::prelude::RealEpisodeData;
 use crate::utils::boxed_array::BoxedArray;
@@ -20,16 +19,16 @@ pub struct CityMap {
     pub entry_point: (u16, u16),
     pub exit_point: (u16, u16),
     pub camera_position: (u16, u16),
-    pub fishing_spots: Vec<Option<(u16, u16)>>,
-    pub wolf_spawn: Vec<Option<(u16, u16)>>,
-    pub urchin_spawn: Vec<Option<(u16, u16)>>,
-    pub invasion_points: Vec<Option<(u16, u16)>>,
-    pub deer_spawn: Vec<Option<(u16, u16)>>,
-    pub disaster_points: Vec<Option<(u16, u16)>>,
-    pub boar_spawn: Vec<Option<(u16, u16)>>,
-    pub monster_spawn: Vec<Option<(u16, u16)>>,
-    pub disembark_points: Vec<Option<(u16, u16)>>,
-    pub landslide_spawn: Vec<Option<(u16, u16)>>,
+    pub fishing_spots: [Option<(u16, u16)>; 8],
+    pub wolf_spawn: [Option<(u16, u16)>; 4],
+    pub urchin_spawn: [Option<(u16, u16)>; 8],
+    pub invasion_points: [Option<(u16, u16)>; 16],
+    pub deer_spawn: [Option<(u16, u16)>; 4],
+    pub disaster_points: [Option<(u16, u16)>; 8],
+    pub boar_spawn: [Option<(u16, u16)>; 8],
+    pub monster_spawn: [Option<(u16, u16)>; 3],
+    pub disembark_points: [Option<(u16, u16)>; 6],
+    pub landslide_spawn: [Option<(u16, u16)>; 6],
     pub earthquake_area: Option<(u16, u16)>,
     pub river_entry: Option<(u16, u16)>,
     pub river_exit: Option<(u16, u16)>,
@@ -37,6 +36,7 @@ pub struct CityMap {
 
 impl CityMap {
     pub fn from_map_data(map_data: &MapData) -> Self {
+        let map_new_file_ver = map_data.version_1 >= 300;
         return CityMap {
             map_size: map_data.scenario_data.map_size,
             tropical: map_data.scenario_data.tropical != 0,
@@ -55,7 +55,11 @@ impl CityMap {
             wolf_spawn: zip_positions(&map_data.scenario_data.wolf_x, &map_data.scenario_data.wolf_y),
             urchin_spawn: zip_positions(&map_data.scenario_data.urchin_x, &map_data.scenario_data.urchin_y),
             invasion_points: zip_positions(&map_data.scenario_data.invasion_x, &map_data.scenario_data.invasion_y),
-            deer_spawn: zip_positions(&map_data.scenario_data.deer_x, &map_data.scenario_data.deer_y),
+            deer_spawn: if map_new_file_ver {
+                zip_positions(&map_data.scenario_data.deer_x, &map_data.scenario_data.deer_y)
+            } else {
+                [None; 4]
+            },
             disaster_points: zip_positions(&map_data.scenario_data.disaster_x, &map_data.scenario_data.disaster_y),
             boar_spawn: zip_positions(&map_data.scenario_data.boar_x, &map_data.scenario_data.boar_y),
             monster_spawn: zip_positions_u32(&map_data.scenario_data.monster_x, &map_data.scenario_data.monster_y),
@@ -145,43 +149,18 @@ impl CityMap {
         };
 
         return MapData {
-            // 321 is the most common new-format value observed across real adventures (see
-            // `Adventure::from_pak`'s `map_new_file_ver`) - resource ids are always written in the
-            // new numbering (see `ResourceType::try_resolve_for_format`), so `version_1` must land in
-            // the new-format range (>= 300) for a round trip through `Adventure` to read them back
-            // correctly.
-            version_1: 321,
-            version_2: 33,
-            manifest: ManifestData::default_map_manifest(),
             sprite: BoxedArray::from_vec(self.sprite.clone()),
             root_offset: BoxedArray::from_vec(self.root_offset.clone()),
             terrain: BoxedArray::from_vec(self.terrain.clone()),
             tile_size: BoxedArray::from_vec(self.tile_size.clone()),
             random: BoxedArray::from_vec(self.random.clone()),
-            constant_1_0x00: Default::default(),
-            seed_1: 0,
-            seed_2: 0,
             camera_x: self.camera_position.0 as u32,
             camera_y: self.camera_position.1 as u32,
             scenario_data,
             meadow: BoxedArray::from_vec(self.meadow.clone()),
-            unknown_3: Default::default(),
-            world_map_elements: Default::default(),
-            trade_routes: Default::default(),
-            constant_2_0xff: BoxedArray::from_vec(vec![0xFF; 51984]),
-            constant_3: BoxedArray::from_vec(vec![180, 70, 100, 180, 70, 100, 0, 100, 0]),
-            prices: Default::default(),
             scrub: BoxedArray::from_vec(self.scrub.clone()),
             elevation: BoxedArray::from_vec(self.elevation.clone()),
-            elevation_rotation: Default::default(),
-            world_locations: Default::default(),
-            background_image: 0,
-            unknown_5: vec![vec![0; 52]; 14],
-            mythology: Default::default(),
-            unknown_6: Default::default(),
-            unknown_7: 0,
-            unknown_8: 0,
-            unknown_9: Default::default(),
+            ..MapData::default()
         };
     }
 }
@@ -194,25 +173,15 @@ fn unzip_position(position: Option<(u16, u16)>) -> (u16, u16) {
     return position.unwrap_or((u16::MAX, u16::MAX));
 }
 
-fn zip_positions<const N: usize>(a: &[u16; N], b: &[u16; N]) -> Vec<Option<(u16, u16)>> {
-    let mut positions: Vec<Option<(u16, u16)>> = a
-        .iter()
-        .zip(b)
-        .map(|(&x, &y)| if x == u16::MAX { None } else { Some((x, y)) })
-        .collect();
-
-    while positions.last() == Some(&None) {
-        positions.pop();
-    }
-
-    return positions;
+fn zip_positions<const N: usize>(a: &[u16; N], b: &[u16; N]) -> [Option<(u16, u16)>; N] {
+    return std::array::from_fn(|i| if a[i] == u16::MAX { None } else { Some((a[i], b[i])) });
 }
 
-fn unzip_positions<const N: usize>(positions: &[Option<(u16, u16)>]) -> ([u16; N], [u16; N]) {
+fn unzip_positions<const N: usize>(positions: &[Option<(u16, u16)>; N]) -> ([u16; N], [u16; N]) {
     let mut x = [u16::MAX; N];
     let mut y = [u16::MAX; N];
 
-    for (i, position) in positions.iter().take(N).enumerate() {
+    for (i, position) in positions.iter().enumerate() {
         if let Some((px, py)) = position {
             x[i] = *px;
             y[i] = *py;
@@ -222,25 +191,15 @@ fn unzip_positions<const N: usize>(positions: &[Option<(u16, u16)>]) -> ([u16; N
     return (x, y);
 }
 
-fn zip_positions_u32<const N: usize>(a: &[u32; N], b: &[u32; N]) -> Vec<Option<(u16, u16)>> {
-    let mut positions: Vec<Option<(u16, u16)>> = a
-        .iter()
-        .zip(b)
-        .map(|(&x, &y)| if x == u32::MAX { None } else { Some((x as u16, y as u16)) })
-        .collect();
-
-    while positions.last() == Some(&None) {
-        positions.pop();
-    }
-
-    return positions;
+fn zip_positions_u32<const N: usize>(a: &[u32; N], b: &[u32; N]) -> [Option<(u16, u16)>; N] {
+    return std::array::from_fn(|i| if a[i] == u32::MAX { None } else { Some((a[i] as u16, b[i] as u16)) });
 }
 
-fn unzip_positions_u32<const N: usize>(positions: &[Option<(u16, u16)>]) -> ([u32; N], [u32; N]) {
+fn unzip_positions_u32<const N: usize>(positions: &[Option<(u16, u16)>; N]) -> ([u32; N], [u32; N]) {
     let mut x = [u32::MAX; N];
     let mut y = [u32::MAX; N];
 
-    for (i, position) in positions.iter().take(N).enumerate() {
+    for (i, position) in positions.iter().enumerate() {
         if let Some((px, py)) = position {
             x[i] = *px as u32;
             y[i] = *py as u32;
