@@ -288,6 +288,16 @@ impl EventData {
         self.validate_time_range()?;
         self.validate_item_exact(ResourceId::Hero.value(), new_file_ver)?;
         self.validate_occurrence_not_episode_complete()?;
+        self.validate_trig_reason()?;
+
+        // Which of the Quest's 3 candidate heroes must complete it - see `adventure::event::Hero`.
+        if !matches!(*self.god_or_mon_or_warship_id, 0 | 1 | 2) {
+            return Err(ValidationError::expected_one_of(
+                "god_or_mon_or_warship_id",
+                *self.god_or_mon_or_warship_id,
+                &[0, 1, 2],
+            ));
+        }
 
         return self.validate_target_range();
     }
@@ -513,6 +523,8 @@ impl EventData {
 
     fn validate_monster_invasion(&self, new_file_ver: bool) -> ValidationResult {
         self.validate_occurrence_not_episode_complete()?;
+        self.validate_trig_reason()?;
+        self.validate_monster_targets_and_aggression()?;
 
         return match self.subtype {
             0 => self.validate_monster_in_city(),
@@ -553,6 +565,42 @@ impl EventData {
 
         if self.third_item >= 0 {
             return Err(ValidationError::expected_exactly("third_item", self.third_item, -1));
+        }
+
+        return Ok(());
+    }
+
+    fn validate_monster_targets_and_aggression(&self) -> ValidationResult {
+        const MONSTER_TARGET_MAX: u16 = 10;
+        const MONUMENT_BIT: u16 = 0x100;
+
+        if *self.mtar1 & !(MONUMENT_BIT | 0xFF) != 0 || (*self.mtar1 & 0xFF) > MONSTER_TARGET_MAX {
+            return Err(ValidationError::expected_range(
+                "mtar1",
+                *self.mtar1,
+                0,
+                MONUMENT_BIT | MONSTER_TARGET_MAX,
+            ));
+        }
+
+        if *self.mtar2 > MONSTER_TARGET_MAX {
+            return Err(ValidationError::expected_range("mtar2", *self.mtar2, 0, MONSTER_TARGET_MAX));
+        }
+
+        if *self.mtar3 > MONSTER_TARGET_MAX {
+            return Err(ValidationError::expected_range("mtar3", *self.mtar3, 0, MONSTER_TARGET_MAX));
+        }
+
+        if *self.magg > 3 {
+            return Err(ValidationError::expected_range("magg", *self.magg, 0, 3));
+        }
+
+        return Ok(());
+    }
+
+    fn validate_trig_reason(&self) -> ValidationResult {
+        if *self.trig_reason > 6 {
+            return Err(ValidationError::expected_range("trig_reason", *self.trig_reason, 0, 6));
         }
 
         return Ok(());

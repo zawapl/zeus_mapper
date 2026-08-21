@@ -324,6 +324,7 @@ pub struct Quest {
     pub city_min: CityId,
     pub city_max: CityId,
     pub reward: MonumentReward,
+    pub hero: Hero,
     pub quest_type: QuestType,
     pub trigger: EventToTrigger,
     pub occurrence: Occurrence,
@@ -339,6 +340,7 @@ impl Quest {
             city_min,
             city_max,
             reward: MonumentReward::try_resolve(&*event.loot_type).unwrap_or(MonumentReward::None),
+            hero: Hero::try_resolve(&*event.god_or_mon_or_warship_id).unwrap_or(Hero::Hero1),
             trigger: EventToTrigger::from_data(event.on_success, *event.trig_reason),
             occurrence: Occurrence::from_data(event),
         };
@@ -357,6 +359,7 @@ impl Quest {
                 min_target,
                 max_target,
                 loot_type: UnconfirmedSign(self.reward.value()),
+                god_or_mon_or_warship_id: UnconfirmedSign(self.hero.value()),
                 on_success,
                 trig_reason: UnconfirmedSign(trig_reason),
                 ..EventData::default()
@@ -1177,6 +1180,13 @@ data_constants!(MonumentReward<u16> {
     None = 0,
     Small = 1,
     Large = 2,
+});
+
+// Which of a Quest's 3 candidate heroes must complete it
+data_constants!(Hero<u16> {
+    Hero1 = 0,
+    Hero2 = 1,
+    Hero3 = 2,
 });
 
 data_constants!(MonsterSlot<u8> {
