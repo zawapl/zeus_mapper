@@ -474,6 +474,7 @@ mod tests {
                 triggerer: self.generate_data(),
                 god_or_mon_or_warship_id: self.generate_data(),
                 mtar1: self.generate_data(),
+                monument: self.generate_data(),
                 mtar2: self.generate_data(),
                 mtar3: self.generate_data(),
                 magg: self.generate_data(),

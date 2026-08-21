@@ -40,9 +40,10 @@ pub struct EventData {
     pub need_msg_res: UnconfirmedSign<u16>,
     pub triggerer: UnconfirmedSign<u16>,
     pub god_or_mon_or_warship_id: UnconfirmedSign<u16>,
-    pub mtar1: UnconfirmedSign<u16>,
-    pub mtar2: UnconfirmedSign<u16>,
-    pub mtar3: UnconfirmedSign<u16>,
+    pub mtar1: u8,
+    pub monument: u8,
+    pub mtar2: u16,
+    pub mtar3: u16,
     pub magg: UnconfirmedSign<u16>,
     pub unkown_row: [UnconfirmedSign<u16>; 9],
     pub trigger_on_1: UnconfirmedSign<u16>,
@@ -572,23 +573,21 @@ impl EventData {
 
     fn validate_monster_targets_and_aggression(&self) -> ValidationResult {
         const MONSTER_TARGET_MAX: u16 = 10;
-        const MONUMENT_BIT: u16 = 0x100;
 
-        if *self.mtar1 & !(MONUMENT_BIT | 0xFF) != 0 || (*self.mtar1 & 0xFF) > MONSTER_TARGET_MAX {
-            return Err(ValidationError::expected_range(
-                "mtar1",
-                *self.mtar1,
-                0,
-                MONUMENT_BIT | MONSTER_TARGET_MAX,
-            ));
+        if self.mtar1 as u16 > MONSTER_TARGET_MAX {
+            return Err(ValidationError::expected_range("mtar1", self.mtar1 as u16, 0, MONSTER_TARGET_MAX));
         }
 
-        if *self.mtar2 > MONSTER_TARGET_MAX {
-            return Err(ValidationError::expected_range("mtar2", *self.mtar2, 0, MONSTER_TARGET_MAX));
+        if !matches!(self.monument, 0 | 1) {
+            return Err(ValidationError::expected_one_of("monument", self.monument, &[0, 1]));
         }
 
-        if *self.mtar3 > MONSTER_TARGET_MAX {
-            return Err(ValidationError::expected_range("mtar3", *self.mtar3, 0, MONSTER_TARGET_MAX));
+        if self.mtar2 > MONSTER_TARGET_MAX {
+            return Err(ValidationError::expected_range("mtar2", self.mtar2, 0, MONSTER_TARGET_MAX));
+        }
+
+        if self.mtar3 > MONSTER_TARGET_MAX {
+            return Err(ValidationError::expected_range("mtar3", self.mtar3, 0, MONSTER_TARGET_MAX));
         }
 
         if *self.magg > 3 {
@@ -898,9 +897,10 @@ impl Default for EventData {
             need_msg_res: UnconfirmedSign(0),
             triggerer: UnconfirmedSign(u16::MAX),
             god_or_mon_or_warship_id: UnconfirmedSign(0),
-            mtar1: UnconfirmedSign(0),
-            mtar2: UnconfirmedSign(0),
-            mtar3: UnconfirmedSign(0),
+            mtar1: 0,
+            monument: 0,
+            mtar2: 0,
+            mtar3: 0,
             magg: UnconfirmedSign(0),
             unkown_row: [UnconfirmedSign(0); 9],
             trigger_on_1: UnconfirmedSign(u16::MAX),
@@ -964,6 +964,7 @@ impl ReadFrom for EventData {
             triggerer: ReadFrom::read_from(reader)?,
             god_or_mon_or_warship_id: ReadFrom::read_from(reader)?,
             mtar1: ReadFrom::read_from(reader)?,
+            monument: ReadFrom::read_from(reader)?,
             mtar2: ReadFrom::read_from(reader)?,
             mtar3: ReadFrom::read_from(reader)?,
             magg: ReadFrom::read_from(reader)?,
@@ -1030,6 +1031,7 @@ impl WriteTo for EventData {
         bytes += WriteTo::write_to(&self.triggerer, writer)?;
         bytes += WriteTo::write_to(&self.god_or_mon_or_warship_id, writer)?;
         bytes += WriteTo::write_to(&self.mtar1, writer)?;
+        bytes += WriteTo::write_to(&self.monument, writer)?;
         bytes += WriteTo::write_to(&self.mtar2, writer)?;
         bytes += WriteTo::write_to(&self.mtar3, writer)?;
         bytes += WriteTo::write_to(&self.magg, writer)?;
@@ -1101,9 +1103,10 @@ mod tests {
             need_msg_res: UnconfirmedSign(26),
             triggerer: UnconfirmedSign(27),
             god_or_mon_or_warship_id: UnconfirmedSign(28),
-            mtar1: UnconfirmedSign(29),
-            mtar2: UnconfirmedSign(30),
-            mtar3: UnconfirmedSign(31),
+            mtar1: 29,
+            monument: 129,
+            mtar2: 30,
+            mtar3: 31,
             magg: UnconfirmedSign(32),
             unkown_row: [
                 UnconfirmedSign(33),

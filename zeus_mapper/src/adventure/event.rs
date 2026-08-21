@@ -451,15 +451,15 @@ impl MonsterInvasion {
             .filter_map(|id| MonsterSlot::try_resolve(&(id as u8)))
             .collect();
 
-        let target = [*event.mtar1 & 0xFF, *event.mtar2, *event.mtar3]
-            .map(|value| MonsterTarget::try_resolve(&value).unwrap_or(MonsterTarget::Random));
+        let target =
+            [event.mtar1 as u16, event.mtar2, event.mtar3].map(|value| MonsterTarget::try_resolve(&value).unwrap_or(MonsterTarget::Random));
 
         let next_event = EventToTrigger::from_data(event.on_success, *event.trig_reason);
 
         return MonsterInvasion {
             subtype,
             monsters,
-            monument: (*event.mtar1 >> 8) != 0,
+            monument: event.monument != 0,
             target,
             aggression: *event.magg as u8,
             next_event,
@@ -473,10 +473,9 @@ impl MonsterInvasion {
         let third_item = monster_ids.next().map(|slot| slot.value() as i16).unwrap_or(-1);
 
         let mut targets = self.target.iter();
-        let mtar1_target = targets.next().map(MonsterTarget::value).unwrap_or(0);
+        let mtar1 = targets.next().map(MonsterTarget::value).unwrap_or(0);
         let mtar2 = targets.next().map(MonsterTarget::value).unwrap_or(0);
         let mtar3 = targets.next().map(MonsterTarget::value).unwrap_or(0);
-        let monument_bit = if self.monument { 0x0100 } else { 0 };
         let (on_success, trig_reason) = self.next_event.to_data();
 
         let mut event_data = EventData {
@@ -484,9 +483,10 @@ impl MonsterInvasion {
             first_item,
             second_item,
             third_item,
-            mtar1: UnconfirmedSign(mtar1_target | monument_bit),
-            mtar2: UnconfirmedSign(mtar2),
-            mtar3: UnconfirmedSign(mtar3),
+            mtar1: mtar1 as u8,
+            monument: if self.monument { 1 } else { 0 },
+            mtar2,
+            mtar3,
             magg: UnconfirmedSign(self.aggression as u16),
             on_success,
             trig_reason: UnconfirmedSign(trig_reason),
