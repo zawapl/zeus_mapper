@@ -17,6 +17,9 @@
 # test_data - to be replaced with better mechanism
 **/test_data/*
 
+# scratch output from investigations & other temp files
+/.tmp/
+
 # Claude Code — ignore ephemeral/personal files, keep shared config
 .claude/logs/
 .claude/*.local.json

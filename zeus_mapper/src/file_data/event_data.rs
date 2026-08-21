@@ -131,6 +131,7 @@ impl EventData {
     fn validate_request(&self, new_file_ver: bool) -> ValidationResult {
         self.validate_time_range()?;
         self.validate_target_range()?;
+        self.validate_occurrence_not_episode_complete()?;
 
         if self.warnings < 1 {
             return Err(ValidationError::expected_range("warnings", self.warnings, 1, i16::MAX));
@@ -267,6 +268,7 @@ impl EventData {
         self.validate_time_range()?;
         self.validate_source_range()?;
         self.validate_amount_range()?;
+        self.validate_occurrence_not_episode_complete()?;
 
         return self.validate_target_range();
     }
@@ -274,6 +276,7 @@ impl EventData {
     fn validate_earthquake(&self) -> ValidationResult {
         self.validate_time_range()?;
         self.validate_target_range()?;
+        self.validate_occurrence_not_episode_complete()?;
         return self.validate_disaster_marker();
     }
 
@@ -284,6 +287,7 @@ impl EventData {
 
         self.validate_time_range()?;
         self.validate_item_exact(ResourceId::Hero.value(), new_file_ver)?;
+        self.validate_occurrence_not_episode_complete()?;
 
         return self.validate_target_range();
     }
@@ -291,18 +295,21 @@ impl EventData {
     fn validate_landslide(&self) -> ValidationResult {
         self.validate_time_range()?;
         self.validate_target_range()?;
+        self.validate_occurrence_not_episode_complete()?;
         return self.validate_disaster_marker();
     }
 
     fn validate_wage_increase(&self) -> ValidationResult {
         self.validate_time_range()?;
         self.validate_target_range()?;
+        self.validate_occurrence_not_episode_complete()?;
         return self.validate_amount_range();
     }
 
     fn validate_wage_decrease(&self) -> ValidationResult {
         self.validate_time_range()?;
         self.validate_target_range()?;
+        self.validate_occurrence_not_episode_complete()?;
         return self.validate_amount_range();
     }
 
@@ -395,7 +402,7 @@ impl EventData {
             return Err(ValidationError::expected_range("warnings", self.warnings, 1, i16::MAX));
         }
 
-        return Ok(());
+        return self.validate_occurrence_not_episode_complete();
     }
 
     fn validate_military_buildup(&self) -> ValidationResult {
@@ -435,11 +442,12 @@ impl EventData {
     }
 
     fn validate_city_conquered_by(&self) -> ValidationResult {
-        return Ok(());
+        return self.validate_occurrence_not_episode_complete();
     }
 
     fn validate_rival_army_change(&self) -> ValidationResult {
         self.validate_time_range()?;
+        self.validate_occurrence_not_episode_complete()?;
         return self.validate_target_range();
     }
 
@@ -479,12 +487,14 @@ impl EventData {
             new_file_ver,
         )?;
         self.validate_target_range()?;
+        self.validate_occurrence_not_episode_complete()?;
         return self.validate_amount_range();
     }
 
     fn validate_lava_flow(&self) -> ValidationResult {
         self.validate_time_range()?;
         self.validate_target_range()?;
+        self.validate_occurrence_not_episode_complete()?;
         return self.validate_disaster_marker();
     }
 
@@ -492,6 +502,7 @@ impl EventData {
         self.validate_time_range()?;
         self.validate_target_range()?;
         self.validate_disaster_marker()?;
+        self.validate_occurrence_not_episode_complete()?;
 
         if !matches!(self.permanent_flag, 0 | 1) {
             return Err(ValidationError::expected_one_of("permanent_flag", self.permanent_flag, &[0, 1]));
@@ -501,6 +512,8 @@ impl EventData {
     }
 
     fn validate_monster_invasion(&self, new_file_ver: bool) -> ValidationResult {
+        self.validate_occurrence_not_episode_complete()?;
+
         return match self.subtype {
             0 => self.validate_monster_in_city(),
             1 => self.validate_monster_unleashed(),
@@ -511,7 +524,8 @@ impl EventData {
 
     fn validate_monster_in_city(&self) -> ValidationResult {
         // The only subtype with no `Occurrence` of its own (see `event.rs`), so
-        // `fixed_time`/`min_time`/`max_time` are meaningless leftovers here.
+        // `fixed_time`/`min_time`/`max_time` are meaningless leftovers here - `flags` still matters
+        // though, since the editor rejects `EpisodeComplete` here too (checked by the caller).
         return self.validate_items_in_range(0, 2);
     }
 
@@ -546,6 +560,7 @@ impl EventData {
 
     fn validate_god_invasion(&self) -> ValidationResult {
         self.validate_time_range()?;
+        self.validate_occurrence_not_episode_complete()?;
         return self.validate_items_in_range(0, 13);
     }
 
@@ -553,6 +568,7 @@ impl EventData {
         self.validate_time_range()?;
         self.validate_target_range()?;
         self.validate_disaster_marker()?;
+        self.validate_occurrence_not_episode_complete()?;
         return self.validate_amount_range_bounded(1, 5); // todo check why the editor enforces this limit
     }
 
@@ -653,6 +669,21 @@ impl EventData {
     fn validate_month(&self) -> ValidationResult {
         if self.month > 11 {
             return Err(ValidationError::expected_range("month", self.month, 0, 11));
+        }
+
+        return Ok(());
+    }
+
+    fn validate_occurrence_not_episode_complete(&self) -> ValidationResult {
+        // The `flags` bit representing  "Episode Complete".
+        const EPISODE_COMPLETE_FLAG: u32 = 0x20000;
+
+        if self.flags & EPISODE_COMPLETE_FLAG != 0 {
+            return Err(ValidationError::expected_exactly(
+                "flags",
+                format!("{:b}", self.flags),
+                format!("{:b}", self.flags & !EPISODE_COMPLETE_FLAG),
+            ));
         }
 
         return Ok(());
