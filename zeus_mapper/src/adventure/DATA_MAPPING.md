@@ -635,7 +635,7 @@ further by `subtype`:
 |          8/9 | wage increase/decrease          | `WageIncrease`/`WageDecrease`                                                                                                                                                                                                                                                                                                                                                          |
 |        13/14 | trade demand increase/decrease  | `TradeChangeSubtype::DemandIncrease`/`DemandDecrease`                                                                                                                                                                                                                                                                                                                                  |
 |        15/16 | price increase/decrease         | `TradeChangeSubtype::PriceIncrease`/`PriceDecrease`                                                                                                                                                                                                                                                                                                                                    |
-|           19 | city status / trade-open change | see below                                                                                                                                                                                                                                                                                                                                                                              |
+|           19 | city event_status / trade-open change | see below                                                                                                                                                                                                                                                                                                                                                                              |
 |        21/22 | trade supply increase/decrease  | `TradeChangeSubtype::SupplyIncrease`/`SupplyDecrease`                                                                                                                                                                                                                                                                                                                                  |
 |           23 | gift                            | `Gift`                                                                                                                                                                                                                                                                                                                                                                                 |
 |           24 | lava flow                       | `Disaster(LavaFlow)`                                                                                                                                                                                                                                                                                                                                                                   |
@@ -680,9 +680,10 @@ Field notes:
   { .. }` read). `WageDecrease.amount` is the one remaining case that collapses the pattern to a
   single representative value via `resolve_range(fixed, min)` (dropping the `max` bound), an accepted
   simplification for that type until there's a reason to give it the same `_min`/`_max` treatment.
-- `CityAttackOutcome` is `eff_on_city`'s low byte; the high byte (a "warning stage" flag) isn't modeled.
-- `MonsterAttack.monument` is `mtar1`'s high byte; `target` is built from `mtar1`'s low byte plus
-  `mtar2`/`mtar3` (each a `MonsterTarget` id).
+- `CityAttackOutcome` is `effect_on_city`'s low byte; the high byte (a "warning stage" flag) isn't modeled.
+- `MonsterInvasion.monument` is `EventData.monument`, its own byte immediately after `monster_target_1` (not a bitfield
+  packed into it); `target` is built from `monster_target_1`/`monster_target_2`/`monster_target_3` (each a
+  `MonsterTarget` id).
 - `DisasterSubtype::TidalWave(bool)`'s payload is `EventData.permanent_flag` (confirmed `0`/`1` only - split out of
   what was a single `unknown_1`/`permanent_flag: UnconfirmedSign<u16>` field, with the other, always-`0` byte
   promoted to `constant_5_0x00`; see `examples/survey_event_fields.rs`, 1344 real events surveyed). `TidalWave`
@@ -698,7 +699,18 @@ Field notes:
   `The Youngest Twins`' colony events (`CityBecomesRival`/`CityBecomesInactive` events that trigger only
   once the episode is otherwise complete).
 - `TriggerType` comes from `trig_reason` (one shared field, so every `EventToTrigger` built from a
-  single event's `on_success`/`on_failure`/`trigger_on_1`/`trigger_on_2` shares the same type).
+  single event's `on_success`/`on_failure`/`on_late`/`on_lost` shares the same type).
+- Of the four forward trigger-link fields, only `on_success` is ever populated in a real adventure (25
+  occurrences across all 60 `.pak` files surveyed, exclusively on `Quest`/`MonsterInvasion`/`GodInvasion`
+  events); `on_failure`/`on_late`/`on_lost` are always `-1` (see `examples/investigate_trigger_fields.rs`).
+  `triggering_event_id` (the reverse-direction "who triggered me" link the original notes describe) is
+  likewise always unset in every real event surveyed, including the events that are a real `on_success`
+  target of another event in the same row - it's plausibly populated only at runtime in `.sav` saves
+  (`SavData` doesn't parse its own `EventData` copies yet, so this is unconfirmed either way), not
+  something `Adventure`-model conversion needs to fill in. `GodInvasion` is the one event type observed
+  using `on_success` (one real sample, `@Athens through the Ages`) that isn't modeled - `GodInvasion::
+  from_data`/`to_data` don't read or write `on_success`/`trig_reason` at all, so that link is silently
+  dropped on round-trip.
 - Several fields look like map-editor template leftovers even on events that don't semantically use
   them (`first_item`, `fixed_target`, `source_min`/`source_max` show up with real, non-default values -
   e.g. recurring pairs like `(1, 8)` or `(0, 231)` - on events with no item/marker/source concept).

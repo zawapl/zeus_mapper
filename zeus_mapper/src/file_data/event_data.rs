@@ -15,7 +15,7 @@ pub struct EventData {
     pub id: u16,
     pub event_type: u8,
     pub month: u8,
-    pub item_chosen: i16,
+    pub item: i16, // unverified
     pub first_item: i16,
     pub second_item: i16,
     pub third_item: i16,
@@ -32,30 +32,30 @@ pub struct EventData {
     pub min_target: i16,
     pub max_target: i16,
     pub on_success: i16,
-    pub on_failure: UnconfirmedSign<u16>,
+    pub on_failure: i16, // unverified
     pub flags: u32,
     pub warnings: i16,
-    pub time_ctr: UnconfirmedSign<u16>,
-    pub status: UnconfirmedSign<u16>,
-    pub need_msg_res: UnconfirmedSign<u16>,
-    pub triggerer: UnconfirmedSign<u16>,
-    pub god_or_mon_or_warship_id: UnconfirmedSign<u16>,
-    pub mtar1: u8,
+    pub time_counter: UnconfirmedSign<u16>,           // unverified
+    pub event_status: UnconfirmedSign<u16>,           // unverified
+    pub needs_message_response: UnconfirmedSign<u16>, // unverified
+    pub triggering_event_id: UnconfirmedSign<u16>,    // unverified
+    pub selector_id_or_warship_count: UnconfirmedSign<u16>,
+    pub monster_target_1: u8,
     pub monument: u8,
-    pub mtar2: u16,
-    pub mtar3: u16,
-    pub magg: UnconfirmedSign<u16>,
-    pub unkown_row: [UnconfirmedSign<u16>; 9],
-    pub trigger_on_1: UnconfirmedSign<u16>,
-    pub trigger_on_2: UnconfirmedSign<u16>,
-    pub eff_on_city: UnconfirmedSign<u16>,
+    pub monster_target_2: u16,
+    pub monster_target_3: u16,
+    pub monster_aggression: UnconfirmedSign<u16>,
+    pub unknown_row: [UnconfirmedSign<u16>; 9],
+    pub on_late: UnconfirmedSign<u16>, // unverified
+    pub on_lost: UnconfirmedSign<u16>, // unverified
+    pub effect_on_city: UnconfirmedSign<u16>,
     pub source: UnconfirmedSign<u16>,
     pub source_fixed: i16,
     pub source_min: i16,
     pub source_max: i16,
     pub subtype: u16,
-    pub prev_amount: UnconfirmedSign<u16>,
-    pub related_to_triggered_evt: UnconfirmedSign<u32>,
+    pub progress_state: UnconfirmedSign<u16>, // unverified
+    pub related_to_triggered_event: UnconfirmedSign<u32>,
     pub constant_1_0x00: u16,
     pub trig_reason: UnconfirmedSign<u16>,
     pub constant_2_0x00: u16,
@@ -65,12 +65,12 @@ pub struct EventData {
     pub loot_amount: UnconfirmedSign<u16>,
     pub constant_4_0x00: u8,
     pub ally_city: UnconfirmedSign<u8>,
-    pub ally_strength: UnconfirmedSign<u8>,
-    pub to_strength: UnconfirmedSign<u8>,
+    pub ally_troop_count: UnconfirmedSign<u8>,   // unverified
+    pub own_troop_strength: UnconfirmedSign<u8>, // unverified
     pub constant_5_0x00: u8,
     pub permanent_flag: u8,
     pub quest: u8,
-    pub tail: UnconfirmedSign<u8>,
+    pub quest_high_byte: UnconfirmedSign<u8>, // unverified
 }
 
 impl EventData {
@@ -177,16 +177,16 @@ impl EventData {
     }
 
     fn validate_city_under_attack(&self, new_file_ver: bool) -> ValidationResult {
-        if !matches!(*self.eff_on_city, 0 | 1 | 2) {
-            return Err(ValidationError::expected_one_of("eff_on_city", *self.eff_on_city, &[0, 1, 2]));
+        if !matches!(*self.effect_on_city, 0 | 1 | 2) {
+            return Err(ValidationError::expected_one_of("effect_on_city", *self.effect_on_city, &[0, 1, 2]));
         }
 
         return self.validate_item_exact(ResourceId::Troops.value(), new_file_ver);
     }
 
     fn validate_city_attacks_rival(&self, new_file_ver: bool) -> ValidationResult {
-        if !matches!(*self.eff_on_city, 0 | 2) {
-            return Err(ValidationError::expected_one_of("eff_on_city", *self.eff_on_city, &[0, 2]));
+        if !matches!(*self.effect_on_city, 0 | 2) {
+            return Err(ValidationError::expected_one_of("effect_on_city", *self.effect_on_city, &[0, 2]));
         }
         return self.validate_item_exact(ResourceId::Troops.value(), new_file_ver);
     }
@@ -210,10 +210,10 @@ impl EventData {
             new_file_ver,
         )?;
 
-        if *self.god_or_mon_or_warship_id > 13 {
+        if *self.selector_id_or_warship_count > 13 {
             return Err(ValidationError::expected_range(
-                "god_or_mon_or_warship_id",
-                *self.god_or_mon_or_warship_id,
+                "selector_id_or_warship_count",
+                *self.selector_id_or_warship_count,
                 0,
                 13,
             ));
@@ -223,14 +223,14 @@ impl EventData {
     }
 
     fn validate_city_terrorized(&self, new_file_ver: bool) -> ValidationResult {
-        if !matches!(*self.eff_on_city, 0 | 1) {
-            return Err(ValidationError::expected_one_of("eff_on_city", *self.eff_on_city, &[0, 1]));
+        if !matches!(*self.effect_on_city, 0 | 1) {
+            return Err(ValidationError::expected_one_of("effect_on_city", *self.effect_on_city, &[0, 1]));
         }
 
-        if !matches!(*self.god_or_mon_or_warship_id, 0 | 1 | 2) {
+        if !matches!(*self.selector_id_or_warship_count, 0 | 1 | 2) {
             return Err(ValidationError::expected_one_of(
-                "god_or_mon_or_warship_id",
-                *self.god_or_mon_or_warship_id,
+                "selector_id_or_warship_count",
+                *self.selector_id_or_warship_count,
                 &[0, 1, 2],
             ));
         }
@@ -292,10 +292,10 @@ impl EventData {
         self.validate_trig_reason()?;
 
         // Which of the Quest's 3 candidate heroes must complete it - see `adventure::event::Hero`.
-        if !matches!(*self.god_or_mon_or_warship_id, 0 | 1 | 2) {
+        if !matches!(*self.selector_id_or_warship_count, 0 | 1 | 2) {
             return Err(ValidationError::expected_one_of(
-                "god_or_mon_or_warship_id",
-                *self.god_or_mon_or_warship_id,
+                "selector_id_or_warship_count",
+                *self.selector_id_or_warship_count,
                 &[0, 1, 2],
             ));
         }
@@ -398,10 +398,10 @@ impl EventData {
     }
 
     fn validate_god_disaster(&self) -> ValidationResult {
-        if *self.god_or_mon_or_warship_id > 13 {
+        if *self.selector_id_or_warship_count > 13 {
             return Err(ValidationError::expected_range(
-                "god_or_mon_or_warship_id",
-                *self.god_or_mon_or_warship_id,
+                "selector_id_or_warship_count",
+                *self.selector_id_or_warship_count,
                 0,
                 13,
             ));
@@ -574,24 +574,44 @@ impl EventData {
     fn validate_monster_targets_and_aggression(&self) -> ValidationResult {
         const MONSTER_TARGET_MAX: u16 = 10;
 
-        if self.mtar1 as u16 > MONSTER_TARGET_MAX {
-            return Err(ValidationError::expected_range("mtar1", self.mtar1 as u16, 0, MONSTER_TARGET_MAX));
+        if self.monster_target_1 as u16 > MONSTER_TARGET_MAX {
+            return Err(ValidationError::expected_range(
+                "monster_target_1",
+                self.monster_target_1 as u16,
+                0,
+                MONSTER_TARGET_MAX,
+            ));
         }
 
         if !matches!(self.monument, 0 | 1) {
             return Err(ValidationError::expected_one_of("monument", self.monument, &[0, 1]));
         }
 
-        if self.mtar2 > MONSTER_TARGET_MAX {
-            return Err(ValidationError::expected_range("mtar2", self.mtar2, 0, MONSTER_TARGET_MAX));
+        if self.monster_target_2 > MONSTER_TARGET_MAX {
+            return Err(ValidationError::expected_range(
+                "monster_target_2",
+                self.monster_target_2,
+                0,
+                MONSTER_TARGET_MAX,
+            ));
         }
 
-        if self.mtar3 > MONSTER_TARGET_MAX {
-            return Err(ValidationError::expected_range("mtar3", self.mtar3, 0, MONSTER_TARGET_MAX));
+        if self.monster_target_3 > MONSTER_TARGET_MAX {
+            return Err(ValidationError::expected_range(
+                "monster_target_3",
+                self.monster_target_3,
+                0,
+                MONSTER_TARGET_MAX,
+            ));
         }
 
-        if *self.magg > 3 {
-            return Err(ValidationError::expected_range("magg", *self.magg, 0, 3));
+        if *self.monster_aggression > 3 {
+            return Err(ValidationError::expected_range(
+                "monster_aggression",
+                *self.monster_aggression,
+                0,
+                3,
+            ));
         }
 
         return Ok(());
@@ -872,7 +892,7 @@ impl Default for EventData {
             id: 0,
             event_type: 0,
             month: 0,
-            item_chosen: 0,
+            item: 0,
             first_item: -1,
             second_item: -1,
             third_item: -1,
@@ -889,30 +909,30 @@ impl Default for EventData {
             min_target: -1,
             max_target: -1,
             on_success: -1,
-            on_failure: UnconfirmedSign(u16::MAX),
+            on_failure: -1,
             flags: 0,
             warnings: 0,
-            time_ctr: UnconfirmedSign(0),
-            status: UnconfirmedSign(0),
-            need_msg_res: UnconfirmedSign(0),
-            triggerer: UnconfirmedSign(u16::MAX),
-            god_or_mon_or_warship_id: UnconfirmedSign(0),
-            mtar1: 0,
+            time_counter: UnconfirmedSign(0),
+            event_status: UnconfirmedSign(0),
+            needs_message_response: UnconfirmedSign(0),
+            triggering_event_id: UnconfirmedSign(u16::MAX),
+            selector_id_or_warship_count: UnconfirmedSign(0),
+            monster_target_1: 0,
             monument: 0,
-            mtar2: 0,
-            mtar3: 0,
-            magg: UnconfirmedSign(0),
-            unkown_row: [UnconfirmedSign(0); 9],
-            trigger_on_1: UnconfirmedSign(u16::MAX),
-            trigger_on_2: UnconfirmedSign(u16::MAX),
-            eff_on_city: UnconfirmedSign(0),
+            monster_target_2: 0,
+            monster_target_3: 0,
+            monster_aggression: UnconfirmedSign(0),
+            unknown_row: [UnconfirmedSign(0); 9],
+            on_late: UnconfirmedSign(u16::MAX),
+            on_lost: UnconfirmedSign(u16::MAX),
+            effect_on_city: UnconfirmedSign(0),
             source: UnconfirmedSign(0),
             source_fixed: -1,
             source_min: -1,
             source_max: -1,
             subtype: 0,
-            prev_amount: UnconfirmedSign(0),
-            related_to_triggered_evt: UnconfirmedSign(0),
+            progress_state: UnconfirmedSign(0),
+            related_to_triggered_event: UnconfirmedSign(0),
             constant_1_0x00: 0,
             trig_reason: UnconfirmedSign(0),
             constant_2_0x00: 0,
@@ -922,12 +942,12 @@ impl Default for EventData {
             loot_amount: UnconfirmedSign(0),
             constant_4_0x00: 0,
             ally_city: UnconfirmedSign(0),
-            ally_strength: UnconfirmedSign(0),
-            to_strength: UnconfirmedSign(0),
+            ally_troop_count: UnconfirmedSign(0),
+            own_troop_strength: UnconfirmedSign(0),
             constant_5_0x00: 0,
             permanent_flag: 0,
             quest: 0,
-            tail: UnconfirmedSign(0),
+            quest_high_byte: UnconfirmedSign(0),
         };
     }
 }
@@ -938,7 +958,7 @@ impl ReadFrom for EventData {
             id: ReadFrom::read_from(reader)?,
             event_type: ReadFrom::read_from(reader)?,
             month: ReadFrom::read_from(reader)?,
-            item_chosen: ReadFrom::read_from(reader)?,
+            item: ReadFrom::read_from(reader)?,
             first_item: ReadFrom::read_from(reader)?,
             second_item: ReadFrom::read_from(reader)?,
             third_item: ReadFrom::read_from(reader)?,
@@ -958,27 +978,27 @@ impl ReadFrom for EventData {
             on_failure: ReadFrom::read_from(reader)?,
             flags: ReadFrom::read_from(reader)?,
             warnings: ReadFrom::read_from(reader)?,
-            time_ctr: ReadFrom::read_from(reader)?,
-            status: ReadFrom::read_from(reader)?,
-            need_msg_res: ReadFrom::read_from(reader)?,
-            triggerer: ReadFrom::read_from(reader)?,
-            god_or_mon_or_warship_id: ReadFrom::read_from(reader)?,
-            mtar1: ReadFrom::read_from(reader)?,
+            time_counter: ReadFrom::read_from(reader)?,
+            event_status: ReadFrom::read_from(reader)?,
+            needs_message_response: ReadFrom::read_from(reader)?,
+            triggering_event_id: ReadFrom::read_from(reader)?,
+            selector_id_or_warship_count: ReadFrom::read_from(reader)?,
+            monster_target_1: ReadFrom::read_from(reader)?,
             monument: ReadFrom::read_from(reader)?,
-            mtar2: ReadFrom::read_from(reader)?,
-            mtar3: ReadFrom::read_from(reader)?,
-            magg: ReadFrom::read_from(reader)?,
-            unkown_row: ReadFrom::read_from(reader)?,
-            trigger_on_1: ReadFrom::read_from(reader)?,
-            trigger_on_2: ReadFrom::read_from(reader)?,
-            eff_on_city: ReadFrom::read_from(reader)?,
+            monster_target_2: ReadFrom::read_from(reader)?,
+            monster_target_3: ReadFrom::read_from(reader)?,
+            monster_aggression: ReadFrom::read_from(reader)?,
+            unknown_row: ReadFrom::read_from(reader)?,
+            on_late: ReadFrom::read_from(reader)?,
+            on_lost: ReadFrom::read_from(reader)?,
+            effect_on_city: ReadFrom::read_from(reader)?,
             source: ReadFrom::read_from(reader)?,
             source_fixed: ReadFrom::read_from(reader)?,
             source_min: ReadFrom::read_from(reader)?,
             source_max: ReadFrom::read_from(reader)?,
             subtype: ReadFrom::read_from(reader)?,
-            prev_amount: ReadFrom::read_from(reader)?,
-            related_to_triggered_evt: ReadFrom::read_from(reader)?,
+            progress_state: ReadFrom::read_from(reader)?,
+            related_to_triggered_event: ReadFrom::read_from(reader)?,
             constant_1_0x00: ReadFrom::read_from(reader)?,
             trig_reason: ReadFrom::read_from(reader)?,
             constant_2_0x00: ReadFrom::read_from(reader)?,
@@ -988,12 +1008,12 @@ impl ReadFrom for EventData {
             loot_amount: ReadFrom::read_from(reader)?,
             constant_4_0x00: ReadFrom::read_from(reader)?,
             ally_city: ReadFrom::read_from(reader)?,
-            ally_strength: ReadFrom::read_from(reader)?,
-            to_strength: ReadFrom::read_from(reader)?,
+            ally_troop_count: ReadFrom::read_from(reader)?,
+            own_troop_strength: ReadFrom::read_from(reader)?,
             constant_5_0x00: ReadFrom::read_from(reader)?,
             permanent_flag: ReadFrom::read_from(reader)?,
             quest: ReadFrom::read_from(reader)?,
-            tail: ReadFrom::read_from(reader)?,
+            quest_high_byte: ReadFrom::read_from(reader)?,
         });
     }
 }
@@ -1005,7 +1025,7 @@ impl WriteTo for EventData {
         bytes += WriteTo::write_to(&self.id, writer)?;
         bytes += WriteTo::write_to(&self.event_type, writer)?;
         bytes += WriteTo::write_to(&self.month, writer)?;
-        bytes += WriteTo::write_to(&self.item_chosen, writer)?;
+        bytes += WriteTo::write_to(&self.item, writer)?;
         bytes += WriteTo::write_to(&self.first_item, writer)?;
         bytes += WriteTo::write_to(&self.second_item, writer)?;
         bytes += WriteTo::write_to(&self.third_item, writer)?;
@@ -1025,27 +1045,27 @@ impl WriteTo for EventData {
         bytes += WriteTo::write_to(&self.on_failure, writer)?;
         bytes += WriteTo::write_to(&self.flags, writer)?;
         bytes += WriteTo::write_to(&self.warnings, writer)?;
-        bytes += WriteTo::write_to(&self.time_ctr, writer)?;
-        bytes += WriteTo::write_to(&self.status, writer)?;
-        bytes += WriteTo::write_to(&self.need_msg_res, writer)?;
-        bytes += WriteTo::write_to(&self.triggerer, writer)?;
-        bytes += WriteTo::write_to(&self.god_or_mon_or_warship_id, writer)?;
-        bytes += WriteTo::write_to(&self.mtar1, writer)?;
+        bytes += WriteTo::write_to(&self.time_counter, writer)?;
+        bytes += WriteTo::write_to(&self.event_status, writer)?;
+        bytes += WriteTo::write_to(&self.needs_message_response, writer)?;
+        bytes += WriteTo::write_to(&self.triggering_event_id, writer)?;
+        bytes += WriteTo::write_to(&self.selector_id_or_warship_count, writer)?;
+        bytes += WriteTo::write_to(&self.monster_target_1, writer)?;
         bytes += WriteTo::write_to(&self.monument, writer)?;
-        bytes += WriteTo::write_to(&self.mtar2, writer)?;
-        bytes += WriteTo::write_to(&self.mtar3, writer)?;
-        bytes += WriteTo::write_to(&self.magg, writer)?;
-        bytes += WriteTo::write_to(&self.unkown_row, writer)?;
-        bytes += WriteTo::write_to(&self.trigger_on_1, writer)?;
-        bytes += WriteTo::write_to(&self.trigger_on_2, writer)?;
-        bytes += WriteTo::write_to(&self.eff_on_city, writer)?;
+        bytes += WriteTo::write_to(&self.monster_target_2, writer)?;
+        bytes += WriteTo::write_to(&self.monster_target_3, writer)?;
+        bytes += WriteTo::write_to(&self.monster_aggression, writer)?;
+        bytes += WriteTo::write_to(&self.unknown_row, writer)?;
+        bytes += WriteTo::write_to(&self.on_late, writer)?;
+        bytes += WriteTo::write_to(&self.on_lost, writer)?;
+        bytes += WriteTo::write_to(&self.effect_on_city, writer)?;
         bytes += WriteTo::write_to(&self.source, writer)?;
         bytes += WriteTo::write_to(&self.source_fixed, writer)?;
         bytes += WriteTo::write_to(&self.source_min, writer)?;
         bytes += WriteTo::write_to(&self.source_max, writer)?;
         bytes += WriteTo::write_to(&self.subtype, writer)?;
-        bytes += WriteTo::write_to(&self.prev_amount, writer)?;
-        bytes += WriteTo::write_to(&self.related_to_triggered_evt, writer)?;
+        bytes += WriteTo::write_to(&self.progress_state, writer)?;
+        bytes += WriteTo::write_to(&self.related_to_triggered_event, writer)?;
         bytes += WriteTo::write_to(&self.constant_1_0x00, writer)?;
         bytes += WriteTo::write_to(&self.trig_reason, writer)?;
         bytes += WriteTo::write_to(&self.constant_2_0x00, writer)?;
@@ -1055,12 +1075,12 @@ impl WriteTo for EventData {
         bytes += WriteTo::write_to(&self.loot_amount, writer)?;
         bytes += WriteTo::write_to(&self.constant_4_0x00, writer)?;
         bytes += WriteTo::write_to(&self.ally_city, writer)?;
-        bytes += WriteTo::write_to(&self.ally_strength, writer)?;
-        bytes += WriteTo::write_to(&self.to_strength, writer)?;
+        bytes += WriteTo::write_to(&self.ally_troop_count, writer)?;
+        bytes += WriteTo::write_to(&self.own_troop_strength, writer)?;
         bytes += WriteTo::write_to(&self.constant_5_0x00, writer)?;
         bytes += WriteTo::write_to(&self.permanent_flag, writer)?;
         bytes += WriteTo::write_to(&self.quest, writer)?;
-        bytes += WriteTo::write_to(&self.tail, writer)?;
+        bytes += WriteTo::write_to(&self.quest_high_byte, writer)?;
 
         return Ok(bytes);
     }
@@ -1078,7 +1098,7 @@ mod tests {
             id: 1,
             event_type: 2,
             month: 3,
-            item_chosen: 4,
+            item: 4,
             first_item: 5,
             second_item: 6,
             third_item: 7,
@@ -1095,20 +1115,20 @@ mod tests {
             min_target: 18,
             max_target: 19,
             on_success: 20,
-            on_failure: UnconfirmedSign(21),
+            on_failure: 21,
             flags: 22,
             warnings: 23,
-            time_ctr: UnconfirmedSign(24),
-            status: UnconfirmedSign(25),
-            need_msg_res: UnconfirmedSign(26),
-            triggerer: UnconfirmedSign(27),
-            god_or_mon_or_warship_id: UnconfirmedSign(28),
-            mtar1: 29,
+            time_counter: UnconfirmedSign(24),
+            event_status: UnconfirmedSign(25),
+            needs_message_response: UnconfirmedSign(26),
+            triggering_event_id: UnconfirmedSign(27),
+            selector_id_or_warship_count: UnconfirmedSign(28),
+            monster_target_1: 29,
             monument: 129,
-            mtar2: 30,
-            mtar3: 31,
-            magg: UnconfirmedSign(32),
-            unkown_row: [
+            monster_target_2: 30,
+            monster_target_3: 31,
+            monster_aggression: UnconfirmedSign(32),
+            unknown_row: [
                 UnconfirmedSign(33),
                 UnconfirmedSign(34),
                 UnconfirmedSign(35),
@@ -1119,16 +1139,16 @@ mod tests {
                 UnconfirmedSign(40),
                 UnconfirmedSign(41),
             ],
-            trigger_on_1: UnconfirmedSign(42),
-            trigger_on_2: UnconfirmedSign(43),
-            eff_on_city: UnconfirmedSign(44),
+            on_late: UnconfirmedSign(42),
+            on_lost: UnconfirmedSign(43),
+            effect_on_city: UnconfirmedSign(44),
             source: UnconfirmedSign(45),
             source_fixed: 46,
             source_min: 47,
             source_max: 48,
             subtype: 49,
-            prev_amount: UnconfirmedSign(50),
-            related_to_triggered_evt: UnconfirmedSign(51),
+            progress_state: UnconfirmedSign(50),
+            related_to_triggered_event: UnconfirmedSign(51),
             constant_1_0x00: 52,
             trig_reason: UnconfirmedSign(53),
             constant_2_0x00: 54,
@@ -1138,12 +1158,12 @@ mod tests {
             loot_amount: UnconfirmedSign(58),
             constant_4_0x00: 59,
             ally_city: UnconfirmedSign(60),
-            ally_strength: UnconfirmedSign(61),
-            to_strength: UnconfirmedSign(62),
+            ally_troop_count: UnconfirmedSign(61),
+            own_troop_strength: UnconfirmedSign(62),
             constant_5_0x00: 63,
             permanent_flag: 64,
             quest: 65,
-            tail: UnconfirmedSign(66),
+            quest_high_byte: UnconfirmedSign(66),
         };
 
         let mut buffer = vec![];
