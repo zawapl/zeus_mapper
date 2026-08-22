@@ -18,7 +18,7 @@
 **/test_data/*
 
 # scratch output from investigations & other temp files
-/.tmp/
+.tmp/
 
 # Claude Code — ignore ephemeral/personal files, keep shared config
 .claude/logs/
