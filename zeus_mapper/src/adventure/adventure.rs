@@ -70,6 +70,13 @@ impl Adventure {
         // clean gap with no observed values in between.
         let map_new_file_ver = pak_data.map_data[0].version_1 >= 300;
 
+        // `colony_episodes_available` sometimes claims more colonies than the file actually backs
+        // with map data (e.g. `bigcity.pak`: `colony_episodes_available == 1` but only the parent
+        // map is present) - `ColonyEpisode::vec_from_data` already clamps to what's actually usable,
+        // so `available_colonies` is read from its result rather than the raw field to stay
+        // consistent with it (and with what `Adventure::to_pak` writes back).
+        let colony_episodes = ColonyEpisode::vec_from_data(pak_data, adventure_text);
+
         return Adventure {
             title: adventure_text.title.to_owned(),
             introduction_text: adventure_text.introduction.to_owned(),
@@ -81,8 +88,8 @@ impl Adventure {
             parent_city: CityMap::from_map_data(&pak_data.map_data[0]),
             prices: ResourceType::prices_from_data(pak_data.map_data[0].prices.as_slice(), map_new_file_ver),
             parent_episodes: ParentEpisode::vec_from_data(pak_data, adventure_text),
-            colony_episodes: ColonyEpisode::vec_from_data(pak_data, adventure_text),
-            available_colonies: pak_data.settings_data.colony_episodes_available as u8,
+            available_colonies: colony_episodes.len() as u8,
+            colony_episodes,
             initial_funds: pak_data.settings_data.real_episode_data[0].starting_cash,
             start_year: pak_data.settings_data.real_episode_data[0].start_date,
             world_locations: WorldLocation::vec_from_data(
@@ -272,9 +279,9 @@ impl Adventure {
             parent_event_counts[i] = episode.events.len() as u32;
         }
 
-        let mut colony_event_counts = [0u8; 3];
+        let mut colony_event_counts = [0u32; 4];
         for (i, colony_episode) in self.colony_episodes.iter().take(colony_event_counts.len()).enumerate() {
-            colony_event_counts[i] = colony_episode.events.len() as u8;
+            colony_event_counts[i] = colony_episode.events.len() as u32;
         }
 
         let settings_data = SettingsData {
@@ -378,9 +385,12 @@ mod tests {
     use crate::prelude::DataConstant;
     use crate::prelude::PakData;
     use crate::prelude::ResourceType;
+    use std::fs;
     use std::fs::File;
     use std::io::BufReader;
     use std::io::Result;
+    use std::path::Path;
+    use std::path::PathBuf;
 
     #[test]
     fn validate_adventure_name_accepts_the_longest_known_real_name() -> Result<()> {
@@ -510,28 +520,47 @@ mod tests {
     }
 
     #[test]
-    fn parse_the_youngest_twins_round_trip() -> Result<()> {
+    fn all_real_adventures_round_trip() -> Result<()> {
         if let Ok(game_root) = std::env::var("ZEUS_HOME") {
-            let adventure = Adventure::read_from(format!("{game_root}/Adventures/The Youngest Twins"))?;
-            let pak_data = adventure.to_pak();
-            let adventure_text = adventure.to_text();
-            assert_eq!(Adventure::from_pak(&pak_data, &adventure_text), adventure);
+            let adventures_dir = PathBuf::from(format!("{game_root}/Adventures"));
+
+            let mut pak_paths = vec![];
+            collect_paks(&adventures_dir, &mut pak_paths)?;
+
+            for path in pak_paths {
+                let mut reader = BufReader::new(File::open(&path)?);
+                let pak_data = PakData::read_from(&mut reader)?;
+
+                let text_path = path.with_extension("txt");
+                let adventure_text = if text_path.is_file() {
+                    let mut text_reader = BufReader::new(File::open(&text_path)?);
+                    AdventureText::read_from(&mut text_reader)?
+                } else {
+                    AdventureText::default()
+                };
+
+                let adventure = Adventure::from_pak(&pak_data, &adventure_text);
+
+                let reconstructed_pak_data = adventure.to_pak();
+                let reconstructed_text = adventure.to_text();
+                let round_tripped = Adventure::from_pak(&reconstructed_pak_data, &reconstructed_text);
+
+                assert_eq!(round_tripped, adventure, "{path:?} did not round-trip");
+            }
         }
 
         return Ok(());
     }
 
-    #[test]
-    fn parse_two_worlds_collide_round_trip() -> Result<()> {
-        if let Ok(game_root) = std::env::var("ZEUS_HOME") {
-            let path = format!("{game_root}/Adventures/^Two Worlds Collide.pak");
-            let mut reader = BufReader::new(File::open(path)?);
-            let pak_data = PakData::read_from(&mut reader)?;
-            let adventure = Adventure::from_pak(&pak_data, &AdventureText::default());
+    fn collect_paks(dir: &Path, out: &mut Vec<PathBuf>) -> Result<()> {
+        for entry in fs::read_dir(dir)? {
+            let path = entry?.path();
 
-            let reconstructed_pak_data = adventure.to_pak();
-            let adventure_text = adventure.to_text();
-            assert_eq!(Adventure::from_pak(&reconstructed_pak_data, &adventure_text), adventure);
+            if path.is_dir() {
+                collect_paks(&path, out)?;
+            } else if path.extension().is_some_and(|e| e == "pak") {
+                out.push(path);
+            }
         }
 
         return Ok(());

@@ -603,19 +603,42 @@ with `id` always equal to the slot index, for both real and padding slots alike 
 tell them apart).
 
 The real per-episode event count comes from `SettingsData.parent_event_counts: [u32; 10]` (one count
-per parent episode index) and `colony_event_counts: [u8; 3]` (one count per colony index) - split out
-of what the raw format stores as a single `[u8; 43]` block (`parent_event_counts` occupies its first
-40 bytes, 4-byte-strided; the 3 padding bytes between each `u32` are confirmed always `0`). Confirmed
-against 5 real parent episodes across two adventures (`The Youngest Twins`, `The Founding of Troy`)
-and one colony. `colony_event_counts` is one byte short of the 4 colony slots `real_episode_data` has
-room for (`COLONY_SETTINGS_OFFSET` reserves indices `10..14`) - unresolved whether that's a real
-format limit or `SettingsData`'s fields are mis-sized by one byte somewhere earlier, silently
-borrowing from what's modeled as `unused_blocks`. Slots at and beyond a real count hold real-looking
-but confirmed-unused editor template data, the same "extra populated slots" pattern documented for
-`basic_episode_data`/`real_episode_data` above - this supersedes an earlier (incorrect) conclusion
+per parent episode index) and `colony_event_counts: [u32; 4]` (one count per colony index, matching
+the 4 colony slots `real_episode_data` has room for - `COLONY_SETTINGS_OFFSET` reserves indices
+`10..14`), both the same 4-byte-strided, "count then 3 zero-padding bytes" layout. Confirmed against
+5 real parent episodes across two adventures (`The Youngest Twins`, `The Founding of Troy`) and one
+colony.
+
+`colony_event_counts` was originally modeled as `[u8; 3]` - one count *byte* per colony, covering only
+colony indices `0..3` - immediately followed by an unrelated `unused_blocks` blob. That was wrong: a
+corpus-wide survey (reading each entry as a `u32` instead) found colony indices 1-3's real counts
+sitting exactly where the `[u8; 3]` model had labeled them "unused" - e.g. `]Hercules Labors.pak`'s 3
+real colonies match `[17, 6, 11]` exactly, and `&Enlightenment in the West.pak`'s 4 match
+`[12, 9, 16, 14]` exactly, both with zero discrepancy once read as `u32`s instead of bytes. Confirmed
+further with a purpose-built pair of adventures ("Events1"/"Events2") differing by exactly one event
+added to colony index 3, where a full field-by-field diff of the two files' `SettingsData` showed
+byte offset 9 of the old `unused_blocks` blob (i.e. what's now `colony_event_counts[3]`'s low byte)
+move `0` -> `1`, and nothing else changed outside the new event's own fields.
+
+Slots at and beyond a real count are frequently still populated with ordinary-looking event data, not
+zeroed - the in-game editor leaves stale copies of former real events behind when events are deleted
+(observed shifting surviving events left without clearing the vacated tail), and these accumulate
+across an adventure's edit history. A survey of every ground-truth-count row across every real
+adventure found this leftover count ranging from `0` to `12` with no consistent pattern, and no
+`EventData` field (including `id`, which always mirrors its own slot index either way) reliably
+distinguishing a leftover copy from a real event - the row's own count field is the only trustworthy
+signal, which is exactly why `colony_event_counts` needed its true field width confirmed rather than
+being inferred by scanning for a real terminator. This supersedes an earlier (incorrect) conclusion
 that the raw `[u8; 43]` block "doesn't consistently match" and is unusable, which was itself an
 artifact of comparing it against a dense scan that both skipped the real slot `0` and over-ran into
 this padding.
+
+Fixing this exposed real event data for two colony rows that the old, too-narrow model had always
+silently excluded from `EventData::validate` (their counts always read as `0`) - including one
+previously-unseen `event_type == 19` (`CityStatusChange`) subtype, `22`, in
+`^The Peloponnesian War.pak` (a single, well-formed occurrence: proper `flags`/time-range fields, no
+sign of corruption). Not yet named or added to `CityStatusChangeSubtype` - needs its own investigation
+before `EventData::validate`'s accepted subtype list can be safely widened.
 
 The format itself was reverse-engineered in a forum post archived at `zeus_mapper/notes.md`; this
 mapping's offsets and event/subtype tables were verified against it (hand-computed every `EventData`

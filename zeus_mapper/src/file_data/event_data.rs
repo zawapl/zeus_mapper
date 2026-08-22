@@ -367,12 +367,13 @@ impl EventData {
             19 => self.validate_city_becomes_inactive(),
             20 => self.validate_city_appears(),
             21 => self.validate_city_disappears(),
+            22 => self.validate_unconfirmed_city_status_change_22(),
             23 => self.validate_rebellion_over(),
             24 => self.validate_city_conquered_by(),
             _ => Err(ValidationError::expected_one_of(
                 "subtype",
                 self.subtype,
-                &[2, 3, 9, 10, 11, 13, 14, 15, 16, 17, 18, 19, 20, 21, 23, 24],
+                &[2, 3, 9, 10, 11, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24],
             )),
         };
     }
@@ -445,6 +446,14 @@ impl EventData {
     }
 
     fn validate_city_disappears(&self) -> ValidationResult {
+        return Ok(());
+    }
+
+    // Exactly one confirmed real occurrence so far (`^The Peloponnesian War.pak`), well-formed but not
+    // yet named or modeled as a `CityStatusChangeSubtype` variant - see DATA_MAPPING.md. Accepted here
+    // without further field-level validation until there's enough evidence to model it properly.
+    fn validate_unconfirmed_city_status_change_22(&self) -> ValidationResult {
+        // todo investigate what this type is
         return Ok(());
     }
 

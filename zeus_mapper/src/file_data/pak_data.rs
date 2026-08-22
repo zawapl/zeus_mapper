@@ -683,7 +683,7 @@ mod tests {
                 goal_type: self.generate_data(),
                 resource_id: self.generate_data(),
                 amount: self.generate_data(),
-                unknown_1: self.generate_data(),
+                goal_extra: self.generate_data(),
             };
         }
     }

@@ -33,11 +33,20 @@ impl Event {
     /// **Assumptions**: real events are densely packed starting at slot `0` (unlike most other
     /// dense arrays in this format, slot `0` is a real event, not a sentinel/always-unused slot);
     /// `count` is the episode's real event count, sourced from `SettingsData.parent_event_counts`/
-    /// `colony_event_counts`.
-    /// Slots at and beyond `count` hold real-looking but confirmed-unused editor template data,
-    /// the same "extra populated slots" pattern documented for `basic_episode_data`/
-    /// `real_episode_data` in `DATA_MAPPING.md` - `id` alone can't distinguish real from unused
-    /// since it always mirrors its own slot index either way.
+    /// `colony_event_counts` - the only reliable source, see below.
+    ///
+    /// Slots at and beyond `count` are frequently still populated with ordinary-looking event data,
+    /// not zeroed - the in-game editor leaves stale copies of former real events behind when events
+    /// are deleted (observed shifting surviving events left without clearing the vacated tail), and
+    /// these can accumulate across an adventure's edit history. A survey of every ground-truth-count
+    /// row (all `parent_event_counts` entries plus any `colony_event_counts` entry > 0) across every
+    /// real adventure found this leftover count ranging from `0` to `12` with no consistent pattern,
+    /// and no `EventData` field (including `id`, which always mirrors its own slot index either way)
+    /// reliably distinguishing a leftover copy from a real event - the row's own count is the only
+    /// trustworthy signal. This makes the zero-`event_type`-scanning fallback in
+    /// `ColonyEpisode::vec_from_data` (used only for a colony index outside `colony_event_counts`'s 3
+    /// slots) fundamentally unreliable, not just imprecise - there is no way to recover that colony's
+    /// true event count from this file's raw bytes.
     pub fn vec_from_data(episode_events: &BoxedArray<EventData, 150>, count: usize, new_file_ver: bool) -> Vec<Event> {
         return episode_events
             .iter()

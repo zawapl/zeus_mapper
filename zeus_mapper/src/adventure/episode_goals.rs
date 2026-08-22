@@ -72,11 +72,13 @@ impl EpisodeGoal {
         return match marker {
             0 if resource_id > 0 => Some(EpisodeGoal::Population(resource_id as u16)),
             1 if resource_id > 0 => Some(EpisodeGoal::Treasury(resource_id as u16)),
-            // Old-format only: an unspecified count of *any* god's sanctuary, with the count in
-            // `unknown_1[0]` rather than `amount` - confirmed against `#Zeus and Europa.pak`, where
-            // `unknown_1[0] == 2` matches a real, user-confirmed `Sanctuaries(2)`. No confirmed
-            // new-format example exists, so this shape is only attempted for old-format data.
-            2 if !new_file_ver && resource_id < 0 => Some(EpisodeGoal::Sanctuaries(u32_at(slot.unknown_1.as_slice(), 0) as u8)),
+            // An unspecified count of *any* god's sanctuary, with the count in `goal_extra[0]`
+            // rather than `amount` - the same encoding in both file generations (`resource_id ==
+            // -1`, `amount == u32::MAX`), confirmed against `#Zeus and Europa.pak` (old format,
+            // `goal_extra[0] == 2` matching a real, user-confirmed `Sanctuaries(2)`) and `Sanctuary`
+            // (new format, a purpose-built adventure with a user-confirmed `Sanctuaries(4)` goal
+            // using the identical field layout).
+            2 if resource_id < 0 => Some(EpisodeGoal::Sanctuaries(u32_at(slot.goal_extra.as_slice(), 0) as u8)),
             2 => God::try_resolve(&(resource_id as u32)).map(EpisodeGoal::Sanctuary),
             3 => UnitType::try_resolve(&(resource_id as u32)).map(|unit| EpisodeGoal::Army(unit, amount)),
             4 => resolve_quest(resource_id, events), // todo this implies resource_id should be called something else
@@ -89,7 +91,7 @@ impl EpisodeGoal {
             10 if resource_id > 0 => Some(EpisodeGoal::TradingPartners(resource_id as u16)),
             14 if amount > 0 && amount < 256 => ResourceType::try_resolve_for_format(&(resource_id as i8), new_file_ver)
                 .map(|resource| EpisodeGoal::SetAsideGoods(resource, amount)),
-            15 if new_file_ver && amount == 0 => Some(EpisodeGoal::Pyramids(u32_at(slot.unknown_1.as_slice(), 4) as u8)),
+            15 if new_file_ver && amount == 0 => Some(EpisodeGoal::Pyramids(u32_at(slot.goal_extra.as_slice(), 4) as u8)),
             15 if new_file_ver => PyramidType::try_resolve(&amount).map(EpisodeGoal::Pyramid),
             16 if new_file_ver && resource_id > 0 => Some(EpisodeGoal::Hippodrome(resource_id as u16)),
             _ => None,
@@ -121,7 +123,7 @@ impl EpisodeGoal {
     }
 
     fn to_raw_fields(&self) -> Option<EpisodeGoalData> {
-        let (goal_type, resource_id, amount, unknown_1) = match self {
+        let (goal_type, resource_id, amount, goal_extra) = match self {
             EpisodeGoal::Population(count) => (0, *count as i32, 0, Default::default()),
             EpisodeGoal::Treasury(amount) => (1, *amount as i32, 0, Default::default()),
             EpisodeGoal::Sanctuary(god) => (2, god.value() as i32, 0, Default::default()),
@@ -137,16 +139,14 @@ impl EpisodeGoal {
             EpisodeGoal::Pyramids(count) => (15, 1, 0, pyramids_field_4(*count)),
             EpisodeGoal::Pyramid(kind) => (15, 1, kind.value(), Default::default()),
             EpisodeGoal::Hippodrome(count) => (16, *count as i32, 0, Default::default()),
-            // No confirmed new-format encoding exists for `Sanctuaries` (see `from_raw_fields`) -
-            // `Adventure::to_pak` always writes the new format, so there's nowhere to put it.
-            EpisodeGoal::Sanctuaries(_) => return None,
+            EpisodeGoal::Sanctuaries(count) => (2, -1, u32::MAX, sanctuaries_field_0(*count)),
         };
 
         return Some(EpisodeGoalData {
             goal_type,
             resource_id,
             amount,
-            unknown_1,
+            goal_extra,
         });
     }
 }
@@ -184,20 +184,28 @@ fn resolve_slay(goal_type: i32, events: &BoxedArray<EventData, 150>) -> Option<E
     return Some(EpisodeGoal::Slay(goal_type as u16));
 }
 
-// fixme this is a code smell - we should be using named fields, if we're using an unnamed field it means it should be promoted to named
+// `goal_extra`'s content depends on `goal_type` (see its doc comment on `EpisodeGoalData`), so
+// there's no single fixed-purpose sub-field to promote it to - offset-based access is the
+// tagged-union nature of the data itself, not a naming gap.
 fn u32_at(bytes: &[u8], offset: usize) -> u32 {
     return u32::from_le_bytes([bytes[offset], bytes[offset + 1], bytes[offset + 2], bytes[offset + 3]]);
 }
 
 /// `Pyramids(count)`'s raw encoding: `resource_id`/`amount` are both otherwise-unused for this
 /// goal (`resource_id` a constant `1`, `amount` `0`, matching the one real `Pyramids` goal seen so
-/// far), and `count` itself lives at byte offset 4 (the second `u32`) of `unknown_1`, preceded by a
-/// `u32::MAX` sentinel at offset 0 whose purpose isn't confirmed but is reproduced here to match
+/// far), and `count` itself lives at byte offset 4 (the second `u32`) of `goal_extra`, preceded by
+/// a `u32::MAX` sentinel at offset 0 whose purpose isn't confirmed but is reproduced here to match
 /// the one real record observed.
 fn pyramids_field_4(count: u8) -> BoxedArray<u8, 64> {
     let mut bytes = u32::MAX.to_le_bytes().to_vec();
     bytes.extend((count as u32).to_le_bytes());
     return BoxedArray::from_vec(bytes);
+}
+
+/// `Sanctuaries(count)`'s raw encoding: `count` lives at byte offset 0 of `goal_extra`, the same
+/// slot `from_raw_fields` reads it back from.
+fn sanctuaries_field_0(count: u8) -> BoxedArray<u8, 64> {
+    return BoxedArray::from_vec((count as u32).to_le_bytes().to_vec());
 }
 
 #[derive(PartialEq, Debug)]

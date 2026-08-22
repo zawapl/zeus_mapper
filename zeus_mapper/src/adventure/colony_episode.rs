@@ -54,14 +54,7 @@ impl ColonyEpisode {
             };
 
             let events = &pak_data.settings_data.events[settings_index];
-            let raw_event_count = pak_data.settings_data.colony_event_counts.get(i).copied().unwrap_or(0) as usize;
-
-            // todo can this be replaced with a version check?
-            let event_count = if raw_event_count > 0 || events.first().map(|event| event.event_type) == Some(0) {
-                raw_event_count
-            } else {
-                events.iter().take_while(|event| event.event_type != 0).count().saturating_sub(1)
-            };
+            let event_count = pak_data.settings_data.colony_event_counts.get(i).copied().unwrap_or(0) as usize;
 
             let mythology = Mythology::from_data(&pak_data.settings_data.mythology[settings_index]);
 

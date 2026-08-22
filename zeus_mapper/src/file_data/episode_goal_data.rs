@@ -6,17 +6,12 @@ use std::io;
 use std::io::Read;
 use std::io::Write;
 
-/// One 76-byte "set aside goods" goal slot from `SettingsData.parent_episode_goals`/
-/// `SettingsData.colony_goals`.
-///
-/// **Assumptions**: `goal_type == 14` is the only confirmed value (`SetAsideGoods`); other goal
-/// kinds aren't decoded yet - see `DATA_MAPPING.md`.
 #[derive(Debug, Clone, PartialEq, Default, LogDifferences)]
 pub struct EpisodeGoalData {
     pub goal_type: u32,
     pub resource_id: i32,
     pub amount: u32,
-    pub unknown_1: BoxedArray<u8, 64>,
+    pub goal_extra: BoxedArray<u8, 64>, // todo extract the 2 used named fields from it
 }
 
 impl ReadFrom for EpisodeGoalData {
@@ -25,7 +20,7 @@ impl ReadFrom for EpisodeGoalData {
             goal_type: ReadFrom::read_from(reader)?,
             resource_id: ReadFrom::read_from(reader)?,
             amount: ReadFrom::read_from(reader)?,
-            unknown_1: ReadFrom::read_from(reader)?,
+            goal_extra: ReadFrom::read_from(reader)?,
         });
     }
 }
@@ -37,7 +32,7 @@ impl WriteTo for EpisodeGoalData {
         bytes += WriteTo::write_to(&self.goal_type, writer)?;
         bytes += WriteTo::write_to(&self.resource_id, writer)?;
         bytes += WriteTo::write_to(&self.amount, writer)?;
-        bytes += WriteTo::write_to(&self.unknown_1, writer)?;
+        bytes += WriteTo::write_to(&self.goal_extra, writer)?;
 
         return Ok(bytes);
     }
@@ -55,7 +50,7 @@ mod tests {
             goal_type: 14,
             resource_id: 17,
             amount: 8,
-            unknown_1: BoxedArray::from_vec((0..64).collect()),
+            goal_extra: BoxedArray::from_vec((0..64).collect()),
         };
 
         let mut buffer = vec![];

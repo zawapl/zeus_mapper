@@ -39,8 +39,8 @@ pub struct SettingsData {
     pub map_data: MapData,
     pub padding: Vec<u8>, // Should not contain useful data, we should be able to remove this in the future
     pub parent_event_counts: [u32; 10],
-    pub colony_event_counts: [u8; 3],
-    pub unused_blocks: BoxedArray<u8, 31_693>, // "10 different blocks of data, all apparently never used" per notes.md
+    pub colony_event_counts: [u32; 4],
+    pub unused_blocks: BoxedArray<u8, 31_680>, // "10 different blocks of data, all apparently never used" per notes.md
     pub parent_city_favor: [u32; 10],
     pub constant_2_0x00: BoxedArray<u8, 4112>,
     pub bitmap: u32,
