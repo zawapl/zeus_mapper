@@ -29,8 +29,10 @@ use std::fs;
 use std::fs::File;
 use std::io;
 use std::io::BufReader;
+use std::io::BufWriter;
 use std::io::Error;
 use std::io::ErrorKind;
+use std::io::Write;
 use std::path::Path;
 
 // There are issues with adventures with long names, UI allows for ~21, longest observed is 23
@@ -334,20 +336,24 @@ impl Adventure {
 
         let pak_data = self.to_pak();
 
-        let mut pak_writer = File::create(folder.join(format!("{name}.pak")))?;
+        let mut pak_writer = File::create(folder.join(format!("{name}.pak"))).map(BufWriter::new)?;
         pak_data.write_to(&mut pak_writer)?;
+        pak_writer.flush()?;
 
-        let mut set_writer = File::create(folder.join(format!("{name}.set")))?;
+        let mut set_writer = File::create(folder.join(format!("{name}.set"))).map(BufWriter::new)?;
         pak_data.settings_data.write_to(&mut set_writer)?;
+        set_writer.flush()?;
 
         for (i, map_data) in pak_data.map_data.iter().enumerate() {
             let suffix = if i == 0 { "P".to_string() } else { format!("C{i}") };
-            let mut map_writer = File::create(folder.join(format!("{name}{suffix}.map")))?;
+            let mut map_writer = File::create(folder.join(format!("{name}{suffix}.map"))).map(BufWriter::new)?;
             map_data.write_to(&mut map_writer)?;
+            map_writer.flush()?;
         }
 
-        let mut text_writer = File::create(folder.join(format!("{name}.txt")))?;
+        let mut text_writer = File::create(folder.join(format!("{name}.txt"))).map(BufWriter::new)?;
         self.to_text().write_to(&mut text_writer)?;
+        text_writer.flush()?;
 
         return Ok(());
     }
