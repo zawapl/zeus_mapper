@@ -71,7 +71,7 @@ pub struct RealEpisodeData {
     pub city_resources_bought: [i8; 4],
     pub constant_7_0x00: [u8; 2],
     pub city_resources_sold: [i8; 4],
-    pub unknown_5: [u8; 2],
+    pub constant_8_0x00: [u8; 2],
     pub city_resources_quantity: BoxedArray<u8, 40>,
 }
 
@@ -84,6 +84,7 @@ impl RealEpisodeData {
         validate_expected_constant("constant_5_0x00", self.constant_5_0x00.as_ref(), 0)?;
         validate_expected_constant("constant_6_0x00", &self.constant_6_0x00, 0)?;
         validate_expected_constant("constant_7_0x00", &self.constant_7_0x00, 0)?;
+        validate_expected_constant("constant_8_0x00", &self.constant_8_0x00, 0)?;
 
         // records with no map (map_size == 0) leave all three at 0 rather than following the formula
         let (expected_duplicate, expected_margin, expected_first_tile_index) = if self.map_size == 0 {
@@ -184,7 +185,7 @@ impl ReadFrom for RealEpisodeData {
             city_resources_bought: ReadFrom::read_from(reader)?,
             constant_7_0x00: ReadFrom::read_from(reader)?,
             city_resources_sold: ReadFrom::read_from(reader)?,
-            unknown_5: ReadFrom::read_from(reader)?,
+            constant_8_0x00: ReadFrom::read_from(reader)?,
             city_resources_quantity: ReadFrom::read_from(reader)?,
         });
     }
@@ -251,7 +252,7 @@ impl WriteTo for RealEpisodeData {
         bytes += WriteTo::write_to(&self.city_resources_bought, writer)?;
         bytes += WriteTo::write_to(&self.constant_7_0x00, writer)?;
         bytes += WriteTo::write_to(&self.city_resources_sold, writer)?;
-        bytes += WriteTo::write_to(&self.unknown_5, writer)?;
+        bytes += WriteTo::write_to(&self.constant_8_0x00, writer)?;
         bytes += WriteTo::write_to(&self.city_resources_quantity, writer)?;
 
         return Ok(bytes);
@@ -337,7 +338,7 @@ mod tests {
             city_resources_bought: seq_i8(60),
             constant_7_0x00: seq_u8(61),
             city_resources_sold: seq_i8(62),
-            unknown_5: seq_u8(63),
+            constant_8_0x00: seq_u8(63),
             city_resources_quantity: BoxedArray::from_vec(seq_u8::<40>(64).to_vec()),
         };
 

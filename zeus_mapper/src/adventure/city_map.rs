@@ -146,7 +146,7 @@ impl CityMap {
             city_resources_bought: Default::default(),
             constant_7_0x00: Default::default(),
             city_resources_sold: Default::default(),
-            unknown_5: Default::default(),
+            constant_8_0x00: Default::default(),
             city_resources_quantity: Default::default(),
         };
 

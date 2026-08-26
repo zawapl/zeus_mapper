@@ -554,7 +554,7 @@ mod tests {
                 tribute_pay_amount: self.generate_data(),
                 tribute_pay_resource: self.generate_data(),
                 tribute_rec_resource: self.generate_data(),
-                unknown_3: self.generate_data(),
+                constant_2_0x00: self.generate_data(),
                 favour: self.generate_data(),
                 constant_1_0x00: self.generate_data(),
                 active_old: self.generate_data(),
@@ -653,7 +653,7 @@ mod tests {
                 city_resources_bought: self.generate_data(),
                 constant_7_0x00: self.generate_data(),
                 city_resources_sold: self.generate_data(),
-                unknown_5: self.generate_data(),
+                constant_8_0x00: self.generate_data(),
                 city_resources_quantity: self.generate_data(),
             };
         }

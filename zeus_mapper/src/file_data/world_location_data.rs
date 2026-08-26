@@ -37,7 +37,7 @@ pub struct WorldLocationData {
     pub tribute_pay_amount: u32,
     pub tribute_pay_resource: i16,
     pub tribute_rec_resource: i16,
-    pub unknown_3: BoxedArray<u8, 100>,
+    pub constant_2_0x00: BoxedArray<u8, 100>,
     pub favour: u8,
     pub constant_1_0x00: BoxedArray<u8, 11>,
     // See `resolve_active` for how this and `active_new` combine. Not read for `ParentCity`. Top
@@ -79,7 +79,7 @@ impl Default for WorldLocationData {
             tribute_pay_amount: 0,
             tribute_pay_resource: 0,
             tribute_rec_resource: 0,
-            unknown_3: Default::default(),
+            constant_2_0x00: Default::default(),
             favour: 0,
             constant_1_0x00: Default::default(),
             active_old: 0,
@@ -100,6 +100,7 @@ impl Default for WorldLocationData {
 impl WorldLocationData {
     pub fn validate(&self) -> ValidationResult {
         validate_expected_constant("constant_1_0x00", self.constant_1_0x00.as_ref(), 0)?;
+        validate_expected_constant("constant_2_0x00", self.constant_2_0x00.as_ref(), 0)?;
 
         // todo check in game if values in higher bytes actually affect how the game interprets this
         if self.active_old > 0xFF {
@@ -158,7 +159,7 @@ impl WorldLocationData {
             tribute_pay_amount: ReadFrom::read_from(reader)?,
             tribute_pay_resource: ReadFrom::read_from(reader)?,
             tribute_rec_resource: ReadFrom::read_from(reader)?,
-            unknown_3: ReadFrom::read_from(reader)?,
+            constant_2_0x00: ReadFrom::read_from(reader)?,
             favour: ReadFrom::read_from(reader)?,
             constant_1_0x00: ReadFrom::read_from(reader)?,
             active_old: ReadFrom::read_from(reader)?,
@@ -210,7 +211,7 @@ impl WorldLocationData {
         bytes += WriteTo::write_to(&self.tribute_pay_amount, writer)?;
         bytes += WriteTo::write_to(&self.tribute_pay_resource, writer)?;
         bytes += WriteTo::write_to(&self.tribute_rec_resource, writer)?;
-        bytes += WriteTo::write_to(&self.unknown_3, writer)?;
+        bytes += WriteTo::write_to(&self.constant_2_0x00, writer)?;
         bytes += WriteTo::write_to(&self.favour, writer)?;
         bytes += WriteTo::write_to(&self.constant_1_0x00, writer)?;
         bytes += WriteTo::write_to(&self.active_old, writer)?;
@@ -294,7 +295,7 @@ mod tests {
             tribute_pay_amount: 15,
             tribute_pay_resource: 16,
             tribute_rec_resource: 17,
-            unknown_3: BoxedArray::from_vec(vec![18; 100]),
+            constant_2_0x00: BoxedArray::from_vec(vec![18; 100]),
             favour: 18,
             constant_1_0x00: BoxedArray::from_vec(vec![18; 11]),
             active_old: 18,
