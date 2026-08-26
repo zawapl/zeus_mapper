@@ -10,8 +10,7 @@ use std::io::Write;
 ///
 /// Record shape and `size`/`x`/`y`/`type_id`/`rotation` offsets checked against a real save's data
 /// (not just that reading succeeds): `type_id` values stay within the plausible building-category
-/// range and `x`/`y` cluster into sane in-bounds city layouts rather than reading as garbage; see
-/// `docs/sav_investigation.md`.
+/// range and `x`/`y` cluster into sane in-bounds city layouts rather than reading as garbage.
 #[derive(Debug, Clone, PartialEq, Default, LogDifferences)]
 pub struct BuildingData {
     pub unknown_1: BoxedArray<u8, 3>,

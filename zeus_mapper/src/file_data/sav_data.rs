@@ -23,9 +23,8 @@ use std::io::Write;
 ///
 /// Confirmed to read every byte with no error, and round-trip (`read` -> `write` -> `read`) to an
 /// equal `SavData`, against all 62/62 real `.sav` files sampled (real player saves and auto-generated
-/// tutorial saves alike) - see `docs/sav_investigation.md` for the full verification results and what
-/// to do next. Still treat any `field_N` not called out in that doc as an unconfirmed hypothesis, not
-/// a known fact.
+/// tutorial saves alike). Any `field_N` without a doc comment explaining its shape is an unconfirmed
+/// hypothesis, not a known fact.
 #[derive(Debug, Clone, PartialEq, LogDifferences)]
 pub struct SavData {
     /// Format version marker, the same role as every other format's leading `version_1`/`version_2`
@@ -33,7 +32,7 @@ pub struct SavData {
     /// tutorial saves and a constant `321` (paired with `version_2 == 139`) on every Poseidon-owning
     /// player save sampled (`Save/Save Tests/`, `Save/Theocritos/`) - unlike `MapData.version_1`,
     /// this doesn't vary per adventure, so it plausibly tracks the game engine build rather than the
-    /// loaded map's own format. See `docs/sav_investigation.md`.
+    /// loaded map's own format.
     pub version_1: u32,
     pub version_2: u32,
     /// A live in-memory analog of `MapData.manifest`: 300 `ManifestData`-shaped entries, one per
@@ -44,24 +43,22 @@ pub struct SavData {
     /// `size`/`count` match already-confirmed array shapes elsewhere in this crate (36 `u32` prices,
     /// 22 `WorldLocationData`-with-extras at 572 bytes, 200 `WorldMapElementData`-with-custom-names
     /// at 72 bytes, 150 `EventData` at 124 bytes, several 51,984-tile grids). 139 of 300 slots are
-    /// populated on Poseidon saves, 138 on vanilla tutorial saves. See `docs/sav_investigation.md`.
+    /// populated on Poseidon saves, 138 on vanilla tutorial saves.
     pub manifest: BoxedArray<ManifestData, 300>,
     /// Single trailing byte right after `manifest`, still unidentified; observed as `0xFF` on most
     /// samples but `0x01` on a few (`Theocritos/Youngest Twins.sav`, `Theocritos/autosave_history.sav`,
     /// `tutorial15.sav`) - a real varying flag, not constant padding.
     pub field_1: u8,
     /// Not identified yet, but `manifest`'s entry for this field consistently decompresses to exactly
-    /// 19,184 bytes on every save sampled (matching `docs/sav_investigation.md`'s pre-existing
-    /// estimate for this field, from an independent source) - promoted from an opaque `Vec<u8>` to a
-    /// fixed-size, decompressed array. See `docs/sav_investigation.md`.
+    /// 19,184 bytes on every save sampled (matching an independently-sourced pre-existing estimate for
+    /// this field) - promoted from an opaque `Vec<u8>` to a fixed-size, decompressed array.
     pub field_2: BoxedArray<u8, 19_184>,
     pub field_3: BoxedArray<u8, 8>,
     /// Not identified yet. Decompressed size depends on vanilla-vs-Poseidon (10,472 bytes on vanilla
     /// tutorial saves, 12,584 on every Poseidon-owning player save sampled) but is constant *within*
     /// each category - `version_2` (already read by this point) selects which, so this holds actual
     /// decompressed content rather than opaque captured-compressed bytes. Kept as `Vec<u8>` rather
-    /// than a `BoxedArray` since its length isn't a single crate-wide constant. See
-    /// `docs/sav_investigation.md`.
+    /// than a `BoxedArray` since its length isn't a single crate-wide constant.
     pub field_4: Vec<u8>,
     pub field_5: BoxedArray<u8, 188>,
     /// Presumed map width/height in tiles (max observed elsewhere in this crate: 228).
@@ -71,72 +68,60 @@ pub struct SavData {
     /// sampled except `Proteus and Bellerophon.sav`/`Two Worlds Collide.sav` (the same 2 Poseidon-
     /// published-but-Greek episodes `poseidon_marker` doesn't disambiguate either). Combined with
     /// `poseidon_marker` it does resolve civilization correctly on all 28/28 samples checked - see
-    /// `civilization` and `docs/sav_investigation.md`.
+    /// `civilization`.
     pub poseidon_flag: u8,
     pub field_7: BoxedArray<u8, 1_383>,
     /// Not identified yet. Same vanilla-vs-Poseidon split as `field_4` (8,000 bytes vanilla, 14,400
-    /// Poseidon), holding actual decompressed content the same way. See `docs/sav_investigation.md`.
+    /// Poseidon), holding actual decompressed content the same way.
     pub field_8: Vec<u8>,
     pub field_9: BoxedArray<u8, 18_609>,
     /// 228x228 byte grid; confirmed byte-identical to `MapData.root_offset` on 6 real adventures
-    /// covering vanilla and Poseidon-expansion, story and Open Play content (see
-    /// `docs/sav_investigation.md`).
+    /// covering vanilla and Poseidon-expansion, story and Open Play content.
     pub root_offset: BoxedArray<u8, 51_984>,
     /// 228x228 `u16` grid; not identified yet, but `manifest`'s entry for this field consistently
-    /// shows `size == 2, count == 51,984` across every save sampled (see `docs/sav_investigation.md`),
-    /// so it's promoted from an opaque `Vec<u8>` to a fixed-size, decompressed array like every other
-    /// grid field here.
+    /// shows `size == 2, count == 51,984` across every save sampled, so it's promoted from an opaque
+    /// `Vec<u8>` to a fixed-size, decompressed array like every other grid field here.
     pub field_11: BoxedArray<u16, 51_984>,
     /// 228x228 `u32` grid; confirmed to be the same `TerrainTypeFlag` bitfield as `MapData.terrain`
-    /// (99.9%+ exact match on 6 real adventures, and the only field that changes when
-    /// road/forest tiles are removed - see `docs/sav_investigation.md`).
+    /// (99.9%+ exact match on 6 real adventures, and the only field that changes when road/forest
+    /// tiles are removed).
     pub terrain: BoxedArray<u32, 51_984>,
-    /// 228x228 byte grid; not identified yet, promoted per `manifest` the same way as `field_11` (see
-    /// `docs/sav_investigation.md`).
+    /// 228x228 byte grid; not identified yet, promoted per `manifest` the same way as `field_11`.
     pub field_13: BoxedArray<u8, 51_984>,
-    /// 228x228 `u16` grid; not identified yet, promoted per `manifest` the same way as `field_11` (see
-    /// `docs/sav_investigation.md`).
+    /// 228x228 `u16` grid; not identified yet, promoted per `manifest` the same way as `field_11`.
     pub field_14: BoxedArray<u16, 51_984>,
     /// 228x228 byte grid; confirmed byte-identical to `MapData.tile_size` on 6 real adventures
-    /// covering vanilla and Poseidon-expansion, story and Open Play content (see
-    /// `docs/sav_investigation.md`).
+    /// covering vanilla and Poseidon-expansion, story and Open Play content.
     pub tile_size: BoxedArray<u8, 51_984>,
-    /// 228x228 byte grid; not identified yet, promoted per `manifest` the same way as `field_11` (see
-    /// `docs/sav_investigation.md`).
+    /// 228x228 byte grid; not identified yet, promoted per `manifest` the same way as `field_11`.
     pub field_16: BoxedArray<u8, 51_984>,
     /// 228x228 byte grid, stored uncompressed rather than length-prefixed; confirmed byte-identical
-    /// to `MapData.random` on 6 real adventures (see `docs/sav_investigation.md`).
+    /// to `MapData.random` on 6 real adventures.
     pub random: BoxedArray<u8, 51_984>,
-    /// 228x228 byte grid; not identified yet, promoted per `manifest` the same way as `field_11` (see
-    /// `docs/sav_investigation.md`).
+    /// 228x228 byte grid; not identified yet, promoted per `manifest` the same way as `field_11`.
     pub field_18: BoxedArray<u8, 51_984>,
-    /// 228x228 byte grid; not identified yet, promoted per `manifest` the same way as `field_11` (see
-    /// `docs/sav_investigation.md`).
+    /// 228x228 byte grid; not identified yet, promoted per `manifest` the same way as `field_11`.
     pub field_19: BoxedArray<u8, 51_984>,
-    /// 228x228 `u16` grid; not identified yet, promoted per `manifest` the same way as `field_11` (see
-    /// `docs/sav_investigation.md`).
+    /// 228x228 `u16` grid; not identified yet, promoted per `manifest` the same way as `field_11`.
     pub field_20: BoxedArray<u16, 51_984>,
-    /// 228x228 byte grid; not identified yet, promoted per `manifest` the same way as `field_11` (see
-    /// `docs/sav_investigation.md`).
+    /// 228x228 byte grid; not identified yet, promoted per `manifest` the same way as `field_11`.
     pub field_21: BoxedArray<u8, 51_984>,
-    /// 228x228 byte grid; not identified yet, promoted per `manifest` the same way as `field_11` (see
-    /// `docs/sav_investigation.md`).
+    /// 228x228 byte grid; not identified yet, promoted per `manifest` the same way as `field_11`.
     pub field_22: BoxedArray<u8, 51_984>,
     pub units: BoxedArray<UnitData, 2_000>,
     /// Not identified yet. Consistently decompresses to exactly 2,000 bytes on every save sampled
     /// (matching `manifest`'s `size=2, count=1000` entry at this position) - promoted from `Vec<u8>`.
-    /// See `docs/sav_investigation.md`.
     pub field_23: BoxedArray<u8, 2_000>,
     /// Not identified yet. Consistently decompresses to exactly 500,000 bytes on every save sampled
     /// (matching `manifest`'s `size=1, count=500000` entry at this position) - promoted from
-    /// `Vec<u8>`. See `docs/sav_investigation.md`.
+    /// `Vec<u8>`.
     pub field_24: BoxedArray<u8, 500_000>,
     /// Not identified yet. Consistently decompresses to exactly 15,600 bytes on every save sampled
     /// (matching `manifest`'s `size=156, count=100` entry at this position) - promoted from
-    /// `Vec<u8>`. See `docs/sav_investigation.md`.
+    /// `Vec<u8>`.
     pub field_25: BoxedArray<u8, 15_600>,
     /// First part of what used to be a single fixed 69-byte `field_26`; still unidentified.
-    /// Consistently a 4-byte value on every save sampled. See `docs/sav_investigation.md`.
+    /// Consistently a 4-byte value on every save sampled.
     pub field_26: BoxedArray<u8, 4>,
     /// Second part of what used to be `field_26`; still unidentified, but its *width* is the
     /// previously-unexplained root cause of the tutorial-save `buildings` misalignment bug: 1 byte on
@@ -144,8 +129,7 @@ pub struct SavData {
     /// parse. `manifest[33].size` (already read by this point) reliably predicts which - reading (and
     /// writing) this field's width accordingly is what fixes those 13 files. Stored widened to `u32`
     /// regardless of the on-disk width, losslessly (narrowing back to 1 byte on write, when
-    /// applicable, can't lose data since the value was never wider than a byte to begin with). See
-    /// `docs/sav_investigation.md`.
+    /// applicable, can't lose data since the value was never wider than a byte to begin with).
     pub field_26b: u32,
     /// Third part of what used to be `field_26`: a null-terminated ASCII string. **Confirmed** on all
     /// 46 real (non-tutorial) `.sav` files sampled: exactly matches the name of the folder the save
@@ -161,61 +145,57 @@ pub struct SavData {
     /// into a buffer that previously held a longer one leaving stray bytes behind the true terminator
     /// (observed on `Theocritos/Youngest Twins.sav`). Safe to trim more aggressively than
     /// `read_string_from` normally would because, unlike `.pak`/`.map`, `SavData` never promises
-    /// byte-identical round trips (see `docs/sav_investigation.md`) - written back zero-padded, so a
-    /// discarded tail is simply not reproduced on write, not silently corrupted.
+    /// byte-identical round trips - written back zero-padded, so a discarded tail is simply not
+    /// reproduced on write, not silently corrupted.
     pub player_name: String,
     pub buildings: BoxedArray<BuildingData, 4_000>,
     pub field_27: BoxedArray<u8, 352>,
     /// Not identified yet. Consistently decompresses to exactly 60,000 bytes on every save sampled
     /// (matching `manifest`'s `size=60, count=1000` entry at this position) - promoted from
-    /// `Vec<u8>`. See `docs/sav_investigation.md`.
+    /// `Vec<u8>`.
     pub field_28: BoxedArray<u8, 60_000>,
     pub field_29: BoxedArray<u8, 17_974>,
     /// Not identified yet, but `manifest`'s entry for this field (index 71) consistently shows
     /// `size == 2, count == 500` across every save sampled - the true element type is `u16`, not the
-    /// `u8` this was originally promoted as. See `docs/sav_investigation.md`.
+    /// `u8` this was originally promoted as.
     pub field_30: BoxedArray<u16, 500>,
     /// Not identified yet, but `manifest`'s entry for this field (index 72) consistently shows
     /// `size == 2, count == 500` across every save sampled - the true element type is `u16`, not the
-    /// `u8` this was originally promoted as. See `docs/sav_investigation.md`.
+    /// `u8` this was originally promoted as.
     pub field_31: BoxedArray<u16, 500>,
     /// Not identified yet, but `manifest`'s entry for this field (index 73) consistently shows
     /// `size == 2, count == 4000` across every save sampled - the true element type is `u16`, not the
-    /// `u8` this was originally promoted as. See `docs/sav_investigation.md`.
+    /// `u8` this was originally promoted as.
     pub field_32: BoxedArray<u16, 4_000>,
     pub field_33: BoxedArray<u8, 53_783>,
     /// 228x228 byte grid, stored uncompressed rather than length-prefixed; confirmed byte-identical
-    /// to `MapData.meadow` on 6 real adventures (see `docs/sav_investigation.md`).
+    /// to `MapData.meadow` on 6 real adventures.
     pub meadow: BoxedArray<u8, 51_984>,
     pub field_35: BoxedArray<u8, 16>,
     /// Not identified yet. Consistently decompresses to exactly 75,168 bytes on every save sampled
     /// (matching `manifest`'s `size=324, count=232` entry at this position - `232` is the same count
-    /// as `MapData.trade_routes`, a plausible but unconfirmed lead) - promoted from `Vec<u8>`. See
-    /// `docs/sav_investigation.md`.
+    /// as `MapData.trade_routes`, a plausible but unconfirmed lead) - promoted from `Vec<u8>`.
     pub field_36: BoxedArray<u8, 75_168>,
     /// 228x228 byte grid, stored uncompressed rather than length-prefixed; refutes the prior
-    /// hypothesis that this held a per-tile marble/livestock/timber resource level (see
-    /// `docs/sav_investigation.md`). Confirmed live, not filler: uniform `0xFF` on every fresh
-    /// "quick save", but real per-tile variation (tens of distinct values, smooth-looking) on every
-    /// actually-played save sampled - purpose still unidentified.
+    /// hypothesis that this held a per-tile marble/livestock/timber resource level. Confirmed live,
+    /// not filler: uniform `0xFF` on every fresh "quick save", but real per-tile variation (tens of
+    /// distinct values, smooth-looking) on every actually-played save sampled - purpose still
+    /// unidentified.
     pub field_37: BoxedArray<u8, 51_984>,
     pub field_38: BoxedArray<u8, 32>,
     /// Not identified yet. Consistently decompresses to exactly 36 bytes on every save sampled
     /// (matching `manifest`'s `size=36, count=1` entry at this position) - promoted from `Vec<u8>`.
-    /// See `docs/sav_investigation.md`.
     pub field_39: BoxedArray<u8, 36>,
     /// 228x228 `u32` grid; not identified yet, but consistently decompresses to exactly 207,936 bytes
     /// (`4 * 51,984`) on every save sampled, matching `manifest`'s `size=4, count=51984` entry at this
     /// position - the same per-tile shape as `terrain`, but a distinct field. Promoted from `Vec<u8>`.
-    /// See `docs/sav_investigation.md`.
     pub field_40: BoxedArray<u32, 51_984>,
     pub field_41: BoxedArray<u8, 39>,
     /// 228x228 byte grid; not identified yet, but consistently decompresses to exactly 51,984 bytes
     /// on every save sampled, matching `manifest`'s `size=1, count=51984` entry at this position -
-    /// promoted from `Vec<u8>`. See `docs/sav_investigation.md`.
+    /// promoted from `Vec<u8>`.
     pub field_42: BoxedArray<u8, 51_984>,
-    /// 228x228 byte grid; confirmed byte-identical to `MapData.scrub` on 6 real adventures (see
-    /// `docs/sav_investigation.md`).
+    /// 228x228 byte grid; confirmed byte-identical to `MapData.scrub` on 6 real adventures.
     pub scrub: BoxedArray<u8, 51_984>,
     /// Everything from here to the trailing 4-byte `poseidon_marker`, unidentified.
     pub field_44: Vec<u8>,
@@ -225,8 +205,7 @@ pub struct SavData {
     /// exceptions. Despite the name, this is **not** civilization - it only correlates with it because
     /// most Poseidon-published episodes happen to be Atlantean; `Proteus and Bellerophon.sav`/
     /// `Two Worlds Collide.sav` are Poseidon-published but Greek, and this field still reads `1` for
-    /// them, correctly reflecting "Poseidon episode" rather than "Atlantean". See `civilization` and
-    /// `docs/sav_investigation.md`.
+    /// them, correctly reflecting "Poseidon episode" rather than "Atlantean". See `civilization`.
     pub poseidon_marker: u32,
 }
 
@@ -331,7 +310,7 @@ impl SavData {
     /// Greek), and `poseidon_flag` is what actually distinguishes Atlantean from Greek within
     /// Poseidon-published episodes. Confirmed against `PakData::civilization` with zero exceptions
     /// across 28 real `Save Tests` files, including both cases where the episode is Poseidon-published
-    /// but Greek. See `docs/sav_investigation.md`.
+    /// but Greek.
     pub fn civilization(&self) -> Civilization {
         if self.poseidon_marker == 1 && self.poseidon_flag == 1 {
             return Civilization::Atlantean;

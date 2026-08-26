@@ -48,7 +48,7 @@ pub struct SettingsData {
     pub constant_3_0x01: [u8; 7],
     // Varies across the game's tutorial/demo `.pak`s specifically (0 on colony/palace/peacewar/
     // warrior, 1 everywhere else including bigcity and every real adventure); meaning otherwise
-    // undeciphered. See "Extending the correlation sweep" in docs/adventure_model_todo.md.
+    // undeciphered.
     pub unknown_4: u8,
     pub constant_4_0x01: BoxedArray<u8, 93>,
     // Varies on bigcity/peacewar specifically (0 there, 1 everywhere else); meaning otherwise

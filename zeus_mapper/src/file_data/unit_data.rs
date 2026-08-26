@@ -10,9 +10,8 @@ use std::io::Write;
 ///
 /// Record shape and `type_id`/`x`/`y` offsets checked against a real save's data (not just that
 /// reading succeeds): `type_id` values are large/mostly-unique until masked with `& 0xff`, after
-/// which they collapse into a small, repeating set - consistent with a real type enumeration; see
-/// `docs/sav_investigation.md`. The masking itself, and the meaning of the unmasked high byte, are
-/// not implemented/decoded here yet.
+/// which they collapse into a small, repeating set - consistent with a real type enumeration. The
+/// masking itself, and the meaning of the unmasked high byte, are not implemented/decoded here yet.
 #[derive(Debug, Clone, PartialEq, Default, LogDifferences)]
 pub struct UnitData {
     pub unknown_1: BoxedArray<u8, 10>,

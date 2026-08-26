@@ -140,3 +140,12 @@ The codebase is a layered pipeline, low-level binary parsing at the bottom, a fr
   such a pair exists; ask for more real-file examples if none are available yet; cross-check any computed offset
   against an already-independently-confirmed value before trusting it further), then
   fix the struct's field boundaries themselves rather than patching around them.
+
+## Open work
+
+`todo/` at the repo root (not under `docs/`) is a generic punch list of open project items, one file per
+item, grouped into subfolders by area — mostly still-open reverse-engineering questions about these file
+formats today, but not limited to that. It has its own `todo/CLAUDE.md` with the folder's conventions
+(grouped by area, deleted once resolved, never referenced by path from outside the folder). Check there
+before assuming a `field_N`/`unknown_N` you're investigating hasn't already got documented partial
+progress.
