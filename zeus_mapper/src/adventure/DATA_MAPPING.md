@@ -190,10 +190,6 @@ only differ in one goal's fields:
   `Army(Warship, 6)` in slot 2, and `colony_episode_goal_counts[0] == 2` is exactly what excludes it.
   `ColonyEpisode::vec_from_data` truncates each row to this count, the same as the parent side.
 
-`world_settings`/`traded_resources` aren't written back by `Adventure::to_pak` yet (round trips as
-empty/`0`) - the read side was reverse-engineered from one adventure's data without a known general
-write-back layout.
-
 `real_episode_data[settings_index].starting_cash` (a colony's raw starting-cash field - not to be
 confused with `real_episode_data[0].starting_cash`, which backs `Adventure.initial_funds`) isn't
 modeled on `ColonyEpisode`, since a separate per-colony starting-cash concept didn't make sense

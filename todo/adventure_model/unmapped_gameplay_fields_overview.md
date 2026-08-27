@@ -10,8 +10,10 @@ this test is not evidence that a given field is safe to ignore.
 
 Fields with real gameplay meaning that are entirely unmodeled and not exercised by that test at all:
 
-1. `episode_goals_decoding.md`, `world_settings_traded_resources.md`, and the `world_location`/
-   `world_map_element` unknown-field todos in this folder.
+1. The `world_location`/`world_map_element` unknown-field todos in this folder. (`episode_goals` and
+   `world_settings.traded_resources` are now fully modeled both ways and no longer belong on this list -
+   see `episode_goals_decoding.md` for the one remaining question there, an in-game causal test rather
+   than an unmodeled field.)
 2. Small per-map fields whose meaning isn't known yet - see `map_data_small_unknown_fields.md`.
 3. "Inert but populated" padding slots (e.g. episode-array slots beyond an episode's real index, kept
    in the original file with real-looking-but-unused data) that `Adventure::to_pak` doesn't currently
@@ -20,8 +22,9 @@ Fields with real gameplay meaning that are entirely unmodeled and not exercised 
 
 Byte-level `file_data`-layer fidelity (does `PakData::read_from` -> `write_to` -> `read_from` reproduce
 the original bytes) is a separate, already-tracked concern -
-`pak_data.rs::byte_identical_adventures_round_trip_exactly` (15/40 real adventures byte-identical as of
-last check) - not what this file is about.
+`pak_data.rs::byte_identical_adventures_round_trip_exactly` (15 real adventures confirmed
+byte-identical as of last check, out of a larger real corpus not all of which round-trips exactly) - not
+what this file is about.
 
 ## Next steps
 
